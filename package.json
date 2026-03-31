@@ -9,12 +9,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/LightZirconite/Microsoft-Rewards-Bot.git"
+    "url": "https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot.git"
   },
   "bugs": {
-    "url": "https://github.com/LightZirconite/Microsoft-Rewards-Bot/issues"
+    "url": "https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/issues"
   },
-  "homepage": "https://github.com/LightZirconite/Microsoft-Rewards-Bot#readme",
+  "homepage": "https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/src/branch/legacy/",
   "scripts": {
     "start": "node -e \"const fs = require('fs'); const cp = require('child_process'); const path = require('path'); console.log('🚀 Starting Microsoft Rewards Bot...'); if (!fs.existsSync('node_modules')) { console.log('📦 Installing dependencies...'); cp.execSync('npm install', {stdio: 'inherit'}); } if (!fs.existsSync('.playwright-chromium-installed')) { console.log('🌐 Installing Chromium browser...'); cp.execSync('npx playwright install chromium --with-deps', {stdio: 'inherit'}); fs.writeFileSync('.playwright-chromium-installed', new Date().toISOString()); } if (!fs.existsSync('dist/index.js')) { console.log('🔨 Building TypeScript project...'); cp.execSync('npm run build', {stdio: 'inherit'}); } console.log('✅ All checks passed! Launching bot...\\n'); cp.execSync('node --enable-source-maps ./dist/index.js', {stdio: 'inherit'});\"",
     "clean": "rimraf dist",
@@ -47,12 +47,12 @@
   ],
   "author": "LightZirconite",
   "contributors": [
-    "Microsoft Rewards Bot Community (https://github.com/LightZirconite/Microsoft-Rewards-Bot/graphs/contributors)"
+    "Microsoft Rewards Bot Community (https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/activity)"
   ],
   "license": "CC-BY-NC-SA-4.0",
   "funding": {
-    "type": "github",
-    "url": "https://github.com/sponsors/LightZirconite"
+    "type": "other",
+    "url": "https://git.justw.tf/LightZirconite"
   },
   "devDependencies": {
     "@types/express": "^4.17.25",

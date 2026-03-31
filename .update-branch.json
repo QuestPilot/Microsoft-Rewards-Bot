@@ -1,11 +1,12 @@
 {
-  "_comment": "This file specifies which GitHub branch to use for auto-updates",
+  "_comment": "This file specifies which branch and host to use for auto-updates",
   "_migration_info": {
     "purpose": "Allows smooth transition when renaming main branch to legacy",
     "status": "Legacy users now redirected to 'legacy' branch. Main branch is ready for v4."
   },
   "branch": "legacy",
   "repository": {
+    "host": "git.justw.tf",
     "owner": "LightZirconite",
     "name": "Microsoft-Rewards-Bot"
   }

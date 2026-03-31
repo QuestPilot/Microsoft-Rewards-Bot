@@ -2,11 +2,11 @@
 /**
  * Microsoft Rewards Bot - Automatic Update System
  *
- * Uses GitHub API to download latest code as ZIP archive.
+ * Uses the remote repository to download latest code as ZIP archive.
  * No Git required, no merge conflicts, always clean.
  *
  * Features:
- *  - Downloads latest code from GitHub (ZIP)
+ *  - Downloads latest code from repository archive (ZIP)
  *  - Preserves user files (accounts, config, sessions)
  *  - Selective file copying
  *  - Automatic dependency installation
@@ -19,15 +19,15 @@
 
 import { spawn } from "node:child_process";
 import {
-    cpSync,
-    createWriteStream,
-    existsSync,
-    mkdirSync,
-    readdirSync,
-    readFileSync,
-    rmSync,
-    statSync,
-    writeFileSync,
+  cpSync,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
 } from "node:fs";
 import { get as httpsGet } from "node:https";
 import { dirname, join } from "node:path";
@@ -120,7 +120,7 @@ function readJsonConfig(preferredPaths) {
 
 /**
  * Read branch configuration for auto-updates
- * This allows smooth transition when renaming branches (main -> legacy)
+ * This allows smooth transitions when changing branch or host.
  */
 function getBranchConfig() {
   const branchConfigPath = join(process.cwd(), ".update-branch.json");
@@ -128,21 +128,41 @@ function getBranchConfig() {
   try {
     if (existsSync(branchConfigPath)) {
       const config = JSON.parse(readFileSync(branchConfigPath, "utf8"));
+      const rawHost = config.repository?.host || "git.justw.tf";
+      const normalizedHost = String(rawHost)
+        .replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "");
+
       return {
-        branch: config.branch || "main",
+        branch: config.branch || "legacy",
         owner: config.repository?.owner || "LightZirconite",
         repo: config.repository?.name || "Microsoft-Rewards-Bot",
+        host: normalizedHost || "git.justw.tf",
       };
     }
   } catch {
     // Fallback to defaults
   }
 
-  // Default fallback (legacy behavior)
+  // Default fallback for legacy branch on the self-hosted forge.
   return {
-    branch: "main",
+    branch: "legacy",
     owner: "LightZirconite",
     repo: "Microsoft-Rewards-Bot",
+    host: "git.justw.tf",
+  };
+}
+
+/**
+ * Build repository URLs from branch configuration
+ */
+function getRepositoryUrls(branchConfig) {
+  const repoBaseUrl = `https://${branchConfig.host}/${branchConfig.owner}/${branchConfig.repo}`;
+  return {
+    repoBaseUrl,
+    rawBaseUrl: `${repoBaseUrl}/raw/branch/${branchConfig.branch}`,
+    packageUrl: `${repoBaseUrl}/raw/branch/${branchConfig.branch}/package.json`,
+    archiveUrl: `${repoBaseUrl}/archive/${branchConfig.branch}.zip`,
   };
 }
 
@@ -321,9 +341,9 @@ function getUpdateMode(configData) {
 // =============================================================================
 
 /**
- * Download a file from GitHub raw URL
+ * Download a file from a repository raw URL
  */
-async function downloadFromGitHub(url, dest) {
+async function downloadFromRepository(url, dest) {
   console.log(`📥 Downloading: ${url}`);
 
   return new Promise((resolve, reject) => {
@@ -342,7 +362,7 @@ async function downloadFromGitHub(url, dest) {
         if (response.statusCode === 302 || response.statusCode === 301) {
           file.close();
           rmSync(dest, { force: true });
-          downloadFromGitHub(response.headers.location, dest)
+          downloadFromRepository(response.headers.location, dest)
             .then(resolve)
             .catch(reject);
           return;
@@ -550,7 +570,7 @@ function migrateLegacyFiles(userConfig) {
  */
 async function smartUpdateExampleFiles(configData) {
   const branchConfig = getBranchConfig();
-  const baseUrl = `https://raw.githubusercontent.com/${branchConfig.owner}/${branchConfig.repo}/refs/heads/${branchConfig.branch}`;
+  const { rawBaseUrl } = getRepositoryUrls(branchConfig);
 
   const files = [];
 
@@ -560,7 +580,7 @@ async function smartUpdateExampleFiles(configData) {
       example: "src/config.example.jsonc",
       target: "src/config.jsonc",
       name: "Configuration",
-      githubUrl: `${baseUrl}/src/config.example.jsonc`,
+      remoteUrl: `${rawBaseUrl}/src/config.example.jsonc`,
     });
   }
 
@@ -569,7 +589,7 @@ async function smartUpdateExampleFiles(configData) {
       example: "src/accounts.example.jsonc",
       target: "src/accounts.jsonc",
       name: "Accounts",
-      githubUrl: `${baseUrl}/src/accounts.example.jsonc`,
+      remoteUrl: `${rawBaseUrl}/src/accounts.example.jsonc`,
     });
   }
 
@@ -588,11 +608,11 @@ async function smartUpdateExampleFiles(configData) {
         `.update-${file.example.split("/").pop()}`,
       );
 
-      // Download latest version from GitHub
-      await downloadFromGitHub(file.githubUrl, tempPath);
+      // Download latest version from remote repository
+      await downloadFromRepository(file.remoteUrl, tempPath);
 
       // Read all versions
-      const githubContent = readFileSync(tempPath, "utf8");
+      const remoteContent = readFileSync(tempPath, "utf8");
       const localExampleContent = existsSync(examplePath)
         ? readFileSync(examplePath, "utf8")
         : "";
@@ -601,24 +621,24 @@ async function smartUpdateExampleFiles(configData) {
         : "";
 
       // Parse JSON (strip comments)
-      const githubJson = JSON.parse(stripJsonComments(githubContent));
+      const remoteJson = JSON.parse(stripJsonComments(remoteContent));
       const userJson = existsSync(targetPath)
         ? JSON.parse(stripJsonComments(userContent))
         : null;
 
-      // Check if GitHub version is different from local example
-      if (githubContent === localExampleContent) {
+      // Check if remote version is different from local example
+      if (remoteContent === localExampleContent) {
         console.log(`✓ ${file.name}: No changes detected`);
         rmSync(tempPath, { force: true });
         continue;
       }
 
       // Update example file first
-      writeFileSync(examplePath, githubContent);
+      writeFileSync(examplePath, remoteContent);
 
       // If user file doesn't exist, create it
       if (!userJson) {
-        writeFileSync(targetPath, githubContent);
+        writeFileSync(targetPath, remoteContent);
         console.log(`✅ ${file.name}: Created from latest example`);
         rmSync(tempPath, { force: true });
         continue;
@@ -628,12 +648,12 @@ async function smartUpdateExampleFiles(configData) {
       let merged;
       if (
         file.name === "Accounts" &&
-        Array.isArray(githubJson) &&
+        Array.isArray(remoteJson) &&
         Array.isArray(userJson)
       ) {
         // Special handling for accounts array
-        if (githubJson.length > 0 && userJson.length > 0) {
-          const exampleAccount = githubJson[0];
+        if (remoteJson.length > 0 && userJson.length > 0) {
+          const exampleAccount = remoteJson[0];
           // Merge each user account with example schema
           merged = userJson.map((account) =>
             deepMerge(exampleAccount, account),
@@ -653,9 +673,9 @@ async function smartUpdateExampleFiles(configData) {
         }
       } else {
         // Standard config object merge
-        merged = deepMerge(githubJson, userJson);
+        merged = deepMerge(remoteJson, userJson);
 
-        const newKeys = findNewKeys(githubJson, userJson);
+        const newKeys = findNewKeys(remoteJson, userJson);
         if (newKeys.length > 0) {
           console.log(`📝 ${file.name}: Added ${newKeys.length} new option(s)`);
           console.log(`   → ${newKeys.join(", ")}`);
@@ -697,36 +717,29 @@ async function checkVersion() {
     const localPkg = JSON.parse(readFileSync(localPkgPath, "utf8"));
     const localVersion = localPkg.version;
 
-    // Fetch remote version from GitHub API (no cache)
+    // Fetch remote version from repository raw package.json (no cache)
     const branchConfig = getBranchConfig();
     const repoOwner = branchConfig.owner;
     const repoName = branchConfig.repo;
     const branch = branchConfig.branch;
+    const { packageUrl } = getRepositoryUrls(branchConfig);
 
     console.log("🔍 Checking for updates...");
     console.log(`   Local:  ${localVersion}`);
     console.log(`   Branch: ${branch}`);
-
-    // Use GitHub API directly - no CDN cache, always fresh
-    const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/package.json?ref=${branch}`;
+    console.log(`   Remote: ${branchConfig.host}/${repoOwner}/${repoName}`);
 
     return new Promise((resolve) => {
       const options = {
         headers: {
           "User-Agent": "Microsoft-Rewards-Bot-Updater",
-          Accept: "application/vnd.github.v3.raw", // Returns raw file content
           "Cache-Control": "no-cache",
         },
       };
 
-      const request = httpsGet(apiUrl, options, (res) => {
+      const request = httpsGet(packageUrl, options, (res) => {
         if (res.statusCode !== 200) {
-          console.log(`   ⚠️  GitHub API returned HTTP ${res.statusCode}`);
-          if (res.statusCode === 403) {
-            console.log(
-              "   ℹ️  Rate limit may be exceeded (60/hour). Try again later.",
-            );
-          }
+          console.log(`   ⚠️  Remote returned HTTP ${res.statusCode}`);
           resolve({
             updateAvailable: false,
             localVersion,
@@ -789,7 +802,7 @@ async function checkVersion() {
 }
 
 /**
- * Perform update using GitHub API (ZIP download)
+ * Perform update using repository archive ZIP download
  */
 async function performUpdate() {
   // Step 0: Check if update is needed by comparing versions
@@ -896,13 +909,11 @@ async function performUpdate() {
     }
   }
 
-  // Step 3: Download latest code from GitHub
+  // Step 3: Download latest code from repository archive
   process.stdout.write("📥 Downloading...");
   const branchConfig = getBranchConfig();
-  const repoOwner = branchConfig.owner;
   const repoName = branchConfig.repo;
-  const branch = branchConfig.branch;
-  const archiveUrl = `https://github.com/${repoOwner}/${repoName}/archive/refs/heads/${branch}.zip`;
+  const { archiveUrl } = getRepositoryUrls(branchConfig);
 
   const archivePath = join(process.cwd(), ".update-download.zip");
   const extractDir = join(process.cwd(), ".update-extract");
@@ -943,19 +954,23 @@ async function performUpdate() {
   // Step 6: Copy files selectively
   process.stdout.write("📦 Updating files...");
   const itemsToUpdate = [
+    "api",
+    "assets",
+    "docker",
+    "scripts",
     "src",
     "docs",
     "setup",
     "public",
     "tests",
+    ".dockerignore",
+    ".eslintignore",
+    ".eslintrc.json",
+    "vercel.json",
     "package.json",
     "package-lock.json",
     "tsconfig.json",
     ".update-branch.json", // Branch configuration for auto-updates
-    "Dockerfile",
-    "compose.yaml",
-    "entrypoint.sh",
-    "run.sh",
     "README.md",
     "LICENSE",
   ];
@@ -1024,7 +1039,7 @@ async function performUpdate() {
         timestamp: new Date().toISOString(),
         fromVersion: versionCheck.localVersion,
         toVersion: versionCheck.remoteVersion,
-        method: "github-api",
+        method: "repository-archive",
       },
       null,
       2,

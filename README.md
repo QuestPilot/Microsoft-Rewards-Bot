@@ -16,7 +16,7 @@ This is the **Legacy version** for the old Microsoft Rewards dashboard. It will 
 	<a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-≥20-brightgreen?style=flat-square&logo=nodedotjs" alt="Node.js 20+" /></a>
 	<a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript" alt="TypeScript" /></a>
 	<a href="https://discord.gg/k5uHkx9mne"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
-	<a href="https://github.com/LightZirconite/Microsoft-Rewards-Bot/stargazers"><img src="https://img.shields.io/github/stars/LightZirconite/Microsoft-Rewards-Bot?style=flat-square&color=gold" alt="Stars" /></a>
+	<a href="https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/src/branch/legacy/"><img src="https://img.shields.io/badge/Repository-git.justw.tf-gold?style=flat-square" alt="Repository" /></a>
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@ This is the **Legacy version** for the old Microsoft Rewards dashboard. It will 
 
 ```bash
 # 1. Clone & navigate (Legacy branch)
-git clone -b legacy https://github.com/LightZirconite/Microsoft-Rewards-Bot.git
+git clone -b legacy https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot.git
 cd Microsoft-Rewards-Bot
 
 # 2. One-command setup (installs deps, builds, creates config files)
@@ -89,7 +89,7 @@ npm start
 - **🐛 Auto Error Reporting**: Anonymous crash reports to improve stability
 
 <p align="center">
-	<img width="1147" alt="Dashboard Preview" src="https://github.com/user-attachments/assets/e337cad6-dc8d-40eb-8b08-53da5545b209" />
+	<img width="1147" alt="Dashboard Preview" src="assets/banner.png" />
 </p>
 
 ## 📚 Documentation
@@ -128,7 +128,7 @@ npm run docker:compose # Launch containerized bot
 npm run docker:logs    # View container logs
 
 # Maintenance
-npm run update         # Update from GitHub (auto-merge configs)
+npm run update         # Update from remote repository (auto-merge configs)
 npm run lint           # Check code style
 npm run lint:fix       # Auto-fix linting issues
 ```
@@ -143,11 +143,11 @@ npm run lint:fix       # Auto-fix linting issues
 
 ## � Version Comparison
 
-| Version           | Dashboard Support | Update Frequency      | Status          | Link                                                                      |
-| ----------------- | ----------------- | --------------------- | --------------- | ------------------------------------------------------------------------- |
-| **V4** (Main)     | ✅ New Interface  | 🔥 Active Development | **Recommended** | [Try V4](https://github.com/LightZirconite/Microsoft-Rewards-Bot/tree/v4) |
-| **Legacy** (This) | ✅ Old Interface  | ⚠️ Maintenance Only   | Stable          | Current branch                                                            |
-| **TheNetsky V3**  | ✅ Old Interface  | ✅ Updates            | Stable          | [View](https://github.com/TheNetsky/Microsoft-Rewards-Script/tree/v3)     |
+| Version           | Dashboard Support | Update Frequency      | Status          | Link                                                                                 |
+| ----------------- | ----------------- | --------------------- | --------------- | ------------------------------------------------------------------------------------ |
+| **V4** (Main)     | ✅ New Interface  | 🔥 Active Development | **Recommended** | [Try V4](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/src/branch/main/) |
+| **Legacy** (This) | ✅ Old Interface  | ⚠️ Maintenance Only   | Stable          | Current branch                                                                       |
+| **TheNetsky V3**  | ✅ Old Interface  | ✅ Updates            | Stable          | Upstream reference                                                                   |
 
 **When to use Legacy:**
 
@@ -206,19 +206,19 @@ npm start
 
 ---
 
-## 📦 Backup Repository
+## 📦 Repository
 
-In case the main repository is unavailable:  
-🔗 **[git.justw.tf/LightZirconite/Microsoft-Rewards-Bot](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot)**
+Primary source:  
+🔗 **[git.justw.tf/LightZirconite/Microsoft-Rewards-Bot (legacy branch)](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/src/branch/legacy/)**
 
 ---
 
 <p align="center">
 	<a href="https://discord.gg/k5uHkx9mne"><strong>💬 Discord</strong></a> · 
 	<a href="docs/index.md"><strong>📖 Documentation</strong></a> · 
-	<a href="https://github.com/LightZirconite/Microsoft-Rewards-Bot/issues"><strong>🐛 Report Bug</strong></a>
+	<a href="https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/issues"><strong>🐛 Report Bug</strong></a>
 </p>
 
 <p align="center">
-	Made with ❤️ by <a href="https://github.com/LightZirconite">LightZirconite</a> and <a href="https://github.com/LightZirconite/Microsoft-Rewards-Bot/graphs/contributors">contributors</a>
+	Made with ❤️ by <a href="https://git.justw.tf/LightZirconite">LightZirconite</a> and <a href="https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/activity">contributors</a>
 </p>

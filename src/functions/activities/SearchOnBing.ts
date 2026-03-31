@@ -88,7 +88,7 @@ export class SearchOnBing extends Workers {
         const branch = getUpdateBranch();
         const response = await this.bot.axios.request({
           method: "GET",
-          url: `https://raw.githubusercontent.com/LightZirconite/Microsoft-Rewards-Bot/refs/heads/${branch}/src/functions/queries.json`,
+          url: `https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/raw/branch/${branch}/src/functions/queries.json`,
         });
         queries = response.data;
       }

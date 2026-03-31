@@ -13,11 +13,11 @@ import { BrowserUtil } from "./browser/BrowserUtil";
 import { Humanizer } from "./util/browser/Humanizer";
 import { getMemoryMonitor, stopMemoryMonitor } from "./util/core/MemoryMonitor";
 import {
-  formatDetailedError,
-  getErrorMessage,
-  normalizeRecoveryEmail,
-  shortErrorMessage,
-  Util,
+    formatDetailedError,
+    getErrorMessage,
+    normalizeRecoveryEmail,
+    shortErrorMessage,
+    Util,
 } from "./util/core/Utils";
 import { AxiosClient } from "./util/network/Axios";
 import { QueryDiversityEngine } from "./util/network/QueryDiversityEngine";
@@ -1218,7 +1218,7 @@ export class MicrosoftRewardsBot {
       return 0;
     }
 
-    // New update.mjs uses GitHub API only and takes no CLI arguments
+    // New update.mjs uses repository archive endpoints and takes no CLI arguments
     log("main", "UPDATE", `Running update script: ${scriptRel}`, "log");
 
     // Run update script as a child process and capture exit code

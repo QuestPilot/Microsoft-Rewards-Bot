@@ -39,7 +39,7 @@ npm start
 
 **Features:**
 
-- Uses GitHub API (downloads ZIP - no Git required)
+- Uses repository archive endpoints (downloads ZIP - no Git required)
 - Preserves your configuration and accounts
 - No merge conflicts, always clean
 - Automatic dependency installation and rebuild

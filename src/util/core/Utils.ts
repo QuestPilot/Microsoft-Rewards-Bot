@@ -329,8 +329,8 @@ export function extractBalancedObject(
 
 /**
  * Get the configured Git branch for auto-updates and remote resources
- * Reads from .update-branch.json if available, otherwise defaults to 'main'
- * @returns Branch name to use for GitHub raw URLs
+ * Reads from .update-branch.json if available, otherwise defaults to 'legacy'
+ * @returns Branch name to use for remote raw URLs
  */
 export function getUpdateBranch(): string {
   try {
@@ -340,11 +340,11 @@ export function getUpdateBranch(): string {
 
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      return config.branch || "main";
+      return config.branch || "legacy";
     }
   } catch {
     // Fallback to default
   }
 
-  return "main"; // Default fallback for legacy installations
+  return "legacy"; // Default fallback for legacy installations
 }

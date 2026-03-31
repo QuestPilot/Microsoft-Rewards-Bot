@@ -11,11 +11,11 @@ Get the bot ready before your first run.
 
 ```bash
 # Clone the repository (Legacy branch for old dashboard)
-git clone -b legacy https://github.com/LightZirconite/Microsoft-Rewards-Bot.git
+git clone -b legacy https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot.git
 cd Microsoft-Rewards-Bot
 
 # For V4 (new dashboard), use:
-# git clone -b v4 https://github.com/LightZirconite/Microsoft-Rewards-Bot.git
+# git clone -b main https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot.git
 
 # Install dependencies (happens automatically on first run)
 npm install

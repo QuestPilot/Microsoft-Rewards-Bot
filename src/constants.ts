@@ -85,7 +85,7 @@ export const DISCORD = {
   COLOR_GRAY: 0x95a5a6,
   WEBHOOK_USERNAME: "Microsoft-Rewards-Bot",
   AVATAR_URL:
-    "https://raw.githubusercontent.com/LightZirconite/Microsoft-Rewards-Bot/main/assets/logo.png",
+    "https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/raw/branch/legacy/assets/logo.png",
 } as const;
 
 export const LOGGER_CLEANUP = {
