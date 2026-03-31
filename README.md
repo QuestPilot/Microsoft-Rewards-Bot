@@ -27,7 +27,11 @@
 
 **[→ Go to V4 branch](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/tree/release)**
 
-https://github.com/user-attachments/assets/d02959c9-1a59-44fb-9a23-247eeb9a7d75
+<p align="center">
+  <video src="assets/welcome.mp4" controls width="900" preload="metadata">
+    Your browser does not support the video tag.
+  </video>
+</p>
 
 ---
 
