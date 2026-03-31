@@ -1,0 +1,81 @@
+{
+  // See docs/accounts.md for detailed configuration guide
+  // Maximum 5 accounts recommended
+  "accounts": [
+    {
+      "enabled": true,
+      "email": "",
+      "password": "",
+      "totp": "",
+      "recoveryEmail": "",
+      "phoneNumber": "",
+      "proxy": {
+        "proxyAxios": false,
+        "url": "",
+        "port": 0,
+        "username": "",
+        "password": ""
+      }
+    },
+    {
+      "enabled": false,
+      "email": "",
+      "password": "",
+      "totp": "",
+      "recoveryEmail": "",
+      "phoneNumber": "",
+      "proxy": {
+        "proxyAxios": false,
+        "url": "",
+        "port": 0,
+        "username": "",
+        "password": ""
+      }
+    },
+    {
+      "enabled": false,
+      "email": "",
+      "password": "",
+      "totp": "",
+      "recoveryEmail": "",
+      "phoneNumber": "",
+      "proxy": {
+        "proxyAxios": false,
+        "url": "",
+        "port": 0,
+        "username": "",
+        "password": ""
+      }
+    },
+    {
+      "enabled": false,
+      "email": "",
+      "password": "",
+      "totp": "",
+      "recoveryEmail": "",
+      "phoneNumber": "",
+      "proxy": {
+        "proxyAxios": false,
+        "url": "",
+        "port": 0,
+        "username": "",
+        "password": ""
+      }
+    },
+    {
+      "enabled": false,
+      "email": "",
+      "password": "",
+      "totp": "",
+      "recoveryEmail": "",
+      "phoneNumber": "",
+      "proxy": {
+        "proxyAxios": false,
+        "url": "",
+        "port": 0,
+        "username": "",
+        "password": ""
+      }
+    }
+  ]
+}

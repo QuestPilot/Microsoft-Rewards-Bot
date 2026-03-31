@@ -1,0 +1,159 @@
+{
+  // === GENERAL ===
+  "baseURL": "https://lgtw.tf/Microsoft-Rewards-Bot-Legacy",
+  "sessionPath": "sessions",
+  "dryRun": false,
+  // === EXECUTION ===
+  "execution": {
+    "parallel": false, // Run multiple accounts in parallel (advanced)
+    "runOnZeroPoints": false, // Skip automation if no points available
+    "clusters": 1, // Number of parallel workers (1 = sequential, 2+ = parallel)
+    "passesPerRun": 3, // Number of retry passes per execution
+  },
+  "jobState": {
+    "enabled": true, // Track completed activities to avoid duplicates
+    "dir": "", // Custom directory for job state (empty = default)
+    "autoResetOnComplete": true, // Reset job state after all tasks complete
+  },
+  // === TASKS ===
+  "workers": {
+    "doDailySet": true, // Complete daily set activities
+    "doMorePromotions": true, // Complete promotional activities
+    "doPunchCards": true, // Complete punch card challenges
+    "doDesktopSearch": true, // Perform desktop Bing searches
+    "doMobileSearch": true, // Perform mobile Bing searches
+    "doDailyCheckIn": true, // Perform mobile daily check-in
+    "doReadToEarn": true, // Complete Read to Earn activities
+    "doFreeRewards": false, // Claim free rewards (experimental)
+    "bundleDailySetWithSearch": true, // Bundle daily set with search tasks
+  },
+  // === SEARCH ===
+  "search": {
+    "useLocalQueries": false, // Use local fallback queries only (faster but less diverse)
+    "settings": {
+      "useGeoLocaleQueries": true, // Use region-specific queries
+      "scrollRandomResults": true, // Scroll through search results naturally
+      "clickRandomResults": true, // Click random search results
+      "retryMobileSearchAmount": 2, // Retry mobile searches on failure
+      "semanticDedup": true, // Remove semantically similar queries
+      "semanticDedupThreshold": 0.65, // Similarity threshold (0-1, higher = more strict)
+      "delay": {
+        "min": "2min", // Minimum delay between searches (string or number in ms)
+        "max": "4min", // Maximum delay between searches
+      },
+    },
+  },
+  "queryDiversity": {
+    "enabled": true, // Enable diverse query sources
+    "sources": [
+      "google-trends", // Google Trends trending searches
+      "reddit", // Reddit hot posts
+      "local-fallback", // Embedded fallback queries
+    ],
+    "maxQueriesPerSource": 10, // Max queries to fetch per source
+    "cacheMinutes": 30, // Cache queries for N minutes
+  },
+  // === HUMANIZATION ===
+  "humanization": {
+    "enabled": true, // CRITICAL: Enable human-like behavior (NEVER disable in production)
+    "stopOnBan": true, // Stop all automation if ban detected
+    "immediateBanAlert": true, // Send immediate alert on ban detection
+    "actionDelay": {
+      "min": 500, // Minimum delay between actions (ms)
+      "max": 2200, // Maximum delay between actions (ms)
+    },
+    "gestureMoveProb": 0.65, // Probability of random mouse movements (0-1)
+    "gestureScrollProb": 0.4, // Probability of random scrolling (0-1)
+    "allowedWindows": [], // Allowed time windows for execution (empty = always)
+  },
+  // === RISK MANAGEMENT ===
+  "riskManagement": {
+    "enabled": true, // Enable risk management features
+    "stopOnCritical": true, // Stop on critical errors (bans, lockouts)
+  },
+  "retryPolicy": {
+    "maxAttempts": 3, // Maximum retry attempts for failed operations
+    "baseDelay": 1000, // Initial retry delay (ms)
+    "maxDelay": "30s", // Maximum retry delay (string or number in ms)
+    "multiplier": 2, // Delay multiplier for exponential backoff
+    "jitter": 0.2, // Jitter factor (0-1) for randomizing delays (±20%)
+  },
+  // === BROWSER ===
+  "browser": {
+    "headless": false, // Run browser in headless mode (true = no GUI, false = GUI)
+    "globalTimeout": "30s", // Global timeout for browser operations
+  },
+  "fingerprinting": {
+    "saveFingerprint": {
+      "mobile": true, // Save mobile browser fingerprint
+      "desktop": true, // Save desktop browser fingerprint
+    },
+  },
+  // === PROXY ===
+  "proxy": {
+    "proxyGoogleTrends": true, // Use proxy for Google Trends API
+    "proxyBingTerms": true, // Use proxy for Bing Terms API
+  },
+  // === NOTIFICATIONS ===
+  // See docs/notifications.md for setup instructions
+  "webhook": {
+    "enabled": false, // Enable Discord/Webhook notifications
+    "url": "", // Discord webhook URL (or any webhook endpoint)
+  },
+  "summaryWebhook": {
+    "enabled": false, // Enable summary webhook (sent at end of each run)
+    "url": "", // Webhook URL for final summary (Discord format)
+  },
+  "stoat": {
+    "enabled": false, // Enable Stoat/Revolt webhook notifications (open-source Discord alternative)
+    "url": "", // Stoat webhook URL: https://stoat.chat/api/webhooks/{id}/{token}
+  },
+  "ntfy": {
+    "enabled": false, // Enable ntfy.sh push notifications
+    "url": "", // ntfy.sh server URL (e.g., https://ntfy.sh)
+    "topic": "rewards", // ntfy.sh topic name
+    "authToken": "", // Optional: ntfy.sh auth token
+  },
+  // === LOGGING ===
+  "logging": {
+    "excludeFunc": [
+      "SEARCH-CLOSE-TABS", // Exclude verbose search tab cleanup logs
+      "LOGIN-NO-PROMPT", // Exclude "no prompt found" login logs
+      "FLOW", // Exclude flow orchestration logs
+    ],
+    "webhookExcludeFunc": ["SEARCH-CLOSE-TABS", "LOGIN-NO-PROMPT", "FLOW"],
+    "redactEmails": true, // Redact email addresses in logs (privacy protection)
+  },
+  // === DASHBOARD ===
+  "dashboard": {
+    "enabled": true, // Auto-start web dashboard with the bot
+    "port": 3000, // Dashboard port (default: 3000)
+    "host": "127.0.0.1", // Dashboard host (127.0.0.1 = localhost only)
+  },
+  // === SCHEDULING ===
+  // Automatic daily execution at specified time
+  // Time is based on YOUR computer/server timezone (automatically detected)
+  "scheduling": {
+    "enabled": true, // Set to true to enable automatic daily runs
+    "time": "09:00", // Time in 24h format (HH:MM) - e.g., "09:00" = 9 AM, "21:30" = 9:30 PM
+    "jitter": {
+      "enabled": true, // Apply random time offset to avoid exact-time runs
+      "minMinutesBefore": 40, // Max minutes to start BEFORE scheduled time
+      "maxMinutesAfter": 20, // Max minutes to start AFTER scheduled time
+    },
+  },
+  // === UPDATES ===
+  "update": {
+    "enabled": true, // Enable automatic update checks
+    "method": "github-api", // Update method (github-api = recommended)
+    "dockerMode": "auto", // Docker detection ("auto", "force-docker", "force-host")
+    "autoUpdateConfig": true, // Automatically update config.jsonc
+    "autoUpdateAccounts": false, // Automatically update accounts.jsonc
+  },
+  // === ERROR REPORTING ===
+  // Help improve the project by automatically reporting errors
+  // NO sensitive data is sent (emails, passwords, proxies are sanitized)
+  "errorReporting": {
+    "enabled": true, // Enable anonymous error reporting to maintainers
+  },
+}
