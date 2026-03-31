@@ -21,22 +21,22 @@
 ## Choose Your Version
 
 ### 🚀 Latest — V4 (New Microsoft Rewards Dashboard Only)
+
 > Supports the new Next.js Microsoft Rewards dashboard  
 > Active development · Premium features · Full automation
 
-**[→ Go to V4 branch](https://github.com/LightZirconite/Microsoft-Rewards-Bot/tree/release)**
-
+**[→ Go to V4 branch](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/tree/release)**
 
 https://github.com/user-attachments/assets/d02959c9-1a59-44fb-9a23-247eeb9a7d75
-
 
 ---
 
 ### 🗂️ Legacy — V3 (Previous Microsoft Rewards Dashboard Only)
+
 > For the classic Microsoft Rewards dashboard  
 > No longer maintained · Open source
 
-**[→ Go to Legacy branch](https://github.com/LightZirconite/Microsoft-Rewards-Bot/tree/legacy)**
+**[→ Go to Legacy branch](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/tree/legacy)**
 
 ---
 
