@@ -25,7 +25,7 @@
 > Supports the new Next.js Microsoft Rewards dashboard  
 > Active development · Premium features · Full automation
 
-**[→ Go to V4 branch](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/tree/release)**
+**[→ Go to V4 branch](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/release)**
 
 <p align="center">
   <video src="assets/welcome.mp4" controls width="900" preload="metadata">
@@ -40,7 +40,7 @@
 > For the classic Microsoft Rewards dashboard  
 > No longer maintained · Open source
 
-**[→ Go to Legacy branch](https://git.justw.tf/LightZirconite/Microsoft-Rewards-Bot/tree/legacy)**
+**[→ Go to Legacy branch](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/legacy)**
 
 ---
 
