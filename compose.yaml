@@ -1,6 +1,6 @@
 services:
     microsoft-rewards-bot:
-        image: microsoft-rewards-bot-custom
+        image: microsoft-rewards-bot
         container_name: microsoft-rewards-bot
         restart: unless-stopped
         build:
