@@ -64,7 +64,8 @@ async function main() {
     console.log(`Prepared ${manifestPath}`)
     console.log(`Archive: ${archiveUrl}`)
     console.log(`SHA-256: ${manifest.sha256}`)
-    console.log('Next: run npm run update:key:check, then npm run update:sign.')
+    console.log('Next: review, test, commit, and push the manifest.')
+    console.log('Optional private signed channels can still run npm run update:key:check and npm run update:sign.')
 }
 
 main().catch(error => {
