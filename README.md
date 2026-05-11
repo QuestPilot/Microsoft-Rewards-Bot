@@ -1,49 +1,93 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="Microsoft Rewards Bot" width="120" />
+<br />
 
-# Microsoft Rewards Bot
+<img src="assets/logo.png" width="80" alt="Microsoft Rewards Bot" />
 
-**Automated Microsoft Rewards point collection — choose your version below**
+<h1>Microsoft Rewards Bot</h1>
 
-<a href="https://discord.gg/k5uHkx9mne">
-  <img src="https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" />
-</a>
-&nbsp;
-<a href="https://stt.gg/hEGXRknQ">
-  <img src="https://img.shields.io/badge/Revolt-Join-FF4655?style=for-the-badge&logo=revolt.chat&logoColor=white" alt="Revolt" />
-</a>
+<p>Automated Microsoft Rewards point collection — set it up once, let it run.</p>
+
+[![Version](https://img.shields.io/github/v/release/QuestPilot/Microsoft-Rewards-Bot?style=flat-square&color=107C10&label=latest)](https://github.com/QuestPilot/Microsoft-Rewards-Bot/releases)
+[![Stars](https://img.shields.io/github/stars/QuestPilot/Microsoft-Rewards-Bot?style=flat-square&color=FFB900)](https://github.com/QuestPilot/Microsoft-Rewards-Bot/stargazers)
+[![License](https://img.shields.io/github/license/QuestPilot/Microsoft-Rewards-Bot?style=flat-square&color=555)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/k5uHkx9mne)
+[![Revolt](https://img.shields.io/badge/Revolt-Join-FF4655?style=flat-square&logo=revolt.chat&logoColor=white)](https://stt.gg/hEGXRknQ)
+
+<br />
 
 </div>
 
 ---
 
-## Choose Your Version
+## Choose your version
 
-### 🚀 Latest — V4 (New Microsoft Rewards Dashboard Only)
+<table>
+<tr>
+<td width="50%" valign="top">
 
-> Supports the new Next.js Microsoft Rewards dashboard  
-> Active development · Premium features · Full automation
+### 🟢 V4 — Current
 
-**[→ Go to V4 branch](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/release)**
+> **New Next.js dashboard only**  
+> Actively maintained · Full automation · Premium features
 
-<p align="center">
-  <video src="assets/welcome.mp4" controls width="900" preload="metadata">
-    Your browser does not support the video tag.
-  </video>
-</p>
+- ✅ Supports the new Microsoft Rewards dashboard
+- ✅ Actively maintained & updated
+- ✅ Premium feature set
+- ✅ Full task automation
+
+<br />
+
+**[→ Open V4 branch](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/release)**
+
+</td>
+<td width="50%" valign="top">
+
+### 🗂️ V3 — Legacy
+
+> **Classic dashboard only**  
+> No longer maintained · Open source reference
+
+- ⬜ Classic Microsoft Rewards dashboard
+- ⬜ Archived — no active development
+- ⬜ Core automation only
+- ⬜ Kept open source for reference
+
+<br />
+
+**[→ Open Legacy branch](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/legacy)**
+
+</td>
+</tr>
+</table>
 
 ---
 
-### 🗂️ Legacy — V3 (Previous Microsoft Rewards Dashboard Only)
+## Preview
 
-> For the classic Microsoft Rewards dashboard  
-> No longer maintained · Open source
+<div align="center">
 
-**[→ Go to Legacy branch](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/legacy)**
+<video src="assets/welcome.mp4" controls width="860" preload="metadata">
+  Your browser does not support the video tag.
+</video>
+
+</div>
+
+---
+
+## Community
+
+Got a question, bug report, or want to follow development?
+
+| Platform | Link |
+|---|---|
+| **Discord** — main hub, fastest responses | [Join →](https://discord.gg/k5uHkx9mne) |
+| **Revolt** — alternative chat | [Join →](https://stt.gg/hEGXRknQ) |
 
 ---
 
 <div align="center">
-<sub>Not affiliated with Microsoft Corporation.</sub>
+
+<sub>Not affiliated with or endorsed by Microsoft Corporation.<br/>Use at your own risk — automation may violate Microsoft's Terms of Service.</sub>
+
 </div>
