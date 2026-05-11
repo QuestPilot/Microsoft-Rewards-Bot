@@ -4,6 +4,8 @@
 
 The bot logs the update error and continues with the local version when the network or manifest is unavailable. It refuses to apply an update if the archive checksum is invalid.
 
+If a 4.0.0 install reports `Manifest signature missing` or `Manifest signature is invalid`, update once with the installer or by pulling the `release` branch manually. The original 4.0.0 updater required a private signing key that is no longer available, so it cannot accept the new public manifest by itself. After 4.0.1 is installed, future public updates use the GitHub manifest plus archive SHA-256 verification.
+
 Use:
 
 ```bash
