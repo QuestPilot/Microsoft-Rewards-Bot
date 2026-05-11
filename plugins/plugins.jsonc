@@ -28,11 +28,13 @@
         "enabled": true,
         "priority": 100,
         // The released Core plugin needs a license validation public key.
+        // Core calls the official validation API, which checks the Turso
+        // license database and returns a signed response. The default API URL
+        // is built in; override licenseApiUrl only for a custom backend.
         // You can also provide these values through MSRB_LICENSE_API_URL
         // and MSRB_LICENSE_PUBLIC_KEY environment variables.
         //
         // "config": {
-        //   "licenseApiUrl": "https://rewards-bot.dev/api/licenses/validate",
         //   "licensePublicKey": "<public RSA key PEM or base64>"
         // }
     }

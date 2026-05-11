@@ -29,7 +29,9 @@ Accepted payment methods for v1:
 
 Xbox and PlayStation gift cards are not accepted.
 
-After payment, you receive a license key. Enable the preinstalled Core plugin in `plugins/plugins.jsonc`, configure the Core license validation endpoint/public key, and start the bot.
+After payment, you receive a license key. Enable the preinstalled Core plugin in `plugins/plugins.jsonc`, configure the Core license validation public key, and start the bot.
+
+Core does not connect directly to Turso at runtime. It calls the official license validation API, and that backend checks the Turso license database before returning a signed response. The default endpoint is already built into Core; only override it if you are running a custom validation backend.
 
 Example:
 
@@ -38,11 +40,12 @@ Example:
   "enabled": true,
   "priority": 100,
   "config": {
-    "licenseApiUrl": "https://rewards-bot.dev/api/licenses/validate",
     "licensePublicKey": "<public RSA key PEM or base64>"
   }
 }
 ```
+
+The files `plugins/core/license-admin.html`, `plugins/core/license-admin-server.js`, and `plugins/core/license-admin.config.example.js` are the local License Desk shipped from the private Core source release. The example config contains no secret; the real `license-admin.config.local.js` is for the private maintainer workspace and is ignored in the public bot repository.
 
 ## Protection Boundary
 
