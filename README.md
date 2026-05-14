@@ -10,7 +10,6 @@
 
 [![Version](https://img.shields.io/github/v/release/QuestPilot/Microsoft-Rewards-Bot?style=flat-square&color=107C10&label=latest)](https://github.com/QuestPilot/Microsoft-Rewards-Bot/releases)
 [![Stars](https://img.shields.io/github/stars/QuestPilot/Microsoft-Rewards-Bot?style=flat-square&color=FFB900)](https://github.com/QuestPilot/Microsoft-Rewards-Bot/stargazers)
-[![License](https://img.shields.io/github/license/QuestPilot/Microsoft-Rewards-Bot?style=flat-square&color=555)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/k5uHkx9mne)
 [![Revolt](https://img.shields.io/badge/Revolt-Join-FF4655?style=flat-square&logo=revolt.chat&logoColor=white)](https://stt.gg/hEGXRknQ)
 
@@ -28,7 +27,7 @@
 
 ### 🟢 V4 — Current
 
-> **New Next.js dashboard only**  
+> **New Next.js dashboard msn rw only**  
 > Actively maintained · Full automation · Premium features
 
 - ✅ Supports the new Microsoft Rewards dashboard
@@ -45,7 +44,7 @@
 
 ### 🗂️ V3 — Legacy
 
-> **Classic dashboard only**  
+> **Classic dashboard msn rw only**  
 > No longer maintained · Open source reference
 
 - ⬜ Classic Microsoft Rewards dashboard
