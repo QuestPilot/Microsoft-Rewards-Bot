@@ -16,6 +16,14 @@ npm run update:check
 
 Use `npm run dev` or pass `-dev`. Auto-update is skipped in development mode.
 
+## Npm Start Stops After The Update Check
+
+Use the latest `release` branch. Older 4.0.1 builds could stop after `Already up to date` when the Windows installer terminal did not expose `npm` correctly to the nested launcher. The launcher now uses npm's own executable path and prints a clear `[START]` error if a child process cannot start.
+
+## Sessions Are Lost After Build
+
+Sessions are stored in the root `sessions/` folder. If an older build saved them under `dist/automation/sessions`, `src/automation/sessions`, `dist/browser/sessions`, or `src/browser/sessions`, `npm run build` migrates missing files into the root session folder before clearing `dist`.
+
 ## Core Plugin Does Not Load
 
 Check `plugins/plugins.jsonc` and run:

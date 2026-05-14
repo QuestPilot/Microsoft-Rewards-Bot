@@ -18,6 +18,7 @@
     },
     "scripts": {
         "pre-build": "npm i && rimraf dist && npx patchright install chromium",
+        "prebuild": "node ./scripts/migrate-legacy-sessions.js",
         "build": "rimraf dist && tsc && node -e \"const fs=require('fs'),p=require('path'),s='src',d='dist';[['config.json','config.json'],['accounts.json','accounts.json'],['config.example.json','config.example.json'],['accounts.example.json','accounts.example.json'],['crontab.template','crontab.template']].forEach(([from,to])=>{const src=p.join(s,from),dst=p.join(d,to);if(fs.existsSync(src))fs.copyFileSync(src,dst)});[['core/bing-search-activity-queries.json'],['core/search-queries.json']].forEach(([f])=>{const src=p.join(s,f),dst=p.join(d,f);if(fs.existsSync(src)){fs.mkdirSync(p.dirname(dst),{recursive:true});fs.copyFileSync(src,dst)}})\" && node -e \"const fs=require('fs'),p=require('path');const src='dist',dst='node_modules/microsoft-rewards-bot';fs.rmSync(dst,{recursive:true,force:true});fs.cpSync(src,dst,{recursive:true});console.log('Copied dist/ to node_modules/microsoft-rewards-bot/')\"",
         "node:check": "node ./scripts/check-node-version.js",
         "prestart": "node ./scripts/check-node-version.js",
