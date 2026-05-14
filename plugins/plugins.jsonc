@@ -27,15 +27,15 @@
     "core": {
         "enabled": true,
         "priority": 100,
-        // The released Core plugin needs a license validation public key.
-        // Core calls the official validation API, which checks the Turso
-        // license database and returns a signed response. The default API URL
-        // is built in; override licenseApiUrl only for a custom backend.
-        // You can also provide these values through MSRB_LICENSE_API_URL
-        // and MSRB_LICENSE_PUBLIC_KEY environment variables.
+        // The released Core plugin validates licenses against the official
+        // Turso license database. Nothing is required here for normal users.
+        // Override these values only for a custom backend/database.
         //
         // "config": {
-        //   "licensePublicKey": "<public RSA key PEM or base64>"
+        //   "licenseApiUrl": "https://example.com/api/licenses/validate",
+        //   "tursoDatabaseUrl": "libsql://example.turso.io",
+        //   "tursoAuthToken": "<database token>",
+        //   "licensePublicKey": "<optional response verification public key>"
         // }
     }
 

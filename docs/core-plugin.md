@@ -29,19 +29,16 @@ Accepted payment methods for v1:
 
 Xbox and PlayStation gift cards are not accepted.
 
-After payment, you receive a license key. Enable the preinstalled Core plugin in `plugins/plugins.jsonc`, configure the Core license validation public key, and start the bot.
+After payment, you receive a license key. Enable the preinstalled Core plugin in `plugins/plugins.jsonc` and start the bot.
 
-Core does not connect directly to Turso at runtime. It calls the official license validation API, and that backend checks the Turso license database before returning a signed response. The default endpoint is already built into Core; only override it if you are running a custom validation backend.
+Core validates licenses against the official Turso license database. The official release already includes the required private runtime configuration; only override it if you are running a custom backend or database.
 
 Example:
 
 ```jsonc
 "core": {
   "enabled": true,
-  "priority": 100,
-  "config": {
-    "licensePublicKey": "<public RSA key PEM or base64>"
-  }
+  "priority": 100
 }
 ```
 
