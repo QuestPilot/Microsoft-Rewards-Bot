@@ -20,7 +20,7 @@ The bot is open source, but the official Core plugin is proprietary and requires
 
 ## License And Payment
 
-To buy or renew Core access, contact `683712256243925066` by private Discord message.
+To buy or renew Core access, contact `@lightzirconite`/`683712256243925066` by private Discord message.
 
 Accepted payment methods for v1:
 
