@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "botVersion": "4.0.1",
+  "botVersion": "4.0.2",
   "coreVersion": "1.0.0",
   "compatibleNode": "24.15.0",
-  "archiveUrl": "https://github.com/QuestPilot/Microsoft-Rewards-Bot/archive/852693748b33e9a8d793aef99d9d81147739ad61.tar.gz",
-  "sha256": "2dbc7cff2844ab5c2f2c98e62c82caa30119c1f3babcd2a991b4c7d6185d76e1",
+  "archiveUrl": "https://github.com/QuestPilot/Microsoft-Rewards-Bot/archive/092371c0abb77b39accb5162c00c456d7bc22f02.tar.gz",
+  "sha256": "3e151eac54bce13d4f91f68372a9509d3ad53a39e82b2fc1556cc27f97fb251c",
   "excludes": [
     ".git",
     ".updates",
