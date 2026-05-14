@@ -5,7 +5,7 @@ const path = require('path')
 const test = require('node:test')
 
 const { migrateUserFiles } = require('../scripts/updater/ConfigMigrator')
-const { UpdateManager } = require('../scripts/updater/UpdateManager')
+const { DEFAULT_BACKUP_PATHS, UpdateManager } = require('../scripts/updater/UpdateManager')
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-updater-'))
@@ -103,4 +103,24 @@ test('updater can still enforce signed manifests when requested', () => {
             }),
         /Manifest signature missing/
     )
+})
+
+test('updater backup paths never include internal updater or dependency folders', () => {
+    const updater = new UpdateManager({ root: process.cwd(), logger: { log() {}, warn() {} } })
+    const backupPaths = updater.getBackupPaths([
+        '.git',
+        '.updates',
+        'node_modules',
+        'dist',
+        'sessions',
+        'src/config.json',
+        'src/accounts.json',
+        'plugins/plugins.jsonc'
+    ])
+
+    assert.deepEqual(backupPaths, ['sessions', 'src/config.json', 'src/accounts.json', 'plugins/plugins.jsonc'])
+    assert.equal(DEFAULT_BACKUP_PATHS.includes('.updates'), false)
+    assert.equal(DEFAULT_BACKUP_PATHS.includes('.git'), false)
+    assert.equal(DEFAULT_BACKUP_PATHS.includes('node_modules'), false)
+    assert.equal(DEFAULT_BACKUP_PATHS.includes('dist'), false)
 })

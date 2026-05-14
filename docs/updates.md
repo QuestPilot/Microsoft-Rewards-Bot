@@ -26,6 +26,8 @@ The updater always refuses an archive when the archive checksum is invalid.
 Manifest signatures are optional for the public release channel so the updater can keep working even when the old signing key is unavailable.
 Set `MSRB_UPDATE_REQUIRE_SIGNATURE=1` only if you are maintaining a signed private channel and you have the matching private key.
 
+The updater never backs up internal updater state, Git metadata, dependencies, or build output. Those paths are preserved by skipping them during the copy step, not by recursively copying them into `.updates/backup`.
+
 ## Preserved User Files
 
 Updates preserve local user data:

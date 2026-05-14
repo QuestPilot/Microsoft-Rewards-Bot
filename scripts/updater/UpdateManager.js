@@ -33,6 +33,16 @@ const DEFAULT_EXCLUDES = [
     'plugins/*/.cache'
 ]
 
+const DEFAULT_BACKUP_PATHS = [
+    'logs',
+    'diagnostics',
+    'Page',
+    'sessions',
+    'src/config.json',
+    'src/accounts.json',
+    'plugins/plugins.jsonc'
+]
+
 function canonicalJson(value) {
     if (Array.isArray(value)) {
         return `[${value.map(canonicalJson).join(',')}]`
@@ -82,7 +92,7 @@ function rmrf(target) {
     fs.rmSync(target, { recursive: true, force: true })
 }
 
-function copyRecursive(src, dest, options = {}) {
+function copyRecursive(src, dest) {
     const srcStat = fs.statSync(src)
 
     if (srcStat.isDirectory()) {
@@ -172,6 +182,18 @@ function download(url, dest, timeoutMs = 45_000) {
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
+}
+
+function removeEmptyParents(startDir, stopDir) {
+    let current = startDir
+    const stop = path.resolve(stopDir)
+
+    while (path.resolve(current).startsWith(stop) && path.resolve(current) !== stop) {
+        if (!fs.existsSync(current)) return
+        if (fs.readdirSync(current).length > 0) return
+        fs.rmdirSync(current)
+        current = path.dirname(current)
+    }
 }
 
 class UpdateManager {
@@ -311,7 +333,7 @@ class UpdateManager {
             migrateUserFiles(this.root, this.logger)
         } catch (error) {
             this.logger.warn(`[UPDATER] Apply failed, rolling back: ${error.message}`)
-            this.restoreBackup(backupDir)
+            this.restoreBackup(backupDir, excludes)
             throw error
         }
     }
@@ -326,7 +348,8 @@ class UpdateManager {
     }
 
     backupMutablePaths(backupDir, excludes) {
-        for (const pattern of excludes) {
+        const backupPaths = this.getBackupPaths(excludes)
+        for (const pattern of backupPaths) {
             if (pattern.includes('*')) continue
             const source = path.join(this.root, pattern)
             if (!fs.existsSync(source)) continue
@@ -335,14 +358,34 @@ class UpdateManager {
         }
     }
 
-    restoreBackup(backupDir) {
+    restoreBackup(backupDir, excludes = DEFAULT_EXCLUDES) {
         if (!fs.existsSync(backupDir)) return
-        copyReleaseTree(backupDir, this.root, [])
+        const backupPaths = this.getBackupPaths(excludes)
+        for (const pattern of backupPaths) {
+            if (pattern.includes('*')) continue
+            const backupSource = path.join(backupDir, pattern)
+            const target = path.join(this.root, pattern)
+
+            if (fs.existsSync(target)) {
+                rmrf(target)
+            }
+
+            if (fs.existsSync(backupSource)) {
+                copyRecursive(backupSource, target)
+            } else {
+                removeEmptyParents(path.dirname(target), this.root)
+            }
+        }
+    }
+
+    getBackupPaths(excludes = DEFAULT_EXCLUDES) {
+        return DEFAULT_BACKUP_PATHS.filter(pattern => excludes.includes(pattern))
     }
 }
 
 module.exports = {
     DEFAULT_EXCLUDES,
+    DEFAULT_BACKUP_PATHS,
     DEFAULT_PUBLIC_KEY,
     UpdateManager,
     canonicalJson,
