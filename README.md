@@ -2,7 +2,7 @@
   <img src="assets/logo.png" alt="Microsoft Rewards Bot" width="200">
 </p>
 
-<h1 align="center">Microsoft Rewards Bot</h1>
+<h1 align="center">Microsoft Rewards Bot BETA</h1>
 
 <p align="center">
   <strong>Open-source Microsoft Rewards automation with a plugin system</strong><br>
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-4.0.1-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-4.0.4-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/Node.js-24.15.0-green?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/License-PolyForm_Noncommercial-orange?style=for-the-badge" alt="License">
 </p>
