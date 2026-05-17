@@ -10,13 +10,36 @@ The bot is open source, but the official Core plugin is proprietary and requires
 | Daily Set | Limited to 2 quests per day | Unlimited |
 | Simple URL rewards and quizzes | Yes | Yes |
 | Public plugin API | Yes | Yes |
-| Dashboard diagnostics | Yes | Yes |
+| Web dashboard | No | Yes |
 | Claim points cards | No | Yes |
 | Daily streak details | No | Yes |
 | Streak protection sync | Forced off when accessible | Forced on when accessible |
 | App rewards | No | Yes |
 | Redeem goal automation | No | Yes |
 | Advanced side-panel automation | No | Yes |
+
+## Core Dashboard
+
+Core includes the official remote dashboard. It starts automatically after a successful license check and opens only an outbound connection to the official dashboard service. It does not expose a local HTTP server and it does not bind to `localhost` or the user's local network.
+
+Users sign in on the official dashboard domain with:
+
+1. their Core license key;
+2. Discord OAuth.
+
+The dashboard shows masked account status, run state, recent filtered logs, point summaries, and safe actions such as starting a run when the bot is idle. Dashboard commands are queued and acknowledged asynchronously, so a small delay after clicking an action is expected. It does not allow full account or configuration editing.
+
+Normal users do not need to configure this. Maintainers can override the dashboard service URL for custom deployments:
+
+```jsonc
+"core": {
+  "enabled": true,
+  "priority": 100,
+  "config": {
+    "dashboardUrl": "https://bot.lgtw.tf"
+  }
+}
+```
 
 ## License And Payment
 

@@ -1,6 +1,6 @@
 {
     "name": "microsoft-rewards-bot",
-    "version": "4.0.4",
+    "version": "4.0.7",
     "description": "Automated Microsoft Rewards points collector. Effortlessly accumulate rewards with intuitive navigation, multi-account support, Docker deployment, account creator, a dashboard, a Discord webbook, and an anti-detection system and more click here.",
     "author": "QuestPilot",
     "license": "SEE LICENSE IN LICENSE",

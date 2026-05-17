@@ -1,45 +1,50 @@
-# Local Dashboard
+# Core Dashboard
 
-The dashboard is a small local web interface that starts with the bot when enabled. It is useful for users who prefer a browser view instead of watching the terminal.
+The web dashboard is an official Core feature. It is not part of the open-source runtime and it does not open a local network port.
 
-## Configuration
+When the official Core plugin is enabled and the license is valid, Core starts a private outbound connection to the official dashboard service. Users open the dashboard from the official domain, enter their Core license key, then complete Discord OAuth.
 
-Copy `src/config.example.json` to `src/config.json`, then set:
+## Availability
 
-```json
-"dashboard": {
-    "enabled": true,
-    "host": "0.0.0.0",
-    "port": 3210,
-    "openOnStart": true,
-    "allowConfigWrite": true
-}
-```
+| Capability | Open source | Official Core |
+| --- | --- | --- |
+| Local HTTP dashboard | No | No |
+| Remote web dashboard | No | Yes |
+| License + Discord login | No | Yes |
+| Masked account status | No | Yes |
+| Recent filtered logs | No | Yes |
+| Safe remote actions | No | Yes |
+| Full config editing | No | No |
 
-`enabled` starts the dashboard with the bot.
+## Security Model
 
-`host` controls where the dashboard listens. Use `0.0.0.0` to make it available from another device on the same local network. Use `127.0.0.1` if it should only be available on the same machine.
+The dashboard service receives only sanitized runtime data:
 
-`port` is the dashboard port.
+- masked account emails;
+- run state and uptime;
+- points summary;
+- filtered recent logs;
+- selected worker and scheduler summary.
 
-`openOnStart` opens the browser automatically when the dashboard starts.
+Core must never send Microsoft account passwords, cookies, access tokens, proxy credentials, webhook URLs, or the full local configuration to the dashboard service.
 
-`allowConfigWrite` allows saving `src/config.json` from the dashboard.
+The first release only supports safe commands such as starting a run when the bot is idle. Full remote configuration editing is intentionally not supported.
 
-## Network Access
+## Live Updates
 
-When the dashboard starts, the bot prints the local address and any detected network addresses. Open one of those URLs from another computer on the same network.
+The dashboard is intentionally not a raw WebSocket stream. Core sends sanitized snapshots on an adaptive timer:
 
-Because the dashboard can expose configuration controls, only enable it on a trusted network.
+- when the dashboard is open, updates arrive every few seconds;
+- when the dashboard is closed, Core slows down to protect the free backend quotas;
+- commands are queued briefly and acknowledged by the bot on its next poll.
 
-## What It Shows
+After clicking an action, the interface shows a notification and then waits for the bot acknowledgement. A short delay is normal and helps prevent Redis, Turso, and Vercel from being spammed by repeated polling.
 
-- current bot version and run state
-- loaded accounts with masked email addresses
-- recent activity logs
-- current points gained for the active run
-- a `Run now` button for manual starts when no run is already active
-- local and network dashboard URLs
-- JSON configuration editor
+## Safe Actions
 
-Changes saved from the dashboard are written to `src/config.json`. Some changes apply immediately, while settings used during a run may require restarting the bot.
+V1 exposes only safe controls:
+
+- `Run now`: starts a run only when the bot is idle or waiting.
+- `Stop safely`: asks a scheduled bot to stop after the current run finishes.
+
+The dashboard does not edit accounts, passwords, cookies, proxy settings, tokens, or the full local config.

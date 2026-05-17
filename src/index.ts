@@ -17,7 +17,6 @@ import { IpcLog, LogService } from './notifications/LogService'
 import { AuthManager } from './automation/auth/AuthManager'
 import { executionContext, getCurrentContext } from './context/ExecutionContext'
 import ActivityRunner from './core/ActivityRunner'
-import { DashboardServer } from './core/DashboardServer'
 import { SearchOrchestrator } from './core/SearchOrchestrator'
 import { TaskBase } from './core/TaskBase'
 
@@ -83,8 +82,8 @@ export class MicrosoftRewardsBot {
     public cookies: { mobile: Cookie[]; desktop: Cookie[] }
     public fingerprint!: BrowserFingerprintWithHeaders
     public dashboardEvents: DashboardLog[] = []
-    public dashboardServer?: DashboardServer
     public dashboardRunState: 'idle' | 'checking' | 'running' | 'waiting' | 'finished' | 'blocked' | 'error' = 'idle'
+    public dashboardStopRequested = false
 
     private pointsCanCollect = 0
 
@@ -132,16 +131,6 @@ export class MicrosoftRewardsBot {
         if (this.dashboardEvents.length > 500) {
             this.dashboardEvents.splice(0, this.dashboardEvents.length - 500)
         }
-    }
-
-    async startDashboard(): Promise<void> {
-        if (!this.config.dashboard?.enabled || cluster.isWorker) return
-        this.dashboardServer = new DashboardServer(this)
-        await this.dashboardServer.start()
-    }
-
-    async stopDashboard(): Promise<void> {
-        await this.dashboardServer?.stop()
     }
 
     async initialize(): Promise<void> {
@@ -604,20 +593,17 @@ async function main(): Promise<void> {
     const rewardsBot = new MicrosoftRewardsBot()
 
     process.on('beforeExit', () => {
-        void rewardsBot.stopDashboard()
         void rewardsBot.pluginManager.destroyAll()
         void flushAllWebhooks()
     })
     process.on('SIGINT', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGINT received, flushing and exiting...')
-        await rewardsBot.stopDashboard()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(130)
     })
     process.on('SIGTERM', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGTERM received, flushing and exiting...')
-        await rewardsBot.stopDashboard()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(143)
@@ -635,7 +621,6 @@ async function main(): Promise<void> {
 
     try {
         await rewardsBot.initialize()
-        await rewardsBot.startDashboard()
         if (cluster.isWorker) {
             await rewardsBot.run()
             return
@@ -645,14 +630,12 @@ async function main(): Promise<void> {
             ? await runScheduled(rewardsBot)
             : await runSingle(rewardsBot)
 
-        await rewardsBot.stopDashboard()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(exitCode)
     } catch (error) {
         rewardsBot.dashboardRunState = 'error'
         rewardsBot.logger.error('main', 'MAIN-ERROR', error as Error)
-        await rewardsBot.stopDashboard()
         await flushAllWebhooks()
     }
 }
@@ -687,6 +670,10 @@ async function runScheduled(rewardsBot: MicrosoftRewardsBot): Promise<number> {
         if (shouldRunNow) {
             const exitCode = await runSingle(rewardsBot)
             if (exitCode !== 0) return exitCode
+            if (rewardsBot.dashboardStopRequested) {
+                rewardsBot.logger.info('main', 'SCHEDULER', 'Remote stop requested. Scheduler will stop after the current run.')
+                return 0
+            }
         }
 
         const nextRun = getNextScheduledRun(scheduler)

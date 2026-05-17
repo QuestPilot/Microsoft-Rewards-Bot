@@ -44,14 +44,6 @@ const SafetyAdvisorySchema = z.object({
     blockedBehavior: z.enum(['prompt', 'continue', 'stop']).default('prompt')
 })
 
-const DashboardSchema = z.object({
-    enabled: z.boolean().default(false),
-    host: z.string().default('0.0.0.0'),
-    port: z.number().int().min(1).max(65535).default(3210),
-    openOnStart: z.boolean().default(false),
-    allowConfigWrite: z.boolean().default(true)
-})
-
 // Webhook
 const WebhookSchema = z.object({
     discord: z
@@ -116,8 +108,7 @@ export const ConfigSchema = z.object({
     webhook: WebhookSchema,
     redeemGoal: RedeemGoalSchema.optional(),
     scheduler: SchedulerSchema.optional(),
-    safetyAdvisory: SafetyAdvisorySchema.optional(),
-    dashboard: DashboardSchema.optional()
+    safetyAdvisory: SafetyAdvisorySchema.optional()
 })
 
 // Account

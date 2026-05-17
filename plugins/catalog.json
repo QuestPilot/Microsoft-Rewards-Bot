@@ -6,10 +6,10 @@
       "description": "Official Core plugin with premium Microsoft Rewards tasks and license validation.",
       "license": "Proprietary",
       "price": "paid",
-      "botVersionRange": ">=4.0.0",
+      "botVersionRange": ">=4.0.7",
       "supportUrl": "https://discord.com/users/683712256243925066",
       "purchaseUrl": "docs/core-plugin.md",
-      "sha256": "a689bcf2b5acb2b41dddb7f6c44d351fb554a18ef0b4a5b3a63f1a04c5767909"
+      "sha256": "64a0f3ce07d31fec6ef3de46ca04424417ccbf572557ef8586d273b7ba69c39e"
     }
   ]
 }

@@ -14,7 +14,7 @@
   },
   "msrb": {
     "officialPlugin": "core",
-    "indexSha256": "a689bcf2b5acb2b41dddb7f6c44d351fb554a18ef0b4a5b3a63f1a04c5767909"
+    "indexSha256": "64a0f3ce07d31fec6ef3de46ca04424417ccbf572557ef8586d273b7ba69c39e"
   },
   "dependencies": {
     "bytenode": "^1.5.7"

@@ -86,13 +86,6 @@
             "max": "30min"
         }
     },
-    "dashboard": {
-        "enabled": false,
-        "host": "0.0.0.0",
-        "port": 3210,
-        "openOnStart": false,
-        "allowConfigWrite": true
-    },
     "safetyAdvisory": {
         "enabled": true,
         "url": "https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/release/safety-advisory.json",

@@ -34,7 +34,15 @@ npm run plugins
 
 The Plugin Desk shows whether the Core checksum matches `plugins/official-core.json`.
 
-## Dashboard Actions Stop Working
+## Core Dashboard Does Not Show A Machine
+
+The web dashboard is a Core-only feature. Check that `plugins/plugins.jsonc` enables Core and that the license prompt succeeds.
+
+If Core is active but the machine is still absent, check whether the dashboard service URL is reachable from the machine. The official release uses the default service; custom deployments can set `core.config.dashboardUrl`.
+
+The open-source bot no longer starts a local dashboard server.
+
+## Rewards Dashboard Automation Stops Working
 
 Run the page analyzer against saved Microsoft Rewards captures:
 

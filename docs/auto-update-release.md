@@ -87,6 +87,8 @@ Use the two-commit flow:
 - commit A: the actual release code and Core files
 - commit B: `updates/stable.json` pointing to commit A's archive
 
+For this release, commit A should contain the `4.0.7` version bump, dashboard/Core changes, documentation, and updated Core checksums. Only after that commit exists on the `release` branch should `updates/stable.json` be regenerated.
+
 6. Prepare `updates/stable.json`.
 
 ```bash

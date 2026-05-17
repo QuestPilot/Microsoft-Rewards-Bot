@@ -17,15 +17,6 @@ export interface Config {
     plugins?: ConfigPlugins
     scheduler?: ConfigScheduler
     safetyAdvisory?: ConfigSafetyAdvisory
-    dashboard?: ConfigDashboard
-}
-
-export interface ConfigDashboard {
-    enabled: boolean
-    host: string
-    port: number
-    openOnStart: boolean
-    allowConfigWrite: boolean
 }
 
 export interface ConfigScheduler {

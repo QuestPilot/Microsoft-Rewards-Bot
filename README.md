@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-4.0.4-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-4.0.7-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/Node.js-24.15.0-green?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/License-PolyForm_Noncommercial-orange?style=for-the-badge" alt="License">
 </p>
@@ -73,14 +73,13 @@ The installer will download the latest Windows installer from the release branch
    ```
 
 6. Edit `plugins/plugins.jsonc` to enable or disable plugins.
-7. Optionally enable the local dashboard in `src/config.json`. See [docs/dashboard.md](docs/dashboard.md).
-8. Optionally open the local Plugin Desk:
+7. Optionally open the local Plugin Desk:
 
    ```bash
    npm run plugins
    ```
 
-9. Start the bot:
+8. Start the bot:
 
    ```bash
    npm start
@@ -117,6 +116,7 @@ Plugin behavior is controlled through `plugins/plugins.jsonc`.
 - `priority` controls plugin load order
 - each plugin can receive its own configuration object
 - public plugins cannot register official premium Core tasks
+- the official web dashboard is available only through the proprietary Core plugin
 
 ---
 

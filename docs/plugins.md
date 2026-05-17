@@ -21,6 +21,8 @@ The built-in Core plugin lives in `plugins/core/` and is distributed as a propri
 
 Public plugins cannot register official premium Core tasks or unlock premium entitlements.
 
+The official web dashboard is also outside the public plugin contract. It is started by the verified Core bytecode only and is not available to third-party plugins.
+
 ## Managing Plugins
 
 Run:
