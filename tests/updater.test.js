@@ -20,6 +20,14 @@ test('updater skips dev mode and explicit opt-out', () => {
     assert.equal(updater.shouldSkip(['node', 'src/index.ts'], {}).skip, false)
 })
 
+test('updater skips Docker by default but can be explicitly enabled', () => {
+    const updater = new UpdateManager({ root: process.cwd(), logger: { log() {}, warn() {} } })
+    updater.isDocker = () => true
+
+    assert.equal(updater.shouldSkip(['node'], {}).skip, true)
+    assert.equal(updater.shouldSkip(['node'], { MSRB_AUTO_UPDATE_IN_DOCKER: '1' }).skip, false)
+})
+
 test('config migrator adds missing keys without replacing user values', () => {
     const root = tempRoot()
     const src = path.join(root, 'src')
@@ -37,7 +45,8 @@ test('config migrator adds missing keys without replacing user values', () => {
         path.join(src, 'config.json'),
         JSON.stringify({
             headless: true,
-            workers: { doDailySet: false }
+            workers: { doDailySet: false },
+            dashboard: { enabled: true, port: 3000 }
         })
     )
     fs.writeFileSync(
@@ -72,6 +81,7 @@ test('config migrator adds missing keys without replacing user values', () => {
     assert.equal(config.workers.doDailySet, false)
     assert.equal(config.workers.doClaimPoints, true)
     assert.equal(config.nested.added, 1)
+    assert.equal(Object.hasOwn(config, 'dashboard'), false)
     assert.equal(accounts[0].email, 'user@example.com')
     assert.equal(accounts[0].password, 'secret')
     assert.equal(accounts[0].proxy.url, 'http://proxy')
@@ -123,4 +133,26 @@ test('updater backup paths never include internal updater or dependency folders'
     assert.equal(DEFAULT_BACKUP_PATHS.includes('.git'), false)
     assert.equal(DEFAULT_BACKUP_PATHS.includes('node_modules'), false)
     assert.equal(DEFAULT_BACKUP_PATHS.includes('dist'), false)
+})
+
+test('dependency sync chooses npm ci when package-lock is present', () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(root, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3 }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    const childProcess = require('child_process')
+    const originalSpawnSync = childProcess.spawnSync
+    let capturedArgs = null
+    childProcess.spawnSync = (_command, args) => {
+        capturedArgs = args
+        return { status: 0 }
+    }
+
+    try {
+        updater.syncDependencies()
+    } finally {
+        childProcess.spawnSync = originalSpawnSync
+    }
+
+    assert.deepEqual(capturedArgs, ['ci', '--omit=optional'])
 })

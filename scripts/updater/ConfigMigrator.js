@@ -25,6 +25,24 @@ function mergeMissing(target, defaults) {
     return result
 }
 
+function removePath(target, dottedPath) {
+    if (!isPlainObject(target)) return false
+    const parts = dottedPath.split('.')
+    let current = target
+    for (const part of parts.slice(0, -1)) {
+        if (!isPlainObject(current[part])) return false
+        current = current[part]
+    }
+    const leaf = parts[parts.length - 1]
+    if (!Object.hasOwn(current, leaf)) return false
+    delete current[leaf]
+    return true
+}
+
+const DEPRECATED_CONFIG_PATHS = [
+    'dashboard'
+]
+
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
 }
@@ -44,11 +62,16 @@ function migrateConfig(root, logger = console) {
     const userConfig = readJson(userPath)
     const defaultConfig = readJson(examplePath)
     const migrated = mergeMissing(userConfig, defaultConfig)
+    const removed = DEPRECATED_CONFIG_PATHS.filter(configPath => removePath(migrated, configPath))
     const changed = JSON.stringify(migrated) !== JSON.stringify(userConfig)
 
     if (changed) {
         writeJson(userPath, migrated)
-        logger.log('[UPDATER] Migrated src/config.json with new default keys')
+        logger.log(
+            removed.length > 0
+                ? `[UPDATER] Migrated src/config.json and removed deprecated keys: ${removed.join(', ')}`
+                : '[UPDATER] Migrated src/config.json with new default keys'
+        )
     }
 
     return { changed }

@@ -4,6 +4,8 @@
 
 `npm run dev` and any launch using `-dev` always skip auto-update, so local development is not overwritten by the public release branch.
 
+Docker containers skip auto-update by default because container filesystems are normally disposable. Build or pull a newer image instead. If you deliberately run a writable container and want the updater anyway, set `MSRB_AUTO_UPDATE_IN_DOCKER=1`.
+
 ## Release Manifest
 
 The default channel is `stable`. The updater reads:
@@ -41,13 +43,17 @@ Updates preserve local user data:
 - `.updates/`
 
 After an update, missing keys from `config.example.json` and `accounts.example.json` are added without replacing user values.
+Known deprecated keys, such as the old open-source `dashboard` config block, are removed during migration.
 
 ## Commands
 
 ```bash
 npm start
 npm run update:check
+npm run update:doctor
 npm run update:prepare
 ```
 
 Set `MSRB_UPDATE_CHANNEL=beta` to use another channel. Set `MSRB_UPDATE_MANIFEST_URL` for a custom manifest URL. Set `MSRB_AUTO_UPDATE=0` only for CI or emergency local recovery.
+
+`update:doctor` compares the package version, local manifest, remote manifest, and Core checksums. Use it when users do not see a release; if the remote manifest still shows the old version, the update has not been published yet.

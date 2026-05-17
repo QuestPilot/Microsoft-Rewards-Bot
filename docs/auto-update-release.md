@@ -47,6 +47,7 @@ npx tsc --noEmit
 npm test
 npm run test:dashboard:mock
 npm audit --audit-level=moderate
+npm run update:doctor
 ```
 
 2. Rebuild the official Core plugin from `Core-Source` with Node.js `24.15.0`.
@@ -93,6 +94,7 @@ For this release, commit A should contain the `4.0.7` version bump, dashboard/Co
 
 ```bash
 npm run update:prepare
+npm run update:doctor
 ```
 
 This fills the manifest from the current clean `HEAD`:
@@ -116,12 +118,14 @@ MSRB_UPDATE_PRIVATE_KEY="<ed25519-private-key-pem>" npm run update:sign
 
 ```bash
 npm run update:check
+npm run update:doctor
 ```
 
 Expected result:
 
 - local and remote versions are printed
 - preserved paths are listed
+- Core checksum values match
 - no checksum error appears
 
 9. Commit only the manifest and any documentation updates, then push.

@@ -98,7 +98,7 @@ function copyRecursive(src, dest) {
     if (srcStat.isDirectory()) {
         mkdirp(dest)
         for (const entry of fs.readdirSync(src)) {
-            copyRecursive(path.join(src, entry), path.join(dest, entry), options)
+            copyRecursive(path.join(src, entry), path.join(dest, entry))
         }
         return
     }
@@ -143,16 +143,31 @@ function findExtractedRoot(extractDir) {
     throw new Error('Downloaded archive does not contain a package.json root')
 }
 
-function download(url, dest, timeoutMs = 45_000) {
+function withCacheBust(url) {
+    const parsed = new URL(url)
+    parsed.searchParams.set('_msrb', `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`)
+    return parsed.toString()
+}
+
+function download(url, dest, timeoutMs = 45_000, options = {}) {
     return new Promise((resolve, reject) => {
         mkdirp(path.dirname(dest))
         const file = fs.createWriteStream(dest)
 
-        const request = https.get(url, { timeout: timeoutMs, headers: { 'user-agent': 'msrb-updater' } }, response => {
+        const requestUrl = options.cacheBust ? withCacheBust(url) : url
+        const request = https.get(requestUrl, {
+            timeout: timeoutMs,
+            headers: {
+                'user-agent': 'msrb-updater',
+                'cache-control': 'no-cache',
+                pragma: 'no-cache',
+                accept: 'application/json, application/octet-stream;q=0.9, */*;q=0.8'
+            }
+        }, response => {
             if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
                 file.close()
                 rmrf(dest)
-                download(new URL(response.headers.location, url).toString(), dest, timeoutMs).then(resolve, reject)
+                download(new URL(response.headers.location, requestUrl).toString(), dest, timeoutMs, options).then(resolve, reject)
                 return
             }
 
@@ -214,7 +229,19 @@ class UpdateManager {
         if (env.MSRB_AUTO_UPDATE === '0') return { skip: true, reason: 'MSRB_AUTO_UPDATE=0' }
         if (argv.includes('-dev') || argv.includes('--dev')) return { skip: true, reason: 'dev mode' }
         if (env.npm_lifecycle_event === 'dev') return { skip: true, reason: 'npm run dev' }
+        if (this.isDocker() && env.MSRB_AUTO_UPDATE_IN_DOCKER !== '1') {
+            return { skip: true, reason: 'Docker container; update the image or set MSRB_AUTO_UPDATE_IN_DOCKER=1' }
+        }
         return { skip: false }
+    }
+
+    isDocker() {
+        if (fs.existsSync('/.dockerenv')) return true
+        try {
+            return fs.readFileSync('/proc/1/cgroup', 'utf8').includes('docker')
+        } catch {
+            return false
+        }
     }
 
     async run(options = {}) {
@@ -243,6 +270,7 @@ class UpdateManager {
             }
 
             await this.applyManifest(manifest)
+            this.syncDependencies()
             this.logger.log(`[UPDATER] Updated to ${manifest.botVersion}`)
             return { status: 'updated', manifest }
         } catch (error) {
@@ -254,7 +282,7 @@ class UpdateManager {
     async fetchManifest() {
         const manifestPath = path.join(this.updatesDir, `${this.channel}.json`)
         try {
-            await download(this.manifestUrl, manifestPath, 20_000)
+            await download(this.manifestUrl, manifestPath, 20_000, { cacheBust: true })
             return readJson(manifestPath)
         } catch (error) {
             const localManifestPath = path.join(this.root, 'updates', `${this.channel}.json`)
@@ -381,6 +409,15 @@ class UpdateManager {
     getBackupPaths(excludes = DEFAULT_EXCLUDES) {
         return DEFAULT_BACKUP_PATHS.filter(pattern => excludes.includes(pattern))
     }
+
+    syncDependencies() {
+        const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+        const args = fs.existsSync(path.join(this.root, 'package-lock.json')) ? ['ci', '--omit=optional'] : ['install', '--omit=optional']
+        this.logger.log(`[UPDATER] Syncing dependencies with npm ${args.join(' ')}`)
+        const result = childProcess.spawnSync(npm, args, { cwd: this.root, stdio: 'inherit', shell: false })
+        if (result.error) throw new Error(`Dependency sync failed: ${result.error.message}`)
+        if (result.status !== 0) throw new Error(`Dependency sync failed with exit code ${result.status}`)
+    }
 }
 
 module.exports = {
@@ -389,5 +426,6 @@ module.exports = {
     DEFAULT_PUBLIC_KEY,
     UpdateManager,
     canonicalJson,
+    download,
     stripSignature
 }
