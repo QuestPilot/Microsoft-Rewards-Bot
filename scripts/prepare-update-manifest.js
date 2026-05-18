@@ -4,6 +4,7 @@ const fs = require('fs')
 const https = require('https')
 const path = require('path')
 const { URL } = require('url')
+const { DEFAULT_EXCLUDES } = require('./updater/UpdateManager')
 
 const manifestPath = process.argv[2] || path.join('updates', 'stable.json')
 const root = path.resolve(__dirname, '..')
@@ -58,6 +59,7 @@ async function main() {
     manifest.compatibleNode = packageJson.engines?.node || manifest.compatibleNode
     manifest.archiveUrl = archiveUrl
     manifest.sha256 = crypto.createHash('sha256').update(archive).digest('hex')
+    manifest.excludes = DEFAULT_EXCLUDES
     delete manifest.signature
 
     fs.writeFileSync(absoluteManifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
