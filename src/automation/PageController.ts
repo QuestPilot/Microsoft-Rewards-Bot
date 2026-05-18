@@ -72,55 +72,59 @@ export default class PageController {
                 } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
 
                 const response = await this.bot.axios.request(request)
-                const html: string = response.data
+                return this.parseDashboardHtml(String(response.data))
+            } catch {
+                this.bot.logger.warn(
+                    this.bot.isMobile,
+                    'GET-DASHBOARD-DATA',
+                    'HTML fallback failed, trying browser session fallback'
+                )
+            }
 
-                // Strategy 1: Legacy dashboard embed (`var dashboard = {...}`)
-                const legacyMatch = html.match(/var\s+dashboard\s*=\s*({.*?});/s)
-                if (legacyMatch?.[1]) {
-                    this.bot.logger.debug(
-                        this.bot.isMobile,
-                        'GET-DASHBOARD-DATA',
-                        'Extracted dashboard data from legacy HTML embed'
-                    )
-                    return JSON.parse(legacyMatch[1]) as DashboardData
-                }
-
-                // Strategy 2: Next.js SPA hydration chunks
-                // The new dashboard uses `self.__next_f.push([1,"..."])` to embed
-                // serialised React Server Component payloads.  Dashboard data is
-                // typically inside a chunk whose JSON contains `"userStatus"`.
-                const nextChunks = html.matchAll(/self\.__next_f\.push\(\[\d+,"(.*?)"\]\)/gs)
-                for (const chunk of nextChunks) {
-                    const raw = chunk[1]
-                    if (!raw || !raw.includes('userStatus')) continue
-
-                    try {
-                        // The chunk payload is a JSON-serialised string with escaped quotes
-                        const unescaped = raw.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
-                        // Look for the dashboard JSON object within the payload
-                        const jsonMatch = unescaped.match(/\{[^{}]*"userStatus"\s*:\s*\{.*$/s)
-                        if (jsonMatch) {
-                            const parsed = JSON.parse(jsonMatch[0])
-                            if (parsed?.userStatus) {
-                                this.bot.logger.debug(
-                                    this.bot.isMobile,
-                                    'GET-DASHBOARD-DATA',
-                                    'Extracted dashboard data from Next.js hydration chunk'
-                                )
-                                return parsed as DashboardData
-                            }
-                        }
-                    } catch {
-                        // This chunk didn't contain valid dashboard JSON – try next
-                    }
-                }
-
-                throw new Error('Dashboard data not found in HTML (tried legacy embed + Next.js chunks)')
+            try {
+                const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
+                await page.goto(this.bot.config.baseURL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
+                const html = await page.content()
+                return this.parseDashboardHtml(html)
             } catch (fallbackError) {
                 this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data')
                 throw fallbackError
             }
         }
+    }
+
+    private parseDashboardHtml(html: string): DashboardData {
+        const legacyMatch = html.match(/var\s+dashboard\s*=\s*({.*?});/s)
+        if (legacyMatch?.[1]) {
+            this.bot.logger.debug(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Extracted dashboard data from legacy HTML embed')
+            return JSON.parse(legacyMatch[1]) as DashboardData
+        }
+
+        const nextChunks = html.matchAll(/self\.__next_f\.push\(\[\d+,"(.*?)"\]\)/gs)
+        for (const chunk of nextChunks) {
+            const raw = chunk[1]
+            if (!raw || !raw.includes('userStatus')) continue
+
+            try {
+                const unescaped = raw.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+                const jsonMatch = unescaped.match(/\{[^{}]*"userStatus"\s*:\s*\{.*$/s)
+                if (jsonMatch) {
+                    const parsed = JSON.parse(jsonMatch[0])
+                    if (parsed?.userStatus) {
+                        this.bot.logger.debug(
+                            this.bot.isMobile,
+                            'GET-DASHBOARD-DATA',
+                            'Extracted dashboard data from Next.js hydration chunk'
+                        )
+                        return parsed as DashboardData
+                    }
+                }
+            } catch {
+                // This chunk did not contain valid dashboard JSON.
+            }
+        }
+
+        throw new Error('Dashboard data not found in HTML (tried legacy embed + Next.js chunks)')
     }
 
     /**

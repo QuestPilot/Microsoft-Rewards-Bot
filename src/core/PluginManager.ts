@@ -7,6 +7,7 @@
  */
 
 import crypto from 'crypto'
+import cluster from 'cluster'
 import fs from 'fs'
 import path from 'path'
 import { PLUGIN_API_VERSION } from '../plugin-api'
@@ -88,6 +89,9 @@ export class PluginManager {
                 }
 
                 if (entryConfig.enabled === false) {
+                    if (cluster.isWorker) {
+                        continue
+                    }
                     this.bot.logger.info('main', 'PLUGIN-MANAGER', `Plugin "${entryName}" disabled in plugins.jsonc`)
                     continue
                 }
@@ -108,7 +112,7 @@ export class PluginManager {
             }
         }
 
-        if (this.plugins.length > 0) {
+        if (this.plugins.length > 0 && cluster.isPrimary) {
             this.bot.logger.info(
                 'main',
                 'PLUGIN-MANAGER',
@@ -315,11 +319,13 @@ export class PluginManager {
             this.officialCorePlugins.add(plugin)
         }
 
-        this.bot.logger.info(
-            'main',
-            'PLUGIN-MANAGER',
-            `Registered ${isOfficialCore ? 'official ' : ''}plugin: ${plugin.name}@${plugin.version}`
-        )
+        if (cluster.isPrimary) {
+            this.bot.logger.info(
+                'main',
+                'PLUGIN-MANAGER',
+                `Registered ${isOfficialCore ? 'official ' : ''}plugin: ${plugin.name}@${plugin.version}`
+            )
+        }
     }
 
     private isVerifiedOfficialCore(entryName: string, filePath: string): boolean {

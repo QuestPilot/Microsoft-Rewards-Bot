@@ -152,23 +152,27 @@ export class MicrosoftRewardsBot {
         const totalAccounts = this.accounts.length
         const runStartTime = Date.now()
 
-        this.logger.info(
-            'main',
-            'RUN-START',
-            `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
-        )
-
         if (this.config.clusters > 1) {
             if (cluster.isPrimary) {
+                this.logRunStart(totalAccounts)
                 return this.runMaster(runStartTime)
             } else {
                 this.runWorker(runStartTime)
                 return 0
             }
         } else {
+            this.logRunStart(totalAccounts)
             await this.runTasks(this.accounts, runStartTime)
             return 0
         }
+    }
+
+    private logRunStart(totalAccounts: number): void {
+        this.logger.info(
+            'main',
+            'RUN-START',
+            `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
+        )
     }
 
     private async warnIfTooManyAccounts(): Promise<void> {

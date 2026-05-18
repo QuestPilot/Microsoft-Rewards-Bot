@@ -2,14 +2,14 @@
   "plugins": [
     {
       "name": "core",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Official Core plugin with premium Microsoft Rewards tasks and license validation.",
       "license": "Proprietary",
       "price": "paid",
       "botVersionRange": ">=4.0.7",
       "supportUrl": "https://discord.com/users/683712256243925066",
       "purchaseUrl": "docs/core-plugin.md",
-      "sha256": "64a0f3ce07d31fec6ef3de46ca04424417ccbf572557ef8586d273b7ba69c39e"
+      "sha256": "6cb984c69a34c56a0a02ec688f2a098d2df87ba8644f4f1b73550d54a3328850"
     }
   ]
 }

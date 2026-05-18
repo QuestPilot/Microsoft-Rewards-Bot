@@ -43,6 +43,10 @@ const DEFAULT_BACKUP_PATHS = [
     'plugins/plugins.jsonc'
 ]
 
+const DEFAULT_OBSOLETE_PATHS = [
+    'src/core/DashboardServer.ts'
+]
+
 function canonicalJson(value) {
     if (Array.isArray(value)) {
         return `[${value.map(canonicalJson).join(',')}]`
@@ -147,6 +151,16 @@ function withCacheBust(url) {
     const parsed = new URL(url)
     parsed.searchParams.set('_msrb', `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`)
     return parsed.toString()
+}
+
+function removeObsoletePaths(root, obsoletePaths, excludes) {
+    for (const obsoletePath of obsoletePaths) {
+        if (isExcluded(obsoletePath, excludes)) continue
+        const target = path.join(root, obsoletePath)
+        if (!fs.existsSync(target)) continue
+        rmrf(target)
+        removeEmptyParents(path.dirname(target), root)
+    }
 }
 
 function download(url, dest, timeoutMs = 45_000, options = {}) {
@@ -357,6 +371,7 @@ class UpdateManager {
 
         try {
             this.backupMutablePaths(backupDir, excludes)
+            removeObsoletePaths(this.root, manifest.obsoletePaths ?? DEFAULT_OBSOLETE_PATHS, excludes)
             copyReleaseTree(sourceRoot, this.root, excludes)
             migrateUserFiles(this.root, this.logger)
         } catch (error) {
@@ -423,6 +438,7 @@ class UpdateManager {
 module.exports = {
     DEFAULT_EXCLUDES,
     DEFAULT_BACKUP_PATHS,
+    DEFAULT_OBSOLETE_PATHS,
     DEFAULT_PUBLIC_KEY,
     UpdateManager,
     canonicalJson,

@@ -5,7 +5,7 @@ const path = require('path')
 const test = require('node:test')
 
 const { migrateUserFiles } = require('../scripts/updater/ConfigMigrator')
-const { DEFAULT_BACKUP_PATHS, UpdateManager } = require('../scripts/updater/UpdateManager')
+const { DEFAULT_BACKUP_PATHS, DEFAULT_OBSOLETE_PATHS, UpdateManager } = require('../scripts/updater/UpdateManager')
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-updater-'))
@@ -133,6 +133,10 @@ test('updater backup paths never include internal updater or dependency folders'
     assert.equal(DEFAULT_BACKUP_PATHS.includes('.git'), false)
     assert.equal(DEFAULT_BACKUP_PATHS.includes('node_modules'), false)
     assert.equal(DEFAULT_BACKUP_PATHS.includes('dist'), false)
+})
+
+test('updater knows old local dashboard source is obsolete', () => {
+    assert.ok(DEFAULT_OBSOLETE_PATHS.includes('src/core/DashboardServer.ts'))
 })
 
 test('dependency sync chooses npm ci when package-lock is present', () => {

@@ -10,7 +10,7 @@ export class MobileStrategy {
     private redirectUrl = 'https://login.live.com/oauth20_desktop.srf'
     private tokenUrl = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token'
     private scope = 'service::prod.rewardsplatform.microsoft.com::MBI_SSL'
-    private maxTimeout = 180_000 // 3m - skip app token in headless Docker
+    private maxTimeout = 420_000 // Slow proxies and Docker logins can take several minutes.
 
     // Selectors for handling Passkey prompt during OAuth
     private readonly selectors = {
