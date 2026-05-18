@@ -244,7 +244,7 @@ function download(url, dest, timeoutMs = 45_000, options = {}) {
                 'user-agent': 'msrb-updater',
                 'cache-control': 'no-cache',
                 pragma: 'no-cache',
-                accept: 'application/json, application/octet-stream;q=0.9, */*;q=0.8'
+                accept: options.accept || 'application/json, application/octet-stream;q=0.9, */*;q=0.8'
             }
         }, response => {
             if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
@@ -301,7 +301,7 @@ class UpdateManager {
         this.channel = process.env.MSRB_UPDATE_CHANNEL || DEFAULT_CHANNEL
         this.manifestUrl =
             process.env.MSRB_UPDATE_MANIFEST_URL ||
-            `https://raw.githubusercontent.com/${DEFAULT_REPO}/release/updates/${this.channel}.json`
+            `https://api.github.com/repos/${DEFAULT_REPO}/contents/updates/${this.channel}.json?ref=release`
         this.publicKey = process.env.MSRB_UPDATE_PUBLIC_KEY || DEFAULT_PUBLIC_KEY
         this.requireSignature = options.requireSignature ?? process.env.MSRB_UPDATE_REQUIRE_SIGNATURE === '1'
         this.updatesDir = path.join(this.root, '.updates')
@@ -365,7 +365,10 @@ class UpdateManager {
     async fetchManifest() {
         const manifestPath = path.join(this.updatesDir, `${this.channel}.json`)
         try {
-            await download(this.manifestUrl, manifestPath, 20_000, { cacheBust: true })
+            await download(this.manifestUrl, manifestPath, 20_000, {
+                accept: 'application/vnd.github.raw',
+                cacheBust: true
+            })
             return readJson(manifestPath)
         } catch (error) {
             const localManifestPath = path.join(this.root, 'updates', `${this.channel}.json`)

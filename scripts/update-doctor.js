@@ -5,7 +5,7 @@ const path = require('path')
 const { URL } = require('url')
 
 const ROOT = path.resolve(__dirname, '..')
-const DEFAULT_MANIFEST_URL = 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/release/updates/stable.json'
+const DEFAULT_MANIFEST_URL = 'https://api.github.com/repos/QuestPilot/Microsoft-Rewards-Bot/contents/updates/stable.json?ref=release'
 
 function readJson(relativePath) {
     return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), 'utf8'))
@@ -23,6 +23,7 @@ function fetchJson(url) {
             .get(parsed, {
                 headers: {
                     'user-agent': 'msrb-update-doctor',
+                    accept: 'application/vnd.github.raw',
                     'cache-control': 'no-cache',
                     pragma: 'no-cache'
                 }
