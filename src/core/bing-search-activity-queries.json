@@ -578,5 +578,96 @@
             "attractions touristiques à proximité",
             "meilleurs cafés près de chez moi"
         ]
+    },
+    {
+        "title": "Stream your favorites",
+        "queries": [
+            "best streaming services",
+            "streaming platform bundles",
+            "compare streaming services",
+            "best TV streaming packages",
+            "streaming deals this month",
+            "family streaming bundles",
+            "movies and series streaming services",
+            "live TV streaming packages"
+        ]
+    },
+    {
+        "title": "Talk, text, save",
+        "queries": [
+            "best cell phone plans",
+            "compare mobile phone plans",
+            "cheap unlimited phone plans",
+            "family mobile plan deals",
+            "prepaid phone plans",
+            "mobile data plan comparison",
+            "phone plans with unlimited text",
+            "best SIM only plans"
+        ]
+    },
+    {
+        "title": "Take off soon",
+        "queries": [
+            "cheap airline tickets",
+            "compare flight prices",
+            "best flight booking sites",
+            "last minute flight deals",
+            "round trip flight deals",
+            "direct flights near me",
+            "airline ticket discounts",
+            "best time to book flights"
+        ]
+    },
+    {
+        "title": "Bank smarter",
+        "queries": [
+            "best checking accounts",
+            "compare savings accounts",
+            "high yield savings account",
+            "online bank account options",
+            "bank account bonuses",
+            "no fee checking account",
+            "best banks near me",
+            "mobile banking features"
+        ]
+    },
+    {
+        "title": "Drive your way",
+        "queries": [
+            "rental car deals",
+            "compare rental car prices",
+            "cheap car rental near me",
+            "weekly car rental deals",
+            "airport rental cars",
+            "best car rental companies",
+            "SUV rental deals",
+            "one way car rental"
+        ]
+    },
+    {
+        "title": "Glow up",
+        "queries": [
+            "best beauty products",
+            "hair care products",
+            "skin care routine",
+            "trending beauty products",
+            "shampoo and conditioner deals",
+            "makeup product reviews",
+            "best hair styling products",
+            "beauty product bundles"
+        ]
+    },
+    {
+        "title": "Relax completely",
+        "queries": [
+            "all inclusive resorts",
+            "best resort vacation packages",
+            "all inclusive beach resorts",
+            "family all inclusive resorts",
+            "resort getaway deals",
+            "compare all inclusive vacations",
+            "luxury resort packages",
+            "weekend resort getaways"
+        ]
     }
 ]

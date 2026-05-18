@@ -22,6 +22,7 @@ interface BrowserCreationResult {
 }
 
 type BrowserChannel = 'chrome' | 'msedge'
+type BrowserCandidate = BrowserChannel | undefined
 
 class BrowserManager {
     private readonly bot: MicrosoftRewardsBot
@@ -60,22 +61,25 @@ class BrowserManager {
     }
 
     /**
-     * Attempts to find the best locally-installed Chromium-based browser.
-     * Preference: Google Chrome > Microsoft Edge > Patchright bundled Chromium.
+     * Attempts to find the best Chromium-based browser.
+     * Preference: Patchright bundled Chromium > Google Chrome > Microsoft Edge.
      * Edge can block account.live.com on some Windows installations.
      */
-    private async detectBrowserChannel(): Promise<BrowserChannel | undefined> {
-        for (const channel of ['chrome', 'msedge'] as const) {
+    private async detectBrowserChannel(): Promise<BrowserCandidate> {
+        for (const channel of [undefined, 'chrome', 'msedge'] as const) {
             try {
-                const testBrowser = await rebrowser.chromium.launch({ headless: true, channel })
+                const testBrowser = await rebrowser.chromium.launch({
+                    headless: true,
+                    ...(channel && { channel })
+                })
                 await testBrowser.close()
                 return channel
             } catch {
                 // Channel not available, try next
             }
         }
-        // Fallback: Patchright bundled Chromium (no channel needed)
-        return undefined
+
+        throw new Error('No supported Chromium browser found. Run `npx patchright install chromium` and try again.')
     }
 
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
@@ -85,7 +89,7 @@ class BrowserManager {
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BROWSER',
-                'Initializing browser — detecting available channel (Chrome › Edge › Chromium)...'
+                'Initializing browser — detecting available channel (Chromium › Chrome › Edge)...'
             )
 
             const proxyConfig = account.proxy.url

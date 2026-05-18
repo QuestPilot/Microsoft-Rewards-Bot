@@ -3,6 +3,9 @@ import type { Page } from 'patchright'
 import { URLSearchParams } from 'url'
 
 import type { MicrosoftRewardsBot } from '../../../index'
+import type { Account } from '../../../types/Account'
+import { EmailStrategy } from './EmailStrategy'
+import { TotpStrategy } from './TotpStrategy'
 
 export class MobileStrategy {
     private clientId = '0000000040170455'
@@ -14,7 +17,12 @@ export class MobileStrategy {
 
     // Selectors for handling Passkey prompt during OAuth
     private readonly selectors = {
+        primaryButton: 'button[data-testid="primaryButton"]',
         secondaryButton: 'button[data-testid="secondaryButton"]',
+        otherWaysToSignIn: '[data-testid="viewFooter"] [role="button"]',
+        passwordIcon: '[data-testid="tile"]:has(svg path[d*="M11.78 10.22a.75.75"])',
+        passwordEntry: '[data-testid="passwordEntry"], input[type="password"]',
+        totpInput: 'input[name="otc"], form[name="OneTimeCodeViewForm"]',
         passKeyError: '[data-testid="registrationImg"]',
         passKeyVideo: '[data-testid="biometricVideo"]'
     } as const
@@ -40,13 +48,84 @@ export class MobileStrategy {
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Found Passkey prompt on OAuth page, skipping')
                 await this.bot.browser.utils.ghostClick(this.page, this.selectors.secondaryButton)
                 await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                await this.bot.utils.wait(2000)
             }
         } catch {
             // Ignore errors in prompt handling
         }
     }
 
-    async get(email: string): Promise<string> {
+    private async handleInteractivePrompt(account?: Account): Promise<void> {
+        try {
+            const url = new URL(this.page.url())
+            const isPasskeyInterrupt = url.hostname === 'account.live.com' && url.pathname.includes('/interrupt/passkey')
+
+            if (isPasskeyInterrupt) {
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Passkey enrollment interrupt detected during mobile OAuth')
+            }
+
+            if (await this.checkSelector(this.selectors.passKeyError)) {
+                await this.handlePasskeyPrompt()
+                return
+            }
+
+            if (await this.checkSelector(this.selectors.passKeyVideo)) {
+                await this.handlePasskeyPrompt()
+                return
+            }
+
+            if (isPasskeyInterrupt && (await this.checkSelector(this.selectors.secondaryButton))) {
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Skipping passkey enrollment during mobile OAuth')
+                await this.bot.browser.utils.ghostClick(this.page, this.selectors.secondaryButton)
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                await this.bot.utils.wait(2000)
+                return
+            }
+
+            if (account?.totpSecret && (await this.checkSelector(this.selectors.totpInput))) {
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'TOTP prompt detected during mobile OAuth')
+                await new TotpStrategy(this.bot).handle(this.page, account.totpSecret)
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                return
+            }
+
+            if (account?.password && (await this.checkSelector(this.selectors.passwordEntry))) {
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Password prompt detected during mobile OAuth')
+                await new EmailStrategy(this.bot).enterPassword(this.page, account.password)
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                return
+            }
+
+            const passwordTile = this.page.locator(this.selectors.passwordIcon).first()
+            if (account?.password && (await passwordTile.isVisible().catch(() => false))) {
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Selecting password method during mobile OAuth')
+                await passwordTile.click().catch(async () => {
+                    await this.bot.browser.utils.ghostClick(this.page, this.selectors.passwordIcon)
+                })
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                return
+            }
+
+            const otherWaysButtons = this.page.locator(this.selectors.otherWaysToSignIn)
+            const otherWaysCount = await otherWaysButtons.count().catch(() => 0)
+            const otherWays = otherWaysCount > 0 ? otherWaysButtons.nth(otherWaysCount - 1) : otherWaysButtons.first()
+            if (await otherWays.isVisible().catch(() => false)) {
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Selecting alternative sign-in methods during mobile OAuth')
+                await otherWays.click().catch(async () => {
+                    await this.bot.browser.utils.ghostClick(this.page, this.selectors.otherWaysToSignIn)
+                })
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+            }
+        } catch (error) {
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'LOGIN-APP',
+                `Interactive OAuth prompt handler skipped: ${error instanceof Error ? error.message : String(error)}`
+            )
+        }
+    }
+
+    async get(email: string, account?: Account): Promise<string> {
         try {
             const authorizeUrl = new URL(this.authUrl)
             authorizeUrl.searchParams.append('response_type', 'code')
@@ -102,8 +181,7 @@ export class MobileStrategy {
                         }
                     }
 
-                    // Handle Passkey prompt if it appears
-                    await this.handlePasskeyPrompt()
+                    await this.handleInteractivePrompt(account)
                 } catch (err) {
                     this.bot.logger.debug(
                         this.bot.isMobile,

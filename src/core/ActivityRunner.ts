@@ -13,7 +13,13 @@ import { StreakProtectionGate } from './tasks/browser/StreakProtectionGate'
 import type { Promotion } from '../types/AppDashboardData'
 import type { ConfigRedeemGoal } from '../types/Config'
 import type { BasePromotion, DashboardData, FindClippyPromotion, PurplePromotionalItem } from '../types/DashboardData'
-import type { ClaimPointsResult, DailyStreakInfo, DashboardInfo, PremiumTaskMap } from './InternalPluginAPI'
+import type {
+    ClaimPointsResult,
+    DailyStreakInfo,
+    DashboardInfo,
+    PremiumTaskMap,
+    TemporaryPunchcardsResult
+} from './InternalPluginAPI'
 import type { StreakProtectionSyncResult } from './tasks/browser/StreakProtectionGate'
 
 export default class ActivityRunner {
@@ -131,6 +137,14 @@ export default class ActivityRunner {
         }
         this.bot.logger.warn('main', 'PLUGIN', 'Premium plugin required for ClaimPoints — skipping')
         return { claimed: false, pointsClaimed: 0, entries: [] }
+    }
+
+    doTemporaryPunchcards = async (page: Page): Promise<TemporaryPunchcardsResult> => {
+        if (this.premiumTasks.doTemporaryPunchcards) {
+            return this.premiumTasks.doTemporaryPunchcards(page)
+        }
+        this.bot.logger.warn('main', 'PLUGIN', 'Premium plugin required for TemporaryPunchcards — skipping')
+        return { visited: 0, completedSteps: 0, skippedSteps: 0 }
     }
 
     syncStreakProtection = async (page: Page, desiredEnabled: boolean): Promise<StreakProtectionSyncResult> => {

@@ -9,6 +9,9 @@ The bot is open source, but the official Core plugin is proprietary and requires
 | Bing searches | Yes | Yes |
 | Daily Set | Limited to 2 quests per day | Unlimited |
 | Simple URL rewards and quizzes | Yes | Yes |
+| Temporary punchcards and quest pages | No | Best effort |
+| Passive level-up cards | Tracked by Microsoft account state | Tracked by Microsoft account state |
+| External install, sweepstakes, or subscription offers | Not automated | Reported when detected |
 | Public plugin API | Yes | Yes |
 | Web dashboard | No | Yes |
 | Claim points cards | No | Yes |
@@ -17,6 +20,33 @@ The bot is open source, but the official Core plugin is proprietary and requires
 | App rewards | No | Yes |
 | Redeem goal automation | No | Yes |
 | Advanced side-panel automation | No | Yes |
+
+## Rewards Coverage
+
+The open-source bot focuses on the stable Rewards workflow: Bing searches, Daily Set activities, simple URL rewards, and quizzes. It can still skip activities when Microsoft marks them as locked, passive, external, or unavailable for the account region.
+
+Core adds the maintained premium layer for newer dashboard surfaces. This includes claimable point cards, app rewards, streak details, redeem goal automation, and best-effort handling for temporary quest or punchcard pages under `/earn/quest/...`.
+
+Not every card shown on the Microsoft Rewards dashboard is a direct point task. Some cards are account-state progress, such as level-up streaks or default-search progress. Others are external offers, such as installing Edge, installing an extension, using the Bing/Xbox app, redeeming points, subscribing to Game Pass, or entering a sweepstakes. Core may detect and report those cards, but it does not claim them as normal web activities unless Microsoft exposes a supported Rewards action for the signed-in account.
+
+Temporary punchcards are campaign-specific. Core should handle the common pattern when possible:
+
+- open the quest page;
+- activate the punchcard if Microsoft exposes an activation action;
+- complete supported `bing.com/search` or simple URL steps;
+- leave redeem, install, subscription, app-only, or time-gated steps as external.
+
+This keeps the open-source edition simple while allowing Core to evolve with Microsoft dashboard changes without exposing the private automation layer.
+
+## Value Expectations
+
+Core is designed to cover more eligible Rewards surfaces, not to promise a fixed cash return. Microsoft Rewards point values, redemption options, search caps, dashboard cards, and regional availability can change by country, account level, device, subscription status, and time.
+
+For that reason, the project should avoid fixed earnings claims such as “earn X dollars per month”. A clearer promise is:
+
+- open source handles the stable baseline workflow;
+- Core handles the advanced and fast-changing dashboard surfaces when they are eligible for the account;
+- passive, external, app-only, install, subscription, sweepstakes, and redeem/spend-points cards are detected or skipped rather than counted as guaranteed earnings.
 
 ## Core Dashboard
 

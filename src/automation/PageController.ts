@@ -1195,8 +1195,15 @@ export default class PageController {
             this.bot.logger.info(
                 this.bot.isMobile,
                 'REPORT-ACTIVITY-BROWSER',
-                `Server Action: http=${result.status} actionResult=${result.actionSuccess ?? 'unknown'} | offerId=${finalOfferId} | rsc=${result.actionResult ?? '(empty)'}`
+                `Server Action: http=${result.status} actionResult=${result.actionSuccess ?? 'unknown'} | offerId=${finalOfferId}`
             )
+            if (result.actionResult) {
+                this.bot.logger.debug(
+                    this.bot.isMobile,
+                    'REPORT-ACTIVITY-BROWSER',
+                    `Server Action RSC response | offerId=${finalOfferId} | ${result.actionResult.replace(/\s+/g, ' ').slice(0, 300)}`
+                )
+            }
 
             return actionSucceeded
         } catch (error) {

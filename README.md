@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-4.0.7-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-4.0.15-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/Node.js-24.15.0-green?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/License-PolyForm_Noncommercial-orange?style=for-the-badge" alt="License">
 </p>
@@ -117,6 +117,10 @@ Plugin behavior is controlled through `plugins/plugins.jsonc`.
 - each plugin can receive its own configuration object
 - public plugins cannot register official premium Core tasks
 - the official web dashboard is available only through the proprietary Core plugin
+
+The default `src/config.example.json` enables only open-source workers. If you enable Core-only workers without a valid official Core plugin, the bot will skip those tasks and log that Core is required.
+
+Core also handles newer dashboard-only surfaces on a best-effort basis, such as claimable point cards, app rewards, streak details, and temporary punchcards. Some Microsoft cards are passive progress, app-only, install/subscription offers, or sweepstakes entries; those are reported when detected rather than treated as normal web point tasks.
 
 ---
 

@@ -53,6 +53,7 @@ export interface PremiumTaskMap {
     doRedeemGoal: (page: Page, config: ConfigRedeemGoal) => Promise<void>
     collectDashboardInfo: (page: Page) => Promise<DashboardInfo>
     doClaimPoints: (page: Page) => Promise<ClaimPointsResult>
+    doTemporaryPunchcards: (page: Page) => Promise<TemporaryPunchcardsResult>
     syncStreakProtection: (page: Page, desiredEnabled: boolean) => Promise<StreakProtectionSyncResult>
 }
 
@@ -67,6 +68,12 @@ export interface ClaimPointsResult {
     claimed: boolean
     pointsClaimed: number
     entries: ClaimEntry[]
+}
+
+export interface TemporaryPunchcardsResult {
+    visited: number
+    completedSteps: number
+    skippedSteps: number
 }
 
 export interface DashboardInfo {

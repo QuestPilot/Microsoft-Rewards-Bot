@@ -1,7 +1,7 @@
 {
     "name": "microsoft-rewards-bot",
-    "version": "4.0.11",
-    "description": "Automated Microsoft Rewards points collector. Effortlessly accumulate rewards with intuitive navigation, multi-account support, Docker deployment, account creator, a dashboard, a Discord webbook, and an anti-detection system and more click here.",
+    "version": "4.0.15",
+    "description": "Open-source Microsoft Rewards automation with multi-account support, Docker deployment, plugin extensions, Discord webhooks, and optional proprietary Core features.",
     "author": "QuestPilot",
     "license": "SEE LICENSE IN LICENSE",
     "repository": {

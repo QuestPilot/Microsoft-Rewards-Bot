@@ -438,14 +438,23 @@ export class MicrosoftRewardsBot {
 
                 await this.login.login(this.mainMobilePage, account)
 
-                try {
-                    this.accessToken = await this.login.getAppAccessToken(this.mainMobilePage, accountEmail)
-                } catch (error) {
-                    this.logger.error(
-                        'main',
-                        'FLOW',
-                        `Failed to get mobile access token: ${error instanceof Error ? error.message : String(error)}`
-                    )
+                const needsAppAccessToken =
+                    this.config.workers.doAppPromotions ||
+                    this.config.workers.doDailyCheckIn ||
+                    this.config.workers.doReadToEarn
+
+                if (needsAppAccessToken) {
+                    try {
+                        this.accessToken = await this.login.getAppAccessToken(this.mainMobilePage, account)
+                    } catch (error) {
+                        this.logger.error(
+                            'main',
+                            'FLOW',
+                            `Failed to get mobile access token: ${error instanceof Error ? error.message : String(error)}`
+                        )
+                    }
+                } else {
+                    this.logger.debug('main', 'GET-APP-TOKEN', 'Skipping mobile access token: no app-only workers enabled')
                 }
 
                 this.cookies.mobile = await initialContext.cookies()
@@ -482,6 +491,18 @@ export class MicrosoftRewardsBot {
                     } | App: ${appEarnable?.totalEarnablePoints ?? 0} | ${accountEmail} | locale: ${this.userData.geoLocale}`
                 )
 
+                // Claim ready dashboard points before spending time on other activities.
+                if (this.config.workers.doClaimPoints) {
+                    const claimResult = await this.activities.doClaimPoints(this.mainMobilePage)
+                    if (claimResult.claimed) {
+                        this.logger.info(
+                            'main',
+                            'CLAIM-POINTS',
+                            `Claimed ${claimResult.pointsClaimed} points | Entries: ${claimResult.entries.length}`
+                        )
+                    }
+                }
+
                 // Dashboard Info: collect hero data BEFORE any activities (for before/after comparison)
                 if (this.config.workers.doDashboardInfo) {
                     const dashInfo = await this.activities.collectDashboardInfo(this.mainMobilePage)
@@ -491,7 +512,12 @@ export class MicrosoftRewardsBot {
                 if (this.config.workers.doAppPromotions) await this.workers.doAppPromotions(appData)
                 if (this.config.workers.doDailySet) await this.workers.doDailySet(data, this.mainMobilePage)
                 if (this.config.workers.doSpecialPromotions) await this.workers.doSpecialPromotions(data)
-                if (this.config.workers.doMorePromotions) await this.workers.doMorePromotions(data, this.mainMobilePage)
+                if (this.config.workers.doMorePromotions) {
+                    await this.workers.doMorePromotions(data, this.mainMobilePage)
+                    if (this.pluginManager.hasOfficialCoreEntitlement()) {
+                        await this.activities.doTemporaryPunchcards(this.mainMobilePage)
+                    }
+                }
                 if (this.accessToken) {
                     if (this.config.workers.doDailyCheckIn) await this.activities.doDailyCheckIn()
                     if (this.config.workers.doReadToEarn) await this.activities.doReadToEarn()
@@ -523,18 +549,6 @@ export class MicrosoftRewardsBot {
                 // Redeem Goal: set auto-redeem goal if configured
                 if (this.config.workers.doRedeemGoal && this.config.redeemGoal?.enabled) {
                     await this.activities.doRedeemGoal(this.mainMobilePage, this.config.redeemGoal)
-                }
-
-                // Claim Points: claim any "Prêt à réclamer" points before searches
-                if (this.config.workers.doClaimPoints) {
-                    const claimResult = await this.activities.doClaimPoints(this.mainMobilePage)
-                    if (claimResult.claimed) {
-                        this.logger.info(
-                            'main',
-                            'CLAIM-POINTS',
-                            `Claimed ${claimResult.pointsClaimed} points | Entries: ${claimResult.entries.length}`
-                        )
-                    }
                 }
 
                 const searchPoints = await this.browser.func.getSearchPoints()

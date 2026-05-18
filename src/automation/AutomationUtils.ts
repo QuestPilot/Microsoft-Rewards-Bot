@@ -380,6 +380,11 @@ export default class AutomationUtils {
         // ── Intercept WebAuthn passkey creation/get requests — abort them ───
         // These endpoints are called when the browser tries to create or retrieve
         // a passkey through the platform authenticator (triggers Windows Security dialog).
+        //
+        // Do not block top-level document navigations such as
+        // account.live.com/interrupt/passkey/enroll. Microsoft renders a regular
+        // page there with a skip button; blocking that document leaves Chromium on
+        // ERR_BLOCKED_BY_CLIENT and prevents the login state machine from recovering.
         const webauthnPatterns = [
             '**/webauthn/**',
             '**/passkey/**',
@@ -389,10 +394,16 @@ export default class AutomationUtils {
 
         for (const pattern of webauthnPatterns) {
             await page.route(pattern, route => {
+                const request = route.request()
+                if (request.resourceType() === 'document') {
+                    route.continue()
+                    return
+                }
+
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'DISABLE-FIDO',
-                    `Blocked WebAuthn request: ${route.request().url()}`
+                    `Blocked WebAuthn request: ${request.url()}`
                 )
                 route.abort('blockedbyclient')
             })

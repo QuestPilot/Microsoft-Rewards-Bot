@@ -223,6 +223,11 @@ export class AuthManager {
             return 'CHROMEWEBDATA_ERROR'
         }
 
+        if (url.hostname === 'account.live.com' && url.pathname.includes('/interrupt/passkey')) {
+            this.bot.logger.debug(this.bot.isMobile, 'DETECT-STATE', 'Detected passkey enrollment interrupt')
+            return 'PASSKEY_ERROR'
+        }
+
         const isLocked = await this.checkSelector(page, this.selectors.accountLocked)
         if (isLocked) {
             this.bot.logger.debug(this.bot.isMobile, 'DETECT-STATE', 'Account locked selector found')
@@ -337,6 +342,16 @@ export class AuthManager {
     }
 
     private async clickUsePasswordOption(page: Page): Promise<boolean> {
+        const passwordTile = page.locator(this.selectors.passwordIcon).first()
+        if (await passwordTile.isVisible().catch(() => false)) {
+            this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Selecting password sign-in tile')
+            await passwordTile.click().catch(async () => {
+                await this.bot.browser.utils.ghostClick(page, this.selectors.passwordIcon)
+            })
+            await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+            return true
+        }
+
         for (const label of ['Use your password', 'Use my password']) {
             const links = page.getByText(label, { exact: false })
             const count = await links.count().catch(() => 0)
@@ -353,6 +368,26 @@ export class AuthManager {
                 await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
                 return true
             }
+        }
+
+        return false
+    }
+
+    private async clickOtherSignInMethods(page: Page): Promise<boolean> {
+        const footerButtons = page.locator(this.selectors.otherWaysToSignIn)
+        const count = await footerButtons.count().catch(() => 0)
+
+        for (let i = count - 1; i >= 0; i--) {
+            const button = footerButtons.nth(i)
+            const visible = await button.isVisible().catch(() => false)
+            if (!visible) continue
+
+            this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Selecting alternative sign-in methods')
+            await button.click().catch(async () => {
+                await this.bot.browser.utils.ghostClick(page, this.selectors.otherWaysToSignIn)
+            })
+            await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+            return true
         }
 
         return false
@@ -407,6 +442,10 @@ export class AuthManager {
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Attempting to bypass "Get code" page')
 
                 if (await this.clickUsePasswordOption(page)) {
+                    return true
+                }
+
+                if (await this.clickOtherSignInMethods(page)) {
                     return true
                 }
 
@@ -682,6 +721,10 @@ export class AuthManager {
                     return true
                 }
 
+                if (await this.clickOtherSignInMethods(page)) {
+                    return true
+                }
+
                 // Click "Use your password" footer if text lookup did not expose it
                 const footerLink = await page
                     .waitForSelector(this.selectors.viewFooter, { state: 'visible', timeout: 2000 })
@@ -908,8 +951,8 @@ export class AuthManager {
         }
     }
 
-    async getAppAccessToken(page: Page, email: string) {
+    async getAppAccessToken(page: Page, account: Account) {
         this.bot.logger.info(this.bot.isMobile, 'GET-APP-TOKEN', 'Requesting mobile access token')
-        return await new MobileStrategy(this.bot, page).get(email)
+        return await new MobileStrategy(this.bot, page).get(account.email, account)
     }
 }
