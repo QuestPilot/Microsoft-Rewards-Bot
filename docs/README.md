@@ -12,7 +12,8 @@ Public documentation for the Microsoft Rewards Bot.
 - **[Plugin publishing](./plugin-marketplace.md)** - packaging, distribution, and marketplace guidance
 - **[Built-in scheduler](./scheduler.md)** - daily self-scheduling without cron or external services
 - **[Safety advisory](./safety-advisory.md)** - remote risk warnings with user override options
-- **[Official Core plugin](./core-plugin.md)** - what Core adds, payment/contact details, and the open-source boundary
+- **[Official Core plugin](./core-plugin.md)** - public overview, benefits, and buying information
+- **[Core technical reference](./core-plugin-reference.md)** - coverage model, limits, security boundary, and release notes
 - **[Core Dashboard](./dashboard.md)** - official remote dashboard availability and security model
 - **[Node.js version](./node-version.md)** - required Node.js version for bytecode compatibility
 - **[Dashboard testing](./dashboard-testing.md)** - saved-page analysis, mocked side-panel tests, and opt-in live diagnostics

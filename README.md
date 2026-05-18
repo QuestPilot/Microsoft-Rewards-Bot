@@ -133,6 +133,7 @@ Read the plugin documentation here:
 - [Plugin API reference](docs/plugin-api.md)
 - [Plugin publishing](docs/plugin-marketplace.md)
 - [Official Core plugin](docs/core-plugin.md)
+- [Core technical reference](docs/core-plugin-reference.md)
 - [Node.js version](docs/node-version.md)
 - [Dashboard testing](docs/dashboard-testing.md)
 - [Auto-updates](docs/updates.md)
