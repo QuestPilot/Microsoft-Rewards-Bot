@@ -1,6 +1,8 @@
 import ms, { StringValue } from 'ms'
 
 export default class Helpers {
+    private randomDelayMultiplier = 1
+
     async wait(time: number | string): Promise<void> {
         if (typeof time === 'string') {
             time = this.stringToNumber(time)
@@ -85,7 +87,16 @@ export default class Helpers {
     randomDelay(min: string | number, max: string | number): number {
         const minMs = typeof min === 'number' ? min : this.stringToNumber(min)
         const maxMs = typeof max === 'number' ? max : this.stringToNumber(max)
-        return Math.floor(this.randomNumber(minMs, maxMs))
+        return Math.floor(this.randomNumber(minMs, maxMs) * this.randomDelayMultiplier)
+    }
+
+    setRandomDelayMultiplier(multiplier: number): void {
+        if (!Number.isFinite(multiplier) || multiplier < 1) {
+            this.randomDelayMultiplier = 1
+            return
+        }
+
+        this.randomDelayMultiplier = multiplier
     }
 
     /**

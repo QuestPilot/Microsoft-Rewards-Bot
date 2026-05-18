@@ -139,6 +139,7 @@ export class MicrosoftRewardsBot {
 
         // Load plugins from plugins/ directory
         await this.pluginManager.loadPlugins()
+        this.configureActionPacing()
 
         // Install plugin-registered tasks into ActivityRunner
         const tasks = this.pluginManager.getRegisteredTasks()
@@ -146,6 +147,12 @@ export class MicrosoftRewardsBot {
 
         // Notify plugins that bot is initialized
         await this.pluginManager.notifyBotInitialized()
+    }
+
+    private configureActionPacing(): void {
+        if (!this.pluginManager.hasOfficialCoreEntitlement()) {
+            this.utils.setRandomDelayMultiplier(4)
+        }
     }
 
     async run(): Promise<number> {
