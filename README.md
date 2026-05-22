@@ -66,13 +66,10 @@ We offer two branches depending on your requirements and system preferences.
 
 ## 🎬 Preview & Demonstration
 
-See the bot in action. Watch how easily it handles workflows and updates your point balance.
-
 <div align="center">
 
-<video src="assets/welcome.mp4" controls width="100%" style="max-width: 860px; border-radius: 8px;" preload="metadata">
-  Your browser does not support the video tag.
-</video>
+<img width="1448" height="1078" alt="image" src="https://github.com/user-attachments/assets/c1b82be3-60b3-427b-a6ce-c8dbc475889d" />
+
 
 </div>
 
