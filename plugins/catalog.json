@@ -10,6 +10,18 @@
       "supportUrl": "https://discord.com/users/683712256243925066",
       "purchaseUrl": "docs/core-plugin.md",
       "sha256": "fb7bd64d5dbc09e9010d3846a2ce993c1122dfdb69da977e12af0a1d7994e274"
+    },
+    {
+      "name": "run-summary",
+      "version": "1.0.0",
+      "description": "Free local summaries for account run results, written to diagnostics/run-summary.",
+      "license": "MIT",
+      "price": "free",
+      "botVersionRange": ">=4.0.0",
+      "installUrl": "plugins/run-summary",
+      "supportUrl": "docs/plugins.md",
+      "purchaseUrl": "",
+      "sha256": "f9d34ce30f1ee9526e1d9f784bfae5ae5ebcb2a3ef50e421a2d78f157d9908f7"
     }
   ]
 }

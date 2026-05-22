@@ -94,6 +94,8 @@ export interface AccountResult {
 `onAccountStart` receives `{ email, config, log, apiVersion }`.
 `onAccountEnd` receives the same fields plus `result`.
 
+Notification sinks registered with `registerNotificationSink` receive local bot notifications such as run completion summaries. They are for local extensions only; they do not send data anywhere unless the plugin itself does so.
+
 ## Example
 
 ```ts

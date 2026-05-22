@@ -1,0 +1,16 @@
+{
+  "name": "msrb-plugin-run-summary",
+  "version": "1.0.0",
+  "description": "Free local run summaries for Microsoft Rewards Bot account results.",
+  "license": "MIT",
+  "main": "index.js",
+  "private": true,
+  "msrb": {
+    "plugin": "run-summary",
+    "capabilities": [
+      "diagnostics",
+      "notifications"
+    ]
+  }
+}
+

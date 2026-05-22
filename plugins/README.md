@@ -19,6 +19,12 @@ When `plugins/plugins.jsonc` exists, only the plugins listed there are eligible 
 It is compiled to V8 bytecode and loaded through the same plugin manager as third-party plugins.
 Its checksum is pinned in `plugins/official-core.json`; if it does not match, premium entitlement is not granted.
 
+## Built-in Free Plugins
+
+`plugins/run-summary/` is an optional free plugin. It records account results locally in
+`diagnostics/run-summary/` and is useful when users want a simple after-run report without enabling
+premium Core features or sending extra data to a remote service.
+
 ## Third-Party Plugins
 
 A plugin can be a folder with:

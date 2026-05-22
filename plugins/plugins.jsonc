@@ -37,6 +37,22 @@
         //   "tursoAuthToken": "<database token>",
         //   "licensePublicKey": "<optional response verification public key>"
         // }
+    },
+
+    // ───────────────────────────────────────────────────────────────
+    // Free Plugin: Run Summary
+    // ───────────────────────────────────────────────────────────────
+    // Writes local account result summaries to diagnostics/run-summary.
+    // Disabled by default so users can choose whether they want extra files.
+
+    "run-summary": {
+        "enabled": false,
+        "priority": 40,
+        "config": {
+            "outputDir": "diagnostics/run-summary",
+            "includeEmails": false,
+            "writeMarkdown": true
+        }
     }
 
     // ───────────────────────────────────────────────────────────────

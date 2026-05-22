@@ -273,6 +273,11 @@ export class MicrosoftRewardsBot {
                         `Completed all accounts | Accounts processed: ${allAccountStats.length} | Total points collected: +${totalCollectedPoints} | Old total: ${totalInitialPoints} → New total: ${totalFinalPoints} | Total runtime: ${totalDurationMinutes}min`,
                         'green'
                     )
+                    await this.pluginManager.notify({
+                        title: 'Run complete',
+                        message: `Processed ${allAccountStats.length} account(s), collected +${totalCollectedPoints} points in ${totalDurationMinutes}min.`,
+                        level: 'info'
+                    })
                     await flushAllWebhooks()
                     resolve(code ?? 0)
                 }
@@ -376,7 +381,7 @@ export class MicrosoftRewardsBot {
                         success: true
                     })
                 } else {
-                    accountStats.push({
+                    const failedResult = {
                         email: accountEmail,
                         initialPoints: 0,
                         finalPoints: 0,
@@ -384,17 +389,15 @@ export class MicrosoftRewardsBot {
                         duration: parseFloat(durationSeconds),
                         success: false,
                         error: 'Flow failed'
+                    }
+                    accountStats.push({
+                        ...failedResult
                     })
+                    await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
                 }
             } catch (error) {
                 const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1)
-                this.logger.error(
-                    'main',
-                    'ACCOUNT-ERROR',
-                    `${accountEmail}: ${error instanceof Error ? error.message : String(error)}`
-                )
-
-                accountStats.push({
+                const failedResult = {
                     email: accountEmail,
                     initialPoints: 0,
                     finalPoints: 0,
@@ -402,7 +405,17 @@ export class MicrosoftRewardsBot {
                     duration: parseFloat(durationSeconds),
                     success: false,
                     error: error instanceof Error ? error.message : String(error)
+                }
+                this.logger.error(
+                    'main',
+                    'ACCOUNT-ERROR',
+                    `${accountEmail}: ${error instanceof Error ? error.message : String(error)}`
+                )
+
+                accountStats.push({
+                    ...failedResult
                 })
+                await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
             }
         }
 
@@ -418,6 +431,12 @@ export class MicrosoftRewardsBot {
                 `Completed all accounts | Accounts processed: ${accountStats.length} | Total points collected: +${totalCollectedPoints} | Old total: ${totalInitialPoints} → New total: ${totalFinalPoints} | Total runtime: ${totalDurationMinutes}min`,
                 'green'
             )
+
+            await this.pluginManager.notify({
+                title: 'Run complete',
+                message: `Processed ${accountStats.length} account(s), collected +${totalCollectedPoints} points in ${totalDurationMinutes}min.`,
+                level: 'info'
+            })
 
             await flushAllWebhooks()
         }

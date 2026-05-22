@@ -16,6 +16,7 @@ bun.lock
 logs/
 .plugins-marketplace*.log
 .updates/
+.tools/
 .stfolder/
 Page/
 plugins/*/dist/

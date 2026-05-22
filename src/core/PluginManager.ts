@@ -20,7 +20,7 @@ import type {
     PluginLogger,
     PremiumTaskMap
 } from './InternalPluginAPI'
-import type { PluginDiagnosticsProvider, PluginNotificationSink, PublicPluginContext } from '../plugin-api'
+import type { PluginDiagnosticsProvider, PluginNotification, PluginNotificationSink, PublicPluginContext } from '../plugin-api'
 
 interface OfficialCoreManifest {
     plugin: 'core'
@@ -149,6 +149,20 @@ export class PluginManager {
 
     getNotificationSinks(): PluginNotificationSink[] {
         return this.notificationSinks
+    }
+
+    async notify(notification: PluginNotification): Promise<void> {
+        for (const sink of this.notificationSinks) {
+            try {
+                await sink(notification)
+            } catch (error) {
+                this.bot.logger.error(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Plugin notification sink error: ${error instanceof Error ? error.message : String(error)}`
+                )
+            }
+        }
     }
 
     async notifyBotInitialized(): Promise<void> {

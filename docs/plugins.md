@@ -23,6 +23,16 @@ Public plugins cannot register official premium Core tasks or unlock premium ent
 
 The official web dashboard is also outside the public plugin contract. It is started by the verified Core bytecode only and is not available to third-party plugins.
 
+## Built-in Free Plugins
+
+The open-source release can ship optional free plugins beside Core. These plugins are normal public plugins, so users can inspect them, disable them, fork them, or use them as examples.
+
+| Plugin | Default | Purpose |
+| --- | --- | --- |
+| `run-summary` | Disabled | Writes local account result summaries to `diagnostics/run-summary/` after each account finishes. |
+
+Enable one in `plugins/plugins.jsonc` or through the local Plugin Desk.
+
 ## Managing Plugins
 
 Run:
