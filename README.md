@@ -56,7 +56,7 @@ We offer two branches depending on your requirements and system preferences.
 
 <br />
 
-👉 **[Explore V3 (Legacy Branch)](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/legacy)**
+👉 **[Explore V3 (Legacy Branch)](https://github.com/QuestPilot/Microsoft-Rewards-Bot-Classic)**
 
 </td>
 </tr>
