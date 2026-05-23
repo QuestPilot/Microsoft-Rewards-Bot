@@ -64,11 +64,11 @@ We offer two branches depending on your requirements and system preferences.
 
 ---
 
-## 🎬 Preview & Demonstration
+## 🎬 Preview Remote Dash
 
 <div align="center">
 
-<img width="1448" height="1078" alt="image" src="https://github.com/user-attachments/assets/c1b82be3-60b3-427b-a6ce-c8dbc475889d" />
+<img width="2317" height="1189" alt="image" src="https://github.com/user-attachments/assets/c60a0e0c-97d4-44c8-90d0-4666735f0cd1" />
 
 
 </div>
