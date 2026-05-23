@@ -95,9 +95,7 @@ export class LogService {
         })
 
         const badge = platformBadge(isMobile)
-        const rewardsTag = chalk.cyan(chalk.bold(' REWARDS '))
-        const sep = chalk.blue('│')
-        const consoleStr = `${rewardsTag} ${sep} [${now}] ${sep} ${chalk.white(userName)} ${sep} [${levelTag}] ${badge} [${title}] ${formatted}`
+        const consoleStr = `[${now}] [${userName}] [${levelTag}] ${badge} [${title}] ${formatted}`
 
         let logColor: ColorKey | undefined = color
 
