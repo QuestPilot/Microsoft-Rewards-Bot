@@ -38,6 +38,9 @@ We offer two branches depending on your requirements and system preferences.
 * **Rich Dashboard:** Powered by a responsive Next.js frontend for easy tracking and control.
 * **Full Task Automation:** Complete daily searches, mobile emulation, and interactive activities.
 
+  <img width="745" height="922" alt="image" src="https://github.com/user-attachments/assets/3a5c659d-40d6-452b-a62e-0c960486836a" />
+
+
 <br />
 
 👉 **[Explore V4 (Release Branch)](https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/release)**
@@ -45,18 +48,20 @@ We offer two branches depending on your requirements and system preferences.
 </td>
 <td width="50%" valign="top">
 
-### 🗂️ V3 — Legacy Reference
+### 🟢 Bot Classic
 
-> **Classic Dashboard Architecture** > *Archived · No longer maintained · Open-source archive*
+> **Classic Dashboard Architecture** > *· Open-source archive*
 
-* **Legacy Layout:** Built for the older, classic Microsoft Rewards interface.
-* **Archived Status:** No active development, feature updates, or official support.
+* **Classic Layout:** Built for the older, classic Microsoft Rewards interface.
 * **Core Automation:** Includes fundamental search scripts and basic tasks.
 * **Reference Only:** Maintained strictly as an open-source educational resource.
 
+  <img width="809" height="448" alt="image" src="https://github.com/user-attachments/assets/1b4528a9-239d-4738-bb73-6cc22de22868" />
+
+
 <br />
 
-👉 **[Explore V3 (Legacy Branch)](https://github.com/QuestPilot/Microsoft-Rewards-Bot-Classic)**
+👉 **[Explore V3 (Classic Branch)](https://github.com/QuestPilot/Microsoft-Rewards-Bot-Classic)**
 
 </td>
 </tr>
@@ -64,7 +69,7 @@ We offer two branches depending on your requirements and system preferences.
 
 ---
 
-## 🎬 Preview Remote Dash
+## 🎬 Preview Remote Dash MSN-BOT V4
 
 <div align="center">
 
