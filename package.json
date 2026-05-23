@@ -1,6 +1,6 @@
 {
   "name": "microsoft-rewards-bot-classic-migration",
-  "version": "3.70.0",
+  "version": "3.7.0",
   "description": "Migration stub for the split Microsoft Rewards Bot repositories",
   "private": true,
   "main": "index.js",
