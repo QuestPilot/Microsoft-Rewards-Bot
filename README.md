@@ -68,7 +68,8 @@ We offer two branches depending on your requirements and system preferences.
 
 <div align="center">
 
-<img width="2317" height="1189" alt="image" src="https://github.com/user-attachments/assets/c60a0e0c-97d4-44c8-90d0-4666735f0cd1" />
+
+<img width="2309" height="1189" alt="image" src="https://github.com/user-attachments/assets/30fa0bb6-ca76-42c3-bbb5-eb620c455c7c" />
 
 
 </div>
