@@ -25,7 +25,17 @@ import type { PluginDiagnosticsProvider, PluginNotification, PluginNotificationS
 interface OfficialCoreManifest {
     plugin: 'core'
     version: string
-    indexSha256: string
+    indexSha256?: string
+    bytecodeTarget?: {
+        node?: string
+        platform?: string
+        arch?: string
+    }
+    targets?: Record<string, OfficialCoreTarget>
+}
+
+interface OfficialCoreTarget {
+    indexSha256?: string
     bytecodeTarget?: {
         node?: string
         platform?: string
@@ -38,11 +48,13 @@ interface PluginPackageManifest {
         node?: string
     }
     msrb?: {
+        indexSha256?: string
         bytecodeTarget?: {
             node?: string
             platform?: string
             arch?: string
         }
+        targets?: Record<string, OfficialCoreTarget>
     }
 }
 
@@ -289,7 +301,9 @@ export class PluginManager {
         const jscPath = path.join(dirPath, 'index.jsc')
         const jsPath = path.join(dirPath, 'index.js')
 
-        if (fs.existsSync(jscPath)) {
+        if (entryName === 'core' && fs.existsSync(jsPath)) {
+            await this.loadPluginFile(entryName, jsPath, pluginConfig)
+        } else if (fs.existsSync(jscPath)) {
             await this.loadPluginFile(entryName, jscPath, pluginConfig)
         } else if (fs.existsSync(jsPath)) {
             await this.loadPluginFile(entryName, jsPath, pluginConfig)
@@ -301,7 +315,7 @@ export class PluginManager {
         filePath: string,
         pluginConfig: Record<string, unknown>
     ): Promise<void> {
-        if (filePath.endsWith('.jsc')) {
+        if (filePath.endsWith('.jsc') || this.isOfficialCoreLoader(entryName, filePath)) {
             this.assertBytecodeTarget(entryName, filePath)
             require('bytenode')
         }
@@ -362,7 +376,7 @@ export class PluginManager {
     }
 
     private isVerifiedOfficialCore(entryName: string, filePath: string): boolean {
-        if (entryName !== 'core' || path.basename(filePath) !== 'index.jsc') {
+        if (entryName !== 'core' || !['index.jsc', 'index.js'].includes(path.basename(filePath))) {
             return false
         }
 
@@ -372,12 +386,18 @@ export class PluginManager {
         }
 
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as OfficialCoreManifest
-        if (manifest.plugin !== 'core' || typeof manifest.indexSha256 !== 'string') {
+        if (manifest.plugin !== 'core') {
             throw new Error('Official Core manifest is invalid')
         }
 
-        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
-        if (fileHash.toLowerCase() !== manifest.indexSha256.toLowerCase()) {
+        const target = this.resolveOfficialCoreTarget(filePath)
+        if (!target?.indexSha256) {
+            throw new Error(`Official Core manifest does not contain target ${this.currentCoreTargetId()}`)
+        }
+
+        const bytecodePath = this.resolveOfficialCoreBytecodePath(filePath)
+        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(bytecodePath)).digest('hex')
+        if (fileHash.toLowerCase() !== target.indexSha256.toLowerCase()) {
             throw new Error('Official Core bytecode checksum mismatch')
         }
 
@@ -385,35 +405,81 @@ export class PluginManager {
     }
 
     private assertBytecodeTarget(entryName: string, filePath: string): void {
-        if (entryName !== 'core' || path.basename(filePath) !== 'index.jsc') {
+        if (entryName !== 'core' || !['index.jsc', 'index.js'].includes(path.basename(filePath))) {
             return
         }
 
         const packagePath = path.join(path.dirname(filePath), 'package.json')
         const packageManifest = this.readJsonFile<PluginPackageManifest>(packagePath)
-        const officialManifest = this.readJsonFile<OfficialCoreManifest>(
-            path.resolve(process.cwd(), 'plugins', 'official-core.json')
-        )
-
-        const target = officialManifest?.bytecodeTarget ?? packageManifest?.msrb?.bytecodeTarget
-        const requiredNode = target?.node ?? packageManifest?.engines?.node
+        const target = this.resolveOfficialCoreTarget(filePath) ?? {
+            bytecodeTarget: packageManifest?.msrb?.bytecodeTarget
+        }
+        const requiredNode = target?.bytecodeTarget?.node ?? packageManifest?.engines?.node
         if (requiredNode && requiredNode !== process.versions.node) {
             throw new Error(
                 `Official Core bytecode requires Node.js ${requiredNode}; current runtime is ${process.versions.node}`
             )
         }
 
-        if (target?.platform && target.platform !== process.platform) {
+        if (target?.bytecodeTarget?.platform && target.bytecodeTarget.platform !== process.platform) {
             throw new Error(
-                `Official Core bytecode was built for ${target.platform}/${target.arch ?? 'unknown'}; current runtime is ${process.platform}/${process.arch}`
+                `Official Core bytecode was built for ${target.bytecodeTarget.platform}/${target.bytecodeTarget.arch ?? 'unknown'}; current runtime is ${process.platform}/${process.arch}`
             )
         }
 
-        if (target?.arch && target.arch !== process.arch) {
+        if (target?.bytecodeTarget?.arch && target.bytecodeTarget.arch !== process.arch) {
             throw new Error(
-                `Official Core bytecode was built for ${target.platform ?? 'unknown'}/${target.arch}; current runtime is ${process.platform}/${process.arch}`
+                `Official Core bytecode was built for ${target.bytecodeTarget.platform ?? 'unknown'}/${target.bytecodeTarget.arch}; current runtime is ${process.platform}/${process.arch}`
             )
         }
+    }
+
+    private isOfficialCoreLoader(entryName: string, filePath: string): boolean {
+        return entryName === 'core' && path.basename(filePath) === 'index.js'
+    }
+
+    private currentCoreTargetId(): string {
+        return `${process.platform}-${process.arch}-node-${process.versions.node}`
+    }
+
+    private resolveOfficialCoreTarget(filePath: string): OfficialCoreTarget | undefined {
+        const packagePath = path.join(path.dirname(filePath), 'package.json')
+        const packageManifest = this.readJsonFile<PluginPackageManifest>(packagePath)
+        const officialManifest = this.readJsonFile<OfficialCoreManifest>(
+            path.resolve(process.cwd(), 'plugins', 'official-core.json')
+        )
+        const targetId = this.currentCoreTargetId()
+        const manifestTarget = officialManifest?.targets?.[targetId]
+        const packageTarget = packageManifest?.msrb?.targets?.[targetId]
+        if (manifestTarget || packageTarget) {
+            return {
+                ...packageTarget,
+                ...manifestTarget,
+                bytecodeTarget: manifestTarget?.bytecodeTarget ?? packageTarget?.bytecodeTarget
+            }
+        }
+        if (officialManifest?.indexSha256 || officialManifest?.bytecodeTarget) {
+            return {
+                indexSha256: officialManifest.indexSha256,
+                bytecodeTarget: officialManifest.bytecodeTarget
+            }
+        }
+        if (packageManifest?.msrb?.indexSha256 || packageManifest?.msrb?.bytecodeTarget) {
+            return {
+                indexSha256: packageManifest.msrb.indexSha256,
+                bytecodeTarget: packageManifest.msrb.bytecodeTarget
+            }
+        }
+        return undefined
+    }
+
+    private resolveOfficialCoreBytecodePath(filePath: string): string {
+        if (path.basename(filePath) === 'index.jsc') return filePath
+        const targetPath = path.join(path.dirname(filePath), 'targets', this.currentCoreTargetId(), 'index.jsc')
+        if (!fs.existsSync(targetPath)) {
+            throw new Error(`Official Core bytecode target missing: ${this.currentCoreTargetId()}`)
+        }
+        return targetPath
     }
 
     private readJsonFile<T>(filePath: string): T | undefined {

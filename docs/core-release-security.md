@@ -19,14 +19,13 @@ Never ship database tokens, service API keys, private keys, or license backend s
 
 ## Supported Protection Model
 
-The recommended free protection stack is:
+The public release should only receive private Core release artifacts from the maintainer pipeline. Do not document or reproduce the private Core build internals in the public repository.
 
-1. Build TypeScript to JavaScript.
-2. Obfuscate the JavaScript with `javascript-obfuscator`.
-3. Compile the obfuscated output to V8 bytecode with `bytenode`.
-4. Publish only bytecode artifacts and the minimal loader/package metadata.
-5. Pin checksums in the official manifest and plugin catalog.
-6. Keep sensitive authority on Core-API, not in the local plugin.
+The public repository is allowed to describe the security boundary:
+
+- publish only compiled Core artifacts and minimal metadata;
+- pin checksums in the official manifest and plugin catalog;
+- keep sensitive authority on Core-API, not in the local plugin.
 
 This is commercial friction, not absolute secrecy. Treat every shipped local artifact as inspectable by a motivated user.
 
@@ -74,14 +73,7 @@ plugins/core/
       ...
 ```
 
-The loader must select exactly one target:
-
-```js
-const target = `${process.platform}-${process.arch}-node-${process.versions.node}`
-module.exports = require(`./targets/${target}/index.jsc`)
-```
-
-The manifest must pin checksums per target:
+The loader must select exactly one target at runtime, and the manifest must pin checksums per target:
 
 ```json
 {
@@ -123,7 +115,7 @@ Allowed Core artifact types:
 - `package.json`;
 - `package-lock.json`;
 - `LICENSE`;
-- `official-core.json` while the single-target layout still needs compatibility metadata.
+- `official-core.json` metadata.
 
 ## Release Gate
 
@@ -139,8 +131,8 @@ When Core changed, also verify:
 
 - the Core artifact was built on the intended target OS and architecture;
 - `official-core.json` records the correct target;
-- `plugins/official-core.json` matches `plugins/core/index.jsc` for the current single-target layout;
-- `plugins/catalog.json` matches the same checksum;
+- `plugins/official-core.json` matches every shipped Core target;
+- `plugins/catalog.json` matches the same target checksums;
 - no Core source, sourcemap, `.env`, or private secret exists in the public repository.
 
 ## Best Next Step

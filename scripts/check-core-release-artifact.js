@@ -59,33 +59,64 @@ function main() {
         }
     }
 
-    const indexJsc = path.join(CORE_DIR, 'index.jsc')
-    if (!fs.existsSync(indexJsc)) {
-        fail('plugins/core/index.jsc is missing')
-        return
-    }
-
-    const actualHash = sha256(indexJsc)
     const officialCore = readJson(OFFICIAL_CORE_PATH)
     const corePackage = readJson(path.join(CORE_DIR, 'package.json'))
     const catalog = readJson(CATALOG_PATH)
     const catalogCore = Array.isArray(catalog.plugins) ? catalog.plugins.find(plugin => plugin.name === 'core') : null
+    const targets = officialCore.targets || corePackage.msrb?.targets || null
 
-    if (officialCore.indexSha256 !== actualHash) {
-        fail('plugins/official-core.json indexSha256 does not match plugins/core/index.jsc')
-    }
-    if (corePackage.msrb?.indexSha256 !== actualHash) {
-        fail('plugins/core/package.json msrb.indexSha256 does not match plugins/core/index.jsc')
-    }
-    if (catalogCore?.sha256 !== actualHash) {
-        fail('plugins/catalog.json core sha256 does not match plugins/core/index.jsc')
-    }
-
-    const target = officialCore.bytecodeTarget || corePackage.msrb?.bytecodeTarget
-    if (!target) {
-        console.warn('[CORE-RELEASE-CHECK] Core bytecode target metadata is missing; single-target legacy artifact detected.')
+    if (targets && typeof targets === 'object') {
+        if (!catalogCore?.targets || typeof catalogCore.targets !== 'object') {
+            fail('plugins/catalog.json core targets metadata is missing')
+        }
+        const packageTargets = corePackage.msrb?.targets || {}
+        const catalogTargets = catalogCore?.targets || {}
+        for (const [targetId, target] of Object.entries(targets)) {
+            const indexJsc = path.join(CORE_DIR, 'targets', targetId, 'index.jsc')
+            if (!fs.existsSync(indexJsc)) {
+                fail(`plugins/core/targets/${targetId}/index.jsc is missing`)
+                continue
+            }
+            const actualHash = sha256(indexJsc)
+            if (target.indexSha256 !== actualHash) {
+                fail(`plugins/official-core.json ${targetId} indexSha256 does not match the target bytecode`)
+            }
+            if (packageTargets[targetId]?.indexSha256 !== actualHash) {
+                fail(`plugins/core/package.json ${targetId} indexSha256 does not match the target bytecode`)
+            }
+            if (catalogTargets[targetId]?.indexSha256 !== actualHash) {
+                fail(`plugins/catalog.json ${targetId} indexSha256 does not match the target bytecode`)
+            }
+            if (!target.bytecodeTarget?.node || !target.bytecodeTarget?.platform || !target.bytecodeTarget?.arch) {
+                fail(`plugins/official-core.json ${targetId} bytecodeTarget metadata is incomplete`)
+            }
+        }
+        const targetList = Object.keys(targets).join(', ')
+        console.log(`[CORE-RELEASE-CHECK] Core bytecode targets: ${targetList}`)
     } else {
-        console.log(`[CORE-RELEASE-CHECK] Core bytecode target: ${target.platform}/${target.arch}/node-${target.node}`)
+        const indexJsc = path.join(CORE_DIR, 'index.jsc')
+        if (!fs.existsSync(indexJsc)) {
+            fail('plugins/core/index.jsc is missing')
+            return
+        }
+
+        const actualHash = sha256(indexJsc)
+        if (officialCore.indexSha256 !== actualHash) {
+            fail('plugins/official-core.json indexSha256 does not match plugins/core/index.jsc')
+        }
+        if (corePackage.msrb?.indexSha256 !== actualHash) {
+            fail('plugins/core/package.json msrb.indexSha256 does not match plugins/core/index.jsc')
+        }
+        if (catalogCore?.sha256 !== actualHash) {
+            fail('plugins/catalog.json core sha256 does not match plugins/core/index.jsc')
+        }
+
+        const target = officialCore.bytecodeTarget || corePackage.msrb?.bytecodeTarget
+        if (!target) {
+            console.warn('[CORE-RELEASE-CHECK] Core bytecode target metadata is missing; single-target legacy artifact detected.')
+        } else {
+            console.log(`[CORE-RELEASE-CHECK] Core bytecode target: ${target.platform}/${target.arch}/node-${target.node}`)
+        }
     }
 
     if (!process.exitCode) {

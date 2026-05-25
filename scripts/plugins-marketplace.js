@@ -111,6 +111,15 @@ function hashFile(filePath) {
     return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
 }
 
+function currentCoreTargetId() {
+    return `${process.platform}-${process.arch}-node-${process.versions.node}`
+}
+
+function coreTargetPath(basePath) {
+    const targetPath = path.join(basePath, 'targets', currentCoreTargetId(), 'index.jsc')
+    return fs.existsSync(targetPath) ? targetPath : null
+}
+
 function readInstalledPlugins() {
     if (!fs.existsSync(PLUGINS_DIR)) return []
 
@@ -122,7 +131,9 @@ function readInstalledPlugins() {
             const packagePath = entry.isDirectory() ? path.join(basePath, 'package.json') : null
             const packageJson = packagePath ? readJson(packagePath, {}) : {}
             const entryFile = entry.isDirectory()
-                ? fs.existsSync(path.join(basePath, 'index.jsc'))
+                ? entry.name === 'core' && coreTargetPath(basePath)
+                    ? coreTargetPath(basePath)
+                    : fs.existsSync(path.join(basePath, 'index.jsc'))
                     ? path.join(basePath, 'index.jsc')
                     : path.join(basePath, 'index.js')
                 : basePath
@@ -151,8 +162,10 @@ function findCatalogEntry(name) {
 
 function verifyPlugin(plugin) {
     const catalogEntry = findCatalogEntry(plugin.name)
+    const officialCore = plugin.name === 'core' ? readJson(path.join(PLUGINS_DIR, 'official-core.json'), null) : null
+    const targetId = currentCoreTargetId()
     const expected = plugin.name === 'core'
-        ? readJson(path.join(PLUGINS_DIR, 'official-core.json'), null)?.indexSha256 ?? catalogEntry?.sha256
+        ? officialCore?.targets?.[targetId]?.indexSha256 ?? officialCore?.indexSha256 ?? catalogEntry?.targets?.[targetId]?.indexSha256 ?? catalogEntry?.sha256
         : catalogEntry?.sha256
 
     if (!expected || expected.includes('placeholder')) {
@@ -650,7 +663,7 @@ const HTML = `<!doctype html>
       $('#installed-count').textContent = state.installed.length + ' found'
       $('#catalog-count').textContent = state.catalog.length + ' listed'
       $('#core-status').textContent = state.officialCore
-        ? 'manifest ' + state.officialCore.version + ' / ' + state.officialCore.indexSha256.slice(0, 12)
+        ? 'manifest ' + state.officialCore.version + ' / ' + (state.officialCore.targets ? currentCoreTargetId() : state.officialCore.indexSha256.slice(0, 12))
         : 'manifest missing'
 
       installedEl.innerHTML = state.installed.length
