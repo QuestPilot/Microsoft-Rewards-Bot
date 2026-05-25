@@ -2,7 +2,7 @@
  * Microsoft Rewards Bot — Plugin Manager
  * Copyright (c) 2026 QuestPilot
  *
- * Licensed under the PolyForm Non-Commercial License 1.0.
+ * Licensed under the QuestPilot Source Available License 1.0.
  * See LICENSE for full terms.
  */
 
@@ -26,6 +26,24 @@ interface OfficialCoreManifest {
     plugin: 'core'
     version: string
     indexSha256: string
+    bytecodeTarget?: {
+        node?: string
+        platform?: string
+        arch?: string
+    }
+}
+
+interface PluginPackageManifest {
+    engines?: {
+        node?: string
+    }
+    msrb?: {
+        bytecodeTarget?: {
+            node?: string
+            platform?: string
+            arch?: string
+        }
+    }
 }
 
 export class PluginManager {
@@ -284,6 +302,7 @@ export class PluginManager {
         pluginConfig: Record<string, unknown>
     ): Promise<void> {
         if (filePath.endsWith('.jsc')) {
+            this.assertBytecodeTarget(entryName, filePath)
             require('bytenode')
         }
 
@@ -363,6 +382,50 @@ export class PluginManager {
         }
 
         return true
+    }
+
+    private assertBytecodeTarget(entryName: string, filePath: string): void {
+        if (entryName !== 'core' || path.basename(filePath) !== 'index.jsc') {
+            return
+        }
+
+        const packagePath = path.join(path.dirname(filePath), 'package.json')
+        const packageManifest = this.readJsonFile<PluginPackageManifest>(packagePath)
+        const officialManifest = this.readJsonFile<OfficialCoreManifest>(
+            path.resolve(process.cwd(), 'plugins', 'official-core.json')
+        )
+
+        const target = officialManifest?.bytecodeTarget ?? packageManifest?.msrb?.bytecodeTarget
+        const requiredNode = target?.node ?? packageManifest?.engines?.node
+        if (requiredNode && requiredNode !== process.versions.node) {
+            throw new Error(
+                `Official Core bytecode requires Node.js ${requiredNode}; current runtime is ${process.versions.node}`
+            )
+        }
+
+        if (target?.platform && target.platform !== process.platform) {
+            throw new Error(
+                `Official Core bytecode was built for ${target.platform}/${target.arch ?? 'unknown'}; current runtime is ${process.platform}/${process.arch}`
+            )
+        }
+
+        if (target?.arch && target.arch !== process.arch) {
+            throw new Error(
+                `Official Core bytecode was built for ${target.platform ?? 'unknown'}/${target.arch}; current runtime is ${process.platform}/${process.arch}`
+            )
+        }
+    }
+
+    private readJsonFile<T>(filePath: string): T | undefined {
+        if (!fs.existsSync(filePath)) {
+            return undefined
+        }
+
+        try {
+            return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T
+        } catch {
+            return undefined
+        }
     }
 
     private createPublicPluginContext(pluginConfig: Record<string, unknown>): PublicPluginContext {

@@ -1,20 +1,14 @@
 const childProcess = require('child_process')
-const crypto = require('crypto')
 const fs = require('fs')
 const https = require('https')
-const os = require('os')
 const path = require('path')
 const { URL } = require('url')
 
 const { migrateUserFiles } = require('./ConfigMigrator')
 
 const DEFAULT_REPO = 'QuestPilot/Microsoft-Rewards-Bot'
-const DEFAULT_CHANNEL = 'stable'
-const DEFAULT_PUBLIC_KEY = [
-    '-----BEGIN PUBLIC KEY-----',
-    'MCowBQYDK2VwAyEAHEuafXvGqNUq89PhiAXIH9MGlYaap6eUAY1GNKYBn48=',
-    '-----END PUBLIC KEY-----'
-].join('\n')
+const DEFAULT_BRANCH = 'release'
+const DEFAULT_PUBLIC_KEY = ''
 
 const DEFAULT_EXCLUDES = [
     '.git',
@@ -51,21 +45,34 @@ const DEFAULT_BACKUP_PATHS = [
     'plugins/plugins.jsonc'
 ]
 
-const DEFAULT_OBSOLETE_PATHS = [
-    'src/core/DashboardServer.ts'
-]
-
 const DEFAULT_MANAGED_PATHS = [
-    'src',
-    'scripts',
-    'tests',
+    'assets',
     'docs',
     'plugins/core',
     'plugins/catalog.json',
     'plugins/official-core.json',
-    'package.json',
+    'scripts',
+    'src',
+    'tests',
+    'updates',
+    'COMMERCIAL.md',
+    'CONTRIBUTING.md',
+    'Dockerfile',
+    'LICENSE',
+    'NOTICE',
+    'README.md',
+    'TRADEMARK.md',
+    'compose.yaml',
+    'flake.lock',
+    'flake.nix',
     'package-lock.json',
+    'package.json',
+    'safety-advisory.json',
     'tsconfig.json'
+]
+
+const DEFAULT_OBSOLETE_PATHS = [
+    'src/core/DashboardServer.ts'
 ]
 
 function canonicalJson(value) {
@@ -87,10 +94,6 @@ function stripSignature(manifest) {
     return clone
 }
 
-function sha256File(filePath) {
-    return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
-}
-
 function pathToPosix(relativePath) {
     return relativePath.replace(/\\/g, '/')
 }
@@ -100,13 +103,13 @@ function escapeRegex(value) {
 }
 
 function patternToRegex(pattern) {
-    const escaped = escapeRegex(pattern).replace(/\\\*/g, '[^/]*')
+    const escaped = escapeRegex(pathToPosix(pattern)).replace(/\\\*/g, '[^/]*')
     return new RegExp(`^${escaped}(?:/.*)?$`)
 }
 
-function isExcluded(relativePath, patterns) {
+function isExcluded(relativePath, patterns = DEFAULT_EXCLUDES) {
     const posix = pathToPosix(relativePath)
-    return patterns.some(pattern => patternToRegex(pathToPosix(pattern)).test(posix))
+    return patterns.some(pattern => patternToRegex(pattern).test(posix))
 }
 
 function mkdirp(dir) {
@@ -117,10 +120,13 @@ function rmrf(target) {
     fs.rmSync(target, { recursive: true, force: true })
 }
 
-function copyRecursive(src, dest) {
-    const srcStat = fs.statSync(src)
+function readJson(filePath) {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'))
+}
 
-    if (srcStat.isDirectory()) {
+function copyRecursive(src, dest) {
+    const stat = fs.statSync(src)
+    if (stat.isDirectory()) {
         mkdirp(dest)
         for (const entry of fs.readdirSync(src)) {
             copyRecursive(path.join(src, entry), path.join(dest, entry))
@@ -132,10 +138,9 @@ function copyRecursive(src, dest) {
     fs.copyFileSync(src, dest)
 }
 
-function copyReleaseTree(sourceRoot, targetRoot, excludes) {
+function copyReleaseTree(sourceRoot, targetRoot, excludes = DEFAULT_EXCLUDES) {
     for (const entry of fs.readdirSync(sourceRoot)) {
-        const entryPath = path.join(sourceRoot, entry)
-        copyReleaseEntry(entryPath, path.join(targetRoot, entry), entry, excludes)
+        copyReleaseEntry(path.join(sourceRoot, entry), path.join(targetRoot, entry), entry, excludes)
     }
 }
 
@@ -168,13 +173,19 @@ function findExtractedRoot(extractDir) {
     throw new Error('Downloaded archive does not contain a package.json root')
 }
 
-function withCacheBust(url) {
-    const parsed = new URL(url)
-    parsed.searchParams.set('_msrb', `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`)
-    return parsed.toString()
+function removeEmptyParents(startDir, stopDir) {
+    let current = startDir
+    const stop = path.resolve(stopDir)
+
+    while (path.resolve(current).startsWith(stop) && path.resolve(current) !== stop) {
+        if (!fs.existsSync(current)) return
+        if (fs.readdirSync(current).length > 0) return
+        fs.rmdirSync(current)
+        current = path.dirname(current)
+    }
 }
 
-function removeObsoletePaths(root, obsoletePaths, excludes) {
+function removeObsoletePaths(root, obsoletePaths = DEFAULT_OBSOLETE_PATHS, excludes = DEFAULT_EXCLUDES) {
     for (const obsoletePath of obsoletePaths) {
         if (isExcluded(obsoletePath, excludes)) continue
         const target = path.join(root, obsoletePath)
@@ -184,7 +195,7 @@ function removeObsoletePaths(root, obsoletePaths, excludes) {
     }
 }
 
-function pruneManagedPaths(sourceRoot, targetRoot, managedPaths, excludes) {
+function pruneManagedPaths(sourceRoot, targetRoot, managedPaths = DEFAULT_MANAGED_PATHS, excludes = DEFAULT_EXCLUDES) {
     for (const managedPath of managedPaths) {
         if (isExcluded(managedPath, excludes)) continue
 
@@ -232,25 +243,69 @@ function pruneManagedEntry(source, target, relativePath, excludes, targetRoot) {
     }
 }
 
-function download(url, dest, timeoutMs = 45_000, options = {}) {
+function requestBuffer(url, timeoutMs = 45_000, headers = {}) {
     return new Promise((resolve, reject) => {
-        mkdirp(path.dirname(dest))
-        const file = fs.createWriteStream(dest)
-
-        const requestUrl = options.cacheBust ? withCacheBust(url) : url
-        const request = https.get(requestUrl, {
+        const request = https.get(url, {
             timeout: timeoutMs,
             headers: {
                 'user-agent': 'msrb-updater',
                 'cache-control': 'no-cache',
                 pragma: 'no-cache',
-                accept: options.accept || 'application/json, application/octet-stream;q=0.9, */*;q=0.8'
+                ...headers
+            }
+        }, response => {
+            if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
+                response.resume()
+                requestBuffer(new URL(response.headers.location, url).toString(), timeoutMs, headers).then(resolve, reject)
+                return
+            }
+
+            const chunks = []
+            response.on('data', chunk => chunks.push(chunk))
+            response.on('end', () => {
+                const body = Buffer.concat(chunks)
+                if (response.statusCode < 200 || response.statusCode >= 300) {
+                    reject(new Error(`HTTP ${response.statusCode} while requesting ${url}: ${body.toString('utf8').slice(0, 200)}`))
+                    return
+                }
+                resolve(body)
+            })
+        })
+
+        request.on('timeout', () => request.destroy(new Error(`Request timed out after ${timeoutMs}ms`)))
+        request.on('error', reject)
+    })
+}
+
+async function requestJson(url, timeoutMs = 20_000, headers = {}) {
+    const body = await requestBuffer(url, timeoutMs, {
+        accept: 'application/vnd.github+json',
+        ...headers
+    })
+    return JSON.parse(body.toString('utf8'))
+}
+
+async function requestText(url, timeoutMs = 20_000, headers = {}) {
+    const body = await requestBuffer(url, timeoutMs, headers)
+    return body.toString('utf8')
+}
+
+function download(url, dest, timeoutMs = 45_000, options = {}) {
+    return new Promise((resolve, reject) => {
+        mkdirp(path.dirname(dest))
+        const file = fs.createWriteStream(dest)
+
+        const request = https.get(url, {
+            timeout: timeoutMs,
+            headers: {
+                'user-agent': 'msrb-updater',
+                accept: options.accept || 'application/octet-stream, */*;q=0.8'
             }
         }, response => {
             if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
                 file.close()
                 rmrf(dest)
-                download(new URL(response.headers.location, requestUrl).toString(), dest, timeoutMs, options).then(resolve, reject)
+                download(new URL(response.headers.location, url).toString(), dest, timeoutMs, options).then(resolve, reject)
                 return
             }
 
@@ -262,14 +317,10 @@ function download(url, dest, timeoutMs = 45_000, options = {}) {
             }
 
             response.pipe(file)
-            file.on('finish', () => {
-                file.close(resolve)
-            })
+            file.on('finish', () => file.close(resolve))
         })
 
-        request.on('timeout', () => {
-            request.destroy(new Error(`Download timed out after ${timeoutMs}ms`))
-        })
+        request.on('timeout', () => request.destroy(new Error(`Download timed out after ${timeoutMs}ms`)))
         request.on('error', error => {
             file.close()
             rmrf(dest)
@@ -278,32 +329,16 @@ function download(url, dest, timeoutMs = 45_000, options = {}) {
     })
 }
 
-function readJson(filePath) {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'))
-}
-
-function removeEmptyParents(startDir, stopDir) {
-    let current = startDir
-    const stop = path.resolve(stopDir)
-
-    while (path.resolve(current).startsWith(stop) && path.resolve(current) !== stop) {
-        if (!fs.existsSync(current)) return
-        if (fs.readdirSync(current).length > 0) return
-        fs.rmdirSync(current)
-        current = path.dirname(current)
-    }
+function color(code, value) {
+    return `\u001b[${code}m${value}\u001b[0m`
 }
 
 class UpdateManager {
     constructor(options = {}) {
         this.root = options.root ?? path.resolve(__dirname, '..', '..')
         this.logger = options.logger ?? console
-        this.channel = process.env.MSRB_UPDATE_CHANNEL || DEFAULT_CHANNEL
-        this.manifestUrl =
-            process.env.MSRB_UPDATE_MANIFEST_URL ||
-            `https://api.github.com/repos/${DEFAULT_REPO}/contents/updates/${this.channel}.json?ref=release`
-        this.publicKey = process.env.MSRB_UPDATE_PUBLIC_KEY || DEFAULT_PUBLIC_KEY
-        this.requireSignature = options.requireSignature ?? process.env.MSRB_UPDATE_REQUIRE_SIGNATURE === '1'
+        this.repo = options.repo ?? process.env.MSRB_UPDATE_REPO ?? DEFAULT_REPO
+        this.branch = options.branch ?? process.env.MSRB_UPDATE_BRANCH ?? DEFAULT_BRANCH
         this.updatesDir = path.join(this.root, '.updates')
         this.packageJson = readJson(path.join(this.root, 'package.json'))
     }
@@ -312,9 +347,6 @@ class UpdateManager {
         if (env.MSRB_AUTO_UPDATE === '0') return { skip: true, reason: 'MSRB_AUTO_UPDATE=0' }
         if (argv.includes('-dev') || argv.includes('--dev')) return { skip: true, reason: 'dev mode' }
         if (env.npm_lifecycle_event === 'dev') return { skip: true, reason: 'npm run dev' }
-        if (this.isDocker() && env.MSRB_AUTO_UPDATE_IN_DOCKER !== '1') {
-            return { skip: true, reason: 'Docker container; update the image or set MSRB_AUTO_UPDATE_IN_DOCKER=1' }
-        }
         return { skip: false }
     }
 
@@ -328,80 +360,74 @@ class UpdateManager {
     }
 
     async run(options = {}) {
-        const skip = this.shouldSkip(options.argv ?? process.argv, options.env ?? process.env)
+        const env = options.env ?? process.env
+        const skip = this.shouldSkip(options.argv ?? process.argv, env)
         if (skip.skip) {
             this.logger.log(`[UPDATER] Skipped (${skip.reason})`)
             return { status: 'skipped', reason: skip.reason }
         }
 
-        this.logger.log(`[UPDATER] Checking ${this.channel} updates from ${this.manifestUrl}`)
+        this.logger.log(`[UPDATER] Checking ${this.repo}#${this.branch}`)
 
         try {
-            const manifest = await this.fetchManifest()
-            this.verifyManifest(manifest)
-            this.logPlan(manifest)
+            const remote = await this.fetchRemoteRelease()
+            this.logRemote(remote)
 
-            if (!this.isNewer(manifest.botVersion)) {
+            if (!this.isNewer(remote.version)) {
                 this.logger.log(`[UPDATER] Already up to date (${this.packageJson.version})`)
                 migrateUserFiles(this.root, this.logger)
-                return { status: 'current', manifest }
+                return { status: 'current', remote }
             }
 
-            if (options.dryRun || process.env.MSRB_UPDATE_DRY_RUN === '1') {
-                this.logger.log(`[UPDATER] Dry run: would update ${this.packageJson.version} -> ${manifest.botVersion}`)
-                return { status: 'dry-run', manifest }
+            if (this.isDocker()) {
+                this.logDockerUpdateAvailable(remote)
+                return { status: 'update-available', remote, docker: true }
             }
 
-            await this.applyManifest(manifest)
+            if (options.dryRun || env.MSRB_UPDATE_DRY_RUN === '1' || env.MSRB_UPDATE_CHECK_ONLY === '1') {
+                this.logger.log(`[UPDATER] Check only: would update ${this.packageJson.version} -> ${remote.version}`)
+                return { status: 'update-available', remote, checkOnly: true }
+            }
+
+            this.assertCompatibleNode(remote.packageJson)
+            await this.applyRelease(remote)
             this.syncDependencies()
-            this.logger.log(`[UPDATER] Updated to ${manifest.botVersion}`)
-            return { status: 'updated', manifest }
+            this.logger.log(`[UPDATER] Updated to ${remote.version}`)
+            return { status: 'updated', remote }
         } catch (error) {
             this.logger.warn(`[UPDATER] Update check failed: ${error.message}`)
             return { status: 'failed', error }
         }
     }
 
-    async fetchManifest() {
-        const manifestPath = path.join(this.updatesDir, `${this.channel}.json`)
-        try {
-            await download(this.manifestUrl, manifestPath, 20_000, {
-                accept: 'application/vnd.github.raw',
-                cacheBust: true
-            })
-            return readJson(manifestPath)
-        } catch (error) {
-            const localManifestPath = path.join(this.root, 'updates', `${this.channel}.json`)
-            if (!fs.existsSync(localManifestPath)) throw error
-            this.logger.warn(`[UPDATER] Remote manifest unavailable, using local ${pathToPosix(path.relative(this.root, localManifestPath))}`)
-            return readJson(localManifestPath)
+    async fetchRemoteRelease() {
+        const branchUrl = this.githubApiUrl(`/repos/${this.repo}/branches/${encodeURIComponent(this.branch)}`)
+        const branch = await requestJson(branchUrl)
+        const commitSha = branch?.commit?.sha
+        if (!commitSha || typeof commitSha !== 'string') {
+            throw new Error(`GitHub branch ${this.branch} did not return a commit SHA`)
+        }
+
+        const packageUrl = this.githubApiUrl(`/repos/${this.repo}/contents/package.json?ref=${commitSha}`)
+        const packageSource = await requestText(packageUrl, 20_000, { accept: 'application/vnd.github.raw' })
+        const packageJson = JSON.parse(packageSource)
+        if (!packageJson.version || typeof packageJson.version !== 'string') {
+            throw new Error('Remote package.json does not contain a version')
+        }
+
+        return {
+            version: packageJson.version,
+            commitSha,
+            branch: this.branch,
+            repo: this.repo,
+            packageJson,
+            archiveUrl: this.githubApiUrl(`/repos/${this.repo}/tarball/${commitSha}`),
+            checkedAt: new Date().toISOString()
         }
     }
 
-    verifyManifest(manifest) {
-        if (!manifest || typeof manifest !== 'object') throw new Error('Manifest is not an object')
-        if (manifest.schemaVersion !== 1) throw new Error('Unsupported update manifest schema')
-        if (manifest.channel !== this.channel) throw new Error(`Manifest channel mismatch: ${manifest.channel}`)
-        if (typeof manifest.botVersion !== 'string') throw new Error('Manifest botVersion missing')
-
-        if (manifest.signature) {
-            const payload = Buffer.from(canonicalJson(stripSignature(manifest)))
-            const signature = Buffer.from(manifest.signature, 'base64')
-            const ok = crypto.verify(null, payload, this.publicKey, signature)
-            if (!ok && this.requireSignature) throw new Error('Manifest signature is invalid')
-            if (!ok) this.logger.warn('[UPDATER] Manifest signature is invalid; continuing because signature enforcement is disabled')
-        } else if (this.requireSignature) {
-            throw new Error('Manifest signature missing')
-        }
-
-        if (manifest.compatibleNode && !this.nodeSatisfies(manifest.compatibleNode)) {
-            throw new Error(`Node ${process.version} does not satisfy ${manifest.compatibleNode}`)
-        }
-    }
-
-    nodeSatisfies(range) {
-        const semver = require('semver')
-        return semver.satisfies(process.version, range)
+    githubApiUrl(pathname) {
+        return `https://api.github.com${pathname}`
     }
 
     isNewer(remoteVersion) {
@@ -409,83 +435,89 @@ class UpdateManager {
         return semver.gt(remoteVersion, this.packageJson.version)
     }
 
-    logPlan(manifest) {
-        const excludes = manifest.excludes ?? DEFAULT_EXCLUDES
-        this.logger.log(`[UPDATER] Local=${this.packageJson.version} Remote=${manifest.botVersion}`)
-        this.logger.log(`[UPDATER] Preserved paths: ${excludes.join(', ')}`)
+    assertCompatibleNode(packageJson) {
+        const range = packageJson?.engines?.node
+        if (!range) return
+        const semver = require('semver')
+        if (!semver.satisfies(process.version, range)) {
+            throw new Error(`Node ${process.version} does not satisfy remote requirement ${range}`)
+        }
     }
 
-    async applyManifest(manifest) {
-        if (!manifest.archiveUrl || !manifest.sha256) {
-            throw new Error('Manifest update requires archiveUrl and sha256')
-        }
+    logRemote(remote) {
+        this.logger.log(`[UPDATER] Local=${this.packageJson.version} Remote=${remote.version} SHA=${remote.commitSha.slice(0, 12)}`)
+    }
 
+    logDockerUpdateAvailable(remote) {
+        this.logger.warn(
+            color(33, `[UPDATER] Update available: local ${this.packageJson.version} -> remote ${remote.version}. Pull/rebuild the Docker image.`)
+        )
+    }
+
+    async applyRelease(remote) {
         const stamp = new Date().toISOString().replace(/[:.]/g, '-')
         const workDir = path.join(this.updatesDir, stamp)
-        const archivePath = path.join(workDir, path.basename(new URL(manifest.archiveUrl).pathname) || 'release.tar.gz')
+        const archivePath = path.join(workDir, `${this.repo.replace(/[^\w.-]+/g, '-')}-${remote.commitSha}.tar.gz`)
         const extractDir = path.join(workDir, 'extract')
         const backupDir = path.join(workDir, 'backup')
-        const excludes = manifest.excludes ?? DEFAULT_EXCLUDES
 
         mkdirp(workDir)
         mkdirp(extractDir)
         mkdirp(backupDir)
 
-        await download(manifest.archiveUrl, archivePath)
-
-        const actualSha = sha256File(archivePath)
-        if (actualSha.toLowerCase() !== String(manifest.sha256).toLowerCase()) {
-            throw new Error(`Archive checksum mismatch: ${actualSha}`)
-        }
-
+        await this.downloadArchive(remote.archiveUrl, archivePath)
         this.extractArchive(archivePath, extractDir)
         const sourceRoot = findExtractedRoot(extractDir)
 
         try {
-            this.backupMutablePaths(backupDir, excludes)
-            pruneManagedPaths(sourceRoot, this.root, manifest.managedPaths ?? DEFAULT_MANAGED_PATHS, excludes)
-            removeObsoletePaths(this.root, manifest.obsoletePaths ?? DEFAULT_OBSOLETE_PATHS, excludes)
-            copyReleaseTree(sourceRoot, this.root, excludes)
+            this.applyFromSourceRoot(sourceRoot, backupDir)
             migrateUserFiles(this.root, this.logger)
         } catch (error) {
             this.logger.warn(`[UPDATER] Apply failed, rolling back: ${error.message}`)
-            this.restoreBackup(backupDir, excludes)
+            this.restoreBackup(backupDir)
             throw error
         }
     }
 
+    async downloadArchive(archiveUrl, archivePath) {
+        await download(archiveUrl, archivePath, 60_000, { accept: 'application/octet-stream' })
+    }
+
     extractArchive(archivePath, extractDir) {
-        const lower = archivePath.toLowerCase()
-        const args = lower.endsWith('.zip') ? ['-xf', archivePath, '-C', extractDir] : ['-xzf', archivePath, '-C', extractDir]
-        const result = childProcess.spawnSync('tar', args, { stdio: 'pipe', encoding: 'utf8' })
+        const result = childProcess.spawnSync('tar', ['-xzf', archivePath, '-C', extractDir], {
+            stdio: 'pipe',
+            encoding: 'utf8'
+        })
         if (result.status !== 0) {
             throw new Error(`Archive extraction failed: ${result.stderr || result.stdout || 'tar failed'}`)
         }
     }
 
-    backupMutablePaths(backupDir, excludes) {
-        const backupPaths = this.getBackupPaths(excludes)
-        for (const pattern of backupPaths) {
+    applyFromSourceRoot(sourceRoot, backupDir, options = {}) {
+        const excludes = options.excludes ?? DEFAULT_EXCLUDES
+        this.backupMutablePaths(backupDir, excludes)
+        pruneManagedPaths(sourceRoot, this.root, options.managedPaths ?? DEFAULT_MANAGED_PATHS, excludes)
+        removeObsoletePaths(this.root, options.obsoletePaths ?? DEFAULT_OBSOLETE_PATHS, excludes)
+        copyReleaseTree(sourceRoot, this.root, excludes)
+    }
+
+    backupMutablePaths(backupDir, excludes = DEFAULT_EXCLUDES) {
+        for (const pattern of this.getBackupPaths(excludes)) {
             if (pattern.includes('*')) continue
             const source = path.join(this.root, pattern)
             if (!fs.existsSync(source)) continue
-            const target = path.join(backupDir, pattern)
-            copyRecursive(source, target)
+            copyRecursive(source, path.join(backupDir, pattern))
         }
     }
 
     restoreBackup(backupDir, excludes = DEFAULT_EXCLUDES) {
         if (!fs.existsSync(backupDir)) return
-        const backupPaths = this.getBackupPaths(excludes)
-        for (const pattern of backupPaths) {
+        for (const pattern of this.getBackupPaths(excludes)) {
             if (pattern.includes('*')) continue
             const backupSource = path.join(backupDir, pattern)
             const target = path.join(this.root, pattern)
 
-            if (fs.existsSync(target)) {
-                rmrf(target)
-            }
-
+            if (fs.existsSync(target)) rmrf(target)
             if (fs.existsSync(backupSource)) {
                 copyRecursive(backupSource, target)
             } else {
@@ -500,7 +532,7 @@ class UpdateManager {
 
     syncDependencies() {
         const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-        const args = fs.existsSync(path.join(this.root, 'package-lock.json')) ? ['ci', '--omit=optional'] : ['install', '--omit=optional']
+        const args = fs.existsSync(path.join(this.root, 'package-lock.json')) ? ['ci'] : ['install']
         this.logger.log(`[UPDATER] Syncing dependencies with npm ${args.join(' ')}`)
         const result = childProcess.spawnSync(npm, args, { cwd: this.root, stdio: 'inherit', shell: false })
         if (result.error) throw new Error(`Dependency sync failed: ${result.error.message}`)
@@ -509,13 +541,20 @@ class UpdateManager {
 }
 
 module.exports = {
-    DEFAULT_EXCLUDES,
     DEFAULT_BACKUP_PATHS,
-    DEFAULT_OBSOLETE_PATHS,
+    DEFAULT_BRANCH,
+    DEFAULT_EXCLUDES,
     DEFAULT_MANAGED_PATHS,
+    DEFAULT_OBSOLETE_PATHS,
     DEFAULT_PUBLIC_KEY,
+    DEFAULT_REPO,
     UpdateManager,
     canonicalJson,
+    copyReleaseTree,
     download,
+    findExtractedRoot,
+    isExcluded,
+    pruneManagedPaths,
+    requestJson,
     stripSignature
 }

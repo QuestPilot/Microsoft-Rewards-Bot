@@ -2,7 +2,7 @@
 
 Navigation: [Documentation index](./README.md) -> [Official Core plugin](./core-plugin.md) -> [Core technical reference](./core-plugin-reference.md) -> [Troubleshooting](./troubleshooting.md)
 
-The web dashboard is an official Core feature. It is not part of the open-source runtime and it does not open a local network port.
+The web dashboard is an official Core feature. It is not part of the public bot runtime and it does not open a local network port.
 
 When the official Core plugin is enabled and the license is valid, Core starts a private outbound connection to the official dashboard service. Users open the dashboard from the official domain, enter their Core license key, then complete Discord OAuth.
 

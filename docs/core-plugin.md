@@ -4,7 +4,7 @@ Navigation: [Documentation index](./README.md) -> [Plugin system overview](./plu
 
 Core is the optional premium plugin for Microsoft Rewards Bot.
 
-The open-source edition already handles the essential workflow. Core adds the maintained premium layer for users who want broader Rewards coverage, more automation, and access to the official web dashboard.
+The public source-available edition already handles the essential workflow. Core adds the maintained premium layer for users who want broader Rewards coverage, more automation, and access to the official web dashboard.
 
 ## What Core Adds
 
@@ -20,7 +20,7 @@ The open-source edition already handles the essential workflow. Core adds the ma
 | Temporary quest pages | No | Best effort |
 | Official web dashboard | No | Yes |
 
-Core is especially useful when Microsoft changes or expands the newer Rewards dashboard surfaces. The premium plugin is maintained separately so those faster-moving features can keep evolving without making the open-source edition heavier.
+Core is especially useful when Microsoft changes or expands the newer Rewards dashboard surfaces. The premium plugin is maintained separately so those faster-moving features can keep evolving without making the public edition heavier.
 
 ## Dashboard
 
@@ -61,6 +61,14 @@ After payment, you receive a license key. Enable the preinstalled Core plugin in
   "priority": 100
 }
 ```
+
+## Docker
+
+Core is supported in Docker on the official Linux `x64` image target with Node.js `24.15.0`.
+
+Set `LICENSE_KEY` in the container environment so Core can validate the license without an interactive prompt. Without `LICENSE_KEY`, Core disables itself and the public bot continues without premium features.
+
+Read [Docker](./docker.md) for the supported image target and troubleshooting notes.
 
 ## Learn More
 

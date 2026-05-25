@@ -1,44 +1,30 @@
 # Auto-Updates
 
-Navigation: [Documentation index](./README.md) -> [Node.js version](./node-version.md) -> [Troubleshooting](./troubleshooting.md)
+Navigation: [Documentation index](./README.md) -> [Node.js version](./node-version.md) -> [Docker](./docker.md) -> [Troubleshooting](./troubleshooting.md)
 
-`npm start` checks for updates before building and launching the bot.
+`npm start` checks the official GitHub `release` branch before building and launching the bot.
 
-`npm run dev` and any launch using `-dev` always skip auto-update, so local development is not overwritten by the public release branch.
+`npm run dev` and any launch using `-dev` skip auto-update so local development is not overwritten.
 
-Docker containers skip auto-update by default because container filesystems are normally disposable. Build or pull a newer image instead. If you deliberately run a writable container and want the updater anyway, set `MSRB_AUTO_UPDATE_IN_DOCKER=1`.
+Docker never self-updates. It only logs when a newer version exists. Update Docker installs by pulling or rebuilding the image.
 
-## Release Manifest
+## How It Works
 
-The default channel is `stable`. The updater reads:
+The updater uses GitHub directly:
 
-```text
-https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/release/updates/stable.json
-```
+1. read the latest commit SHA from `QuestPilot/Microsoft-Rewards-Bot#release`;
+2. read `package.json` at that SHA;
+3. compare the remote version with the local `package.json`;
+4. download the immutable GitHub tarball for that SHA;
+5. mirror managed project files from the archive;
+6. preserve user files;
+7. run `npm ci` or `npm install`.
 
-The manifest includes:
-
-- `botVersion`
-- `coreVersion`
-- `compatibleNode`
-- `archiveUrl`
-- `sha256`
-- `signature` (optional legacy field)
-- preserved paths
-
-The updater always refuses an archive when the archive checksum is invalid.
-Manifest signatures are optional for the public release channel so the updater can keep working even when the old signing key is unavailable.
-Set `MSRB_UPDATE_REQUIRE_SIGNATURE=1` only if you are maintaining a signed private channel and you have the matching private key.
-
-The updater never backs up internal updater state, Git metadata, dependencies, or build output. Those paths are preserved by skipping them during the copy step, not by recursively copying them into `.updates/backup`.
-
-Root repository tooling files such as `.dockerignore`, `.gitignore`, `.node-version`, and `.github/` are also skipped. They are not required at runtime and can be protected on Windows service-style installs such as `C:\ProgramData`.
-
-Before copying the new release, the updater now prunes managed project areas such as `src/`, `scripts/`, `docs/`, and `plugins/core/` against the downloaded archive. This removes stale files that no longer exist in the release while still preserving the user-owned paths listed below.
+The updater no longer depends on `updates/stable.json`, archive checksums, or manifest signatures.
 
 ## Preserved User Files
 
-Updates preserve local user data:
+Updates preserve:
 
 - `src/config.json`
 - `src/accounts.json`
@@ -46,10 +32,11 @@ Updates preserve local user data:
 - `sessions/`
 - `logs/`
 - `diagnostics/`
+- `Page/`
 - `.updates/`
+- `.git/`
 
 After an update, missing keys from `config.example.json` and `accounts.example.json` are added without replacing user values.
-Known deprecated keys, such as the old open-source `dashboard` config block, are removed during migration.
 
 ## Commands
 
@@ -57,14 +44,16 @@ Known deprecated keys, such as the old open-source `dashboard` config block, are
 npm start
 npm run update:check
 npm run update:doctor
-npm run update:prepare
 ```
 
-Set `MSRB_UPDATE_CHANNEL=beta` to use another channel. Set `MSRB_UPDATE_MANIFEST_URL` for a custom manifest URL. Set `MSRB_AUTO_UPDATE=0` only for CI or emergency local recovery.
+Useful environment variables:
 
-`update:doctor` compares the package version, local manifest, remote manifest, and Core checksums. Use it when users do not see a release; if the remote manifest still shows the old version, the update has not been published yet.
+- `MSRB_AUTO_UPDATE=0`: disable update checks and updates.
+- `MSRB_UPDATE_CHECK_ONLY=1`: check and log only; do not apply updates.
+- `MSRB_UPDATE_REPO=QuestPilot/Microsoft-Rewards-Bot`: override the GitHub repo.
+- `MSRB_UPDATE_BRANCH=release`: override the update branch.
 
-## Manual Install from Git
+## Manual Install From Git
 
 Use the supported public branch:
 
@@ -75,10 +64,4 @@ npm install
 npm start
 ```
 
-The `release` branch is the same channel used by the stable update manifest. Cloning the default branch can install development files that do not match the public updater or compiled Core bytecode.
-
-## Next Steps
-
-- If Node.js is rejected, read [Node.js version](./node-version.md).
-- If the update check fails or stops early, read [Troubleshooting](./troubleshooting.md).
-- If you are publishing a release, follow [Auto-update release checklist](./auto-update-release.md).
+The `release` branch is the same source used by auto-update. Cloning another branch can install development files that do not match the public updater or compiled Core bytecode.

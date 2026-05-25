@@ -11,7 +11,8 @@ services:
         volumes:
             - ./src/accounts.json:/usr/src/microsoft-rewards-bot/dist/accounts.json:ro
             - ./src/config.json:/usr/src/microsoft-rewards-bot/dist/config.json:ro
-            - ./sessions:/usr/src/microsoft-rewards-bot/dist/automation/sessions
+            - ./plugins/plugins.jsonc:/usr/src/microsoft-rewards-bot/plugins/plugins.jsonc:ro
+            - ./sessions:/usr/src/microsoft-rewards-bot/sessions
         environment:
             TZ: 'America/Toronto'
             NODE_ENV: 'production'

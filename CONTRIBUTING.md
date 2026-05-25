@@ -1,6 +1,8 @@
 # Contributing to Microsoft Rewards Bot
 
-Thank you for your interest in contributing to the Microsoft Rewards Bot! This document provides guidelines for contributing to the **open-source core** of this project.
+Thank you for your interest in contributing to Microsoft Rewards Bot. This document provides guidelines for contributing to the **source-available public edition** of this project.
+
+By contributing, you agree to the contribution license in [LICENSE](LICENSE). Contributions may be used by the official project in the public edition, Core, documentation, dashboards, installers, update systems, and related products.
 
 ---
 
@@ -43,7 +45,7 @@ Before submitting a bug report:
 
 1. Check the [existing issues](https://github.com/QuestPilot/Microsoft-Rewards-Bot/issues)
 2. Ensure you're using the latest version
-3. Verify you're using Node.js v25.x
+3. Verify you're using Node.js v24.15.0
 
 **Good bug reports include:**
 
@@ -54,7 +56,7 @@ Before submitting a bug report:
 - Environment details:
     ```
     - Bot version: 4.0.1
-    - Node.js version: v25.3.0
+    - Node.js version: v24.15.0
     - OS: Windows 11 / Ubuntu 22.04 / macOS 14
     - Docker: Yes/No
     ```
@@ -86,6 +88,8 @@ We accept pull requests for:
 - Breaking changes to the plugin API without discussion
 - Code that violates Microsoft's Terms of Service
 - Code that bypasses license validation
+- Code that reproduces, unlocks, bypasses, or replaces official Core functionality
+- Public competing forks or renamed copies of the project
 
 ---
 
@@ -93,7 +97,7 @@ We accept pull requests for:
 
 ### Prerequisites
 
-- Node.js v25.x
+- Node.js v24.15.0
 - Git
 - A Microsoft account (for testing)
 
@@ -388,7 +392,7 @@ export default class MyPlugin implements IPlugin {
 
 - **Open-source plugins:** Share in the community Discord or submit as an example
 - **Proprietary plugins:** You can create private plugins (we won't review them)
-- **License compliance:** Ensure your plugin respects the PolyForm Noncommercial license
+- **License compliance:** Ensure your plugin respects the project license, the Core boundary, and any third-party licenses
 - **Security:** Never share credentials or API keys in plugin code
 - **Premium boundary:** Third-party plugins cannot register official Core premium tasks
 

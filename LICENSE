@@ -1,133 +1,154 @@
-# PolyForm Noncommercial License 1.0.0
+QuestPilot Source Available License 1.0
 
-<https://polyformproject.org/licenses/noncommercial/1.0.0>
+Copyright (c) 2025-2026 LightZirconite and QuestPilot.
+All rights reserved except as expressly granted in this license.
 
-## Acceptance
+This license applies to the public Microsoft Rewards Bot repository, excluding
+the proprietary official Core plugin and any third-party dependencies that carry
+their own license terms.
 
-In order to get any license under these terms, you must agree
-to them as both strict obligations and conditions to all
-your licenses.
+1. Definitions
 
-## Copyright License
+"Software" means this repository, its source code, documentation, configuration
+examples, scripts, assets, update metadata, and compiled public artifacts.
 
-The licensor grants you a copyright license for the software
-to do everything you might do with the software that would
-otherwise infringe the licensor's copyright in it for any
-permitted purpose. However, you may only distribute the
-software according to [Distribution License](#distribution-license)
-and make changes or new works based on the software according
-to [Changes and New Works License](#changes-and-new-works-license).
+"Official Project" means the Microsoft Rewards Bot project published by
+QuestPilot or LightZirconite through repositories, releases, domains, Discord
+servers, or other channels controlled by them.
 
-## Distribution License
+"Core" means the official proprietary Core plugin, its compiled bytecode,
+license checks, private APIs, dashboard integration, premium automation logic,
+and any feature identified by the Official Project as paid, premium, private,
+or Core-only.
 
-The licensor grants you an additional copyright license to
-distribute copies of the software. Your license to distribute
-covers distributing the software with changes and new works
-permitted by [Changes and New Works License](#changes-and-new-works-license).
+"Noncommercial Personal Use" means use by an individual for personal testing,
+learning, private automation, or private modification, without revenue,
+compensation, sponsorship, advertising, paid hosting, resale, consulting,
+commercial advantage, or use on behalf of an organization.
 
-## Notices
+"Fork" means a copy or derivative of the Software made for personal changes or
+for proposing contributions back to the Official Project.
 
-You must ensure that anyone who gets a copy of any part of
-the software from you also gets a copy of these terms or the
-URL for them above, as well as copies of any plain-text lines
-beginning with `Required Notice:` that the licensor provided
-with the software. For example:
+2. Permitted Use
 
-> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+Subject to this license, you may:
 
-## Changes and New Works License
+a. read, download, run, and study the Software for Noncommercial Personal Use;
+b. make private modifications for Noncommercial Personal Use;
+c. create a Fork for the purpose of preparing bug fixes, documentation changes,
+   public plugin examples, or other contributions to the Official Project;
+d. submit your modifications to the Official Project through pull requests,
+   patches, issues, or other contribution channels;
+e. share small private modifications with a limited personal circle, provided
+   the sharing is noncommercial, not public, not promoted, and each recipient
+   receives this license and all copyright, attribution, trademark, and Core
+   notices.
 
-The licensor grants you an additional copyright license to
-make changes and new works based on the software for any
-permitted purpose.
+3. Distribution Limits
 
-## Patent License
+You may not publicly distribute, publish, mirror, host, package, release,
+promote, or make available the Software, a Fork, or a modified version except:
 
-The licensor grants you a patent license for the software that
-covers patent claims the licensor can license, or becomes able
-to license, that you would infringe by using the software.
+a. as a contribution submitted to the Official Project; or
+b. with prior written permission from LightZirconite or QuestPilot.
 
-## Noncommercial Purposes
+Creating a public repository that copies this Software outside the official
+GitHub fork flow is not permitted without prior written permission.
 
-Any noncommercial purpose is a permitted purpose.
+4. Commercial Restrictions
 
-## Personal Uses
+You may not use the Software, a Fork, or a modified version for any commercial
+purpose without prior written permission. Prohibited commercial purposes include:
 
-Personal use for research, experiment, and testing for
-the benefit of public knowledge, personal study, private
-entertainment, hobby projects, amateur pursuits, or religious
-observance, without any anticipated commercial application,
-is use for a permitted purpose.
+a. selling, renting, leasing, sublicensing, or paid distribution;
+b. paid hosting, managed services, automation-as-a-service, or bot-as-a-service;
+c. use for consulting, client work, business operations, lead generation,
+   advertising, affiliate revenue, sponsorship, or monetized content;
+d. bundling with paid products or services;
+e. using the Software to compete with the Official Project or Core.
 
-## Noncommercial Organizations
+5. Core Protection
 
-Use by any charitable organization, educational institution,
-public research organization, public safety or health
-organization, environmental protection organization, or
-government institution is use for a permitted purpose
-regardless of the source of funding or obligations resulting
-from the funding.
+You may not:
 
-## Fair Use
+a. copy, extract, decompile, disassemble, reverse engineer, bypass, unlock,
+   emulate, clone, replace, or reproduce Core;
+b. reimplement Core-only or premium features from Core or from behavior observed
+   in Core for the purpose of avoiding a Core license;
+c. remove, disable, bypass, spoof, or weaken license validation, entitlement
+   checks, official plugin verification, update checks, or Core integrity checks;
+d. distribute code, patches, instructions, binaries, configuration, or services
+   designed to unlock, imitate, or replace Core;
+e. present a modified build as having official Core capabilities unless it uses
+   the unmodified official Core plugin with a valid license.
 
-You may have "fair use" rights for the software under the
-law. These terms do not limit them.
+The included official Core plugin, if present in compiled form, is proprietary.
+You are only allowed to run it as supplied by the Official Project and only
+according to the Core license and entitlement rules. This license does not grant
+rights to modify, redistribute, copy, or reverse engineer Core.
 
-## No Other Rights
+6. No Impersonation or Confusion
 
-These terms do not allow you to sublicense or transfer any of
-your licenses to anyone else, or prevent the licensor from
-granting licenses to anyone else. These terms do not imply
-any other licenses.
+You may not:
 
-## Patent Defense
+a. use the names "QuestPilot", "LightZirconite", "Microsoft Rewards Bot",
+   "Core", the project logos, banners, screenshots, badges, or other branding
+   in a way that suggests endorsement, affiliation, ownership, or official
+   status without permission;
+b. rename or rebrand the Software in order to hide its origin;
+c. remove or alter copyright notices, license notices, provenance, update source
+   references, or attribution;
+d. advertise a Fork or modified copy as the official project, a successor, a
+   replacement, or an equivalent source for official updates or Core features.
 
-If you make any written claim that the software infringes or
-contributes to infringement of any patent, your patent license
-for the software granted under these terms ends immediately.
-If your company makes such a claim, your patent license ends
-immediately for work on behalf of your company.
+7. Contributions
 
-## Violations
+By submitting a contribution to the Official Project, you grant LightZirconite
+and QuestPilot a perpetual, worldwide, irrevocable, royalty-free license to use,
+copy, modify, publish, distribute, sublicense, relicense, and commercialize that
+contribution as part of the Software, Core, related services, documentation,
+websites, dashboards, installers, update systems, or future products.
 
-The first time you are notified in writing that you have
-violated any of these terms, or done anything with the software
-not covered by your licenses, your licenses can nonetheless
-continue if you come into full compliance with these terms,
-and take practical steps to correct past violations, within
-32 days of receiving notice. Otherwise, all your licenses
-end immediately.
+You represent that you have the right to submit the contribution and that it
+does not knowingly include code or content that violates another license,
+copyright, trade secret, or third-party right.
 
-## No Liability
+8. Third-Party Plugins
 
-**_As far as the law allows, the software comes as is, without
-any warranty or condition, and the licensor will not be liable
-to you for any damages arising out of these terms or the use
-or nature of the software, under any kind of legal claim._**
+Public plugins may use the documented public plugin API. Plugins may have their
+own licenses, but they may not claim to be official Core, may not access private
+Core APIs, and may not reproduce, bypass, or replace Core-only functionality.
 
-## Definitions
+9. Termination
 
-The **licensor** is the individual or entity offering these
-terms, and the **software** is the software the licensor makes
-available under these terms.
+Any violation of this license automatically terminates all rights granted to you.
+After termination, you must immediately stop using and distributing the Software
+and remove all unauthorized public copies, mirrors, packages, releases, and
+modified versions.
 
-**You** refers to the individual or entity agreeing to these
-terms.
+LightZirconite or QuestPilot may reinstate permissions in writing after the
+violation is corrected, but they are not required to do so.
 
-**Your company** is any legal entity, sole proprietorship,
-or other kind of organization that you work for, plus all
-organizations that have control over, are under the control of,
-or are under common control with that organization. **Control**
-means ownership of substantially all the assets of an entity,
-or the power to direct its management and policies by vote,
-contract, or otherwise. Control can be direct or indirect.
+10. Reservation of Rights
 
-**Your licenses** are all the licenses granted to you for the
-software under these terms.
+All rights not expressly granted are reserved. No trademark rights, ownership
+rights, Core rights, commercial rights, sublicensing rights, or rights to create
+public competing distributions are granted by this license.
 
-**Use** means anything you do with the software requiring one
-of your licenses.
+11. No Warranty
 
----
+The Software is provided "as is", without warranty of any kind, express or
+implied, including warranties of merchantability, fitness for a particular
+purpose, title, and non-infringement. You use it at your own risk.
 
-Required Notice: Copyright (c) 2025-2026 QuestPilot
+12. Limitation of Liability
+
+To the maximum extent permitted by law, LightZirconite, QuestPilot, contributors,
+and maintainers will not be liable for any claim, damage, loss, liability,
+account action, service interruption, lost profits, lost data, or other harm
+arising from the Software or this license.
+
+13. Legal Rights That Cannot Be Restricted
+
+This license does not limit rights that cannot legally be restricted, such as
+mandatory fair use, quotation, or other statutory exceptions where applicable.

@@ -27,7 +27,7 @@ The official web dashboard is also outside the public plugin contract. It is sta
 
 ## Built-in Free Plugins
 
-The open-source release can ship optional free plugins beside Core. These plugins are normal public plugins, so users can inspect them, disable them, fork them, or use them as examples.
+The source-available public release can ship optional free plugins beside Core. These plugins are normal public plugins, so users can inspect them, disable them, modify them privately, or use them as examples.
 
 | Plugin | Default | Purpose |
 | --- | --- | --- |

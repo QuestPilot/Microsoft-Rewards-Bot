@@ -1,7 +1,7 @@
 import type { Page } from 'patchright'
 import type { MicrosoftRewardsBot } from '../index'
 
-// Core task imports (always available in open-source)
+// Core task imports (always available in the public edition)
 import { FindClippy } from './tasks/api/FindClippy'
 import { Quiz } from './tasks/api/Quiz'
 import { UrlReward } from './tasks/api/UrlReward'

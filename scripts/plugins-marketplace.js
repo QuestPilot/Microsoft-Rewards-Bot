@@ -7,8 +7,9 @@ const ROOT = path.resolve(__dirname, '..')
 const PLUGINS_DIR = path.join(ROOT, 'plugins')
 const CONFIG_PATH = path.join(PLUGINS_DIR, 'plugins.jsonc')
 const CATALOG_PATH = path.join(PLUGINS_DIR, 'catalog.json')
-const UPDATE_MANIFEST_PATH = path.join(ROOT, 'updates', `${process.env.MSRB_UPDATE_CHANNEL || 'stable'}.json`)
 const DEFAULT_PORT = Number(process.env.MSRB_PLUGINS_PORT ?? 4777)
+const UPDATE_REPO = process.env.MSRB_UPDATE_REPO || 'QuestPilot/Microsoft-Rewards-Bot'
+const UPDATE_BRANCH = process.env.MSRB_UPDATE_BRANCH || 'release'
 
 const IGNORED_PLUGIN_FILES = new Set(['README.md', 'plugins.jsonc', 'official-core.json', 'catalog.json'])
 
@@ -191,8 +192,8 @@ function getState() {
         installed,
         catalog: getCatalogEntries(),
         officialCore: readJson(path.join(PLUGINS_DIR, 'official-core.json'), null),
-        updateManifest: readJson(UPDATE_MANIFEST_PATH, null),
-        updateChannel: process.env.MSRB_UPDATE_CHANNEL || 'stable'
+        updateRepo: UPDATE_REPO,
+        updateBranch: UPDATE_BRANCH
     }
 }
 
@@ -623,17 +624,13 @@ const HTML = `<!doctype html>
     }
 
     function renderUpdates(state) {
-      const manifest = state.updateManifest
-      $('#update-status').textContent = manifest ? state.updateChannel + ' -> ' + manifest.botVersion : 'manifest missing'
+      $('#update-status').textContent = state.updateBranch + ' branch'
       updatesEl.innerHTML = '<article class="card"><div class="kv">' +
-        '<div>Channel</div><div>' + esc(state.updateChannel) + '</div>' +
+        '<div>Repository</div><div>' + esc(state.updateRepo) + '</div>' +
+        '<div>Branch</div><div>' + esc(state.updateBranch) + '</div>' +
         '<div>Local bot</div><div>' + esc(state.bot.version || 'unknown') + '</div>' +
-        '<div>Remote bot</div><div>' + esc(manifest?.botVersion || 'missing') + '</div>' +
-        '<div>Remote Core</div><div>' + esc(manifest?.coreVersion || 'missing') + '</div>' +
-        '<div>Node range</div><div>' + esc(manifest?.compatibleNode || 'not set') + '</div>' +
-        '<div>Archive</div><div>' + esc(manifest?.archiveUrl || 'not set') + '</div>' +
-        '<div>Archive sha256</div><div>' + esc(manifest?.sha256 || 'not set') + '</div>' +
-        '<div>Signature</div><div>' + esc(manifest?.signature ? manifest.signature.slice(0, 28) + '...' : 'not required') + '</div>' +
+        '<div>Source</div><div>GitHub branch package.json, then immutable commit tarball</div>' +
+        '<div>Docker</div><div>Notification only; pull or rebuild the image</div>' +
         '</div><div class="actions"><button class="secondary" data-refresh>Refresh</button></div></article>'
     }
 
@@ -642,7 +639,7 @@ const HTML = `<!doctype html>
         '<div>Config path</div><div>plugins/plugins.jsonc</div>' +
         '<div>Configured</div><div>' + esc(Object.keys(state.config || {}).join(', ') || 'none') + '</div>' +
         '<div>Core manifest</div><div>' + esc(state.officialCore ? state.officialCore.indexSha256 : 'missing') + '</div>' +
-        '<div>Auto-update</div><div>Enabled on npm start, skipped by npm run dev and -dev</div>' +
+        '<div>Auto-update</div><div>Enabled on npm start for local installs; Docker is notification-only</div>' +
         '</div></article>'
     }
 

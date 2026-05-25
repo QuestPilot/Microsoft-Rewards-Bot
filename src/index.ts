@@ -73,6 +73,7 @@ interface UserData {
 }
 
 export class MicrosoftRewardsBot {
+    public readonly appVersion = pkg.version
     public logger: LogService
     public config
     public utils: Helpers

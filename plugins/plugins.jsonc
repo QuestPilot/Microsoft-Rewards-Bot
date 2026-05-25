@@ -22,7 +22,7 @@
     // - Double search point bonuses
     //
     // Requires a valid license. Without license, the plugin will not load.
-    // The open-source bot works fine without this plugin.
+    // The public bot works fine without this plugin.
 
     "core": {
         "enabled": true,

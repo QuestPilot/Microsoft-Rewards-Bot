@@ -26,12 +26,12 @@ test('updater skips dev mode and explicit opt-out', () => {
     assert.equal(updater.shouldSkip(['node', 'src/index.ts'], {}).skip, false)
 })
 
-test('updater skips Docker by default but can be explicitly enabled', () => {
+test('updater does not skip Docker during preflight checks', () => {
     const updater = new UpdateManager({ root: process.cwd(), logger: { log() {}, warn() {} } })
     updater.isDocker = () => true
 
-    assert.equal(updater.shouldSkip(['node'], {}).skip, true)
-    assert.equal(updater.shouldSkip(['node'], { MSRB_AUTO_UPDATE_IN_DOCKER: '1' }).skip, false)
+    assert.equal(updater.shouldSkip(['node'], {}).skip, false)
+    assert.equal(updater.shouldSkip(['node'], { MSRB_UPDATE_CHECK_ONLY: '1' }).skip, false)
 })
 
 test('config migrator adds missing keys without replacing user values', () => {
@@ -95,30 +95,70 @@ test('config migrator adds missing keys without replacing user values', () => {
     assert.equal(accounts[0].saveFingerprint.mobile, false)
 })
 
-test('local stable manifest verifies with current update policy', () => {
-    const updater = new UpdateManager({ root: process.cwd(), logger: { log() {}, warn() {} } })
-    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'updates', 'stable.json'), 'utf8'))
-
-    assert.doesNotThrow(() => updater.verifyManifest(manifest))
-    assert.equal(updater.isNewer(manifest.botVersion), false)
-})
-
-test('updater can still enforce signed manifests when requested', () => {
-    const updater = new UpdateManager({
-        root: process.cwd(),
-        logger: { log() {}, warn() {} },
-        requireSignature: true
+test('updater reports current when release branch version is not newer', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.fetchRemoteRelease = async () => ({
+        version: '2.0.0',
+        commitSha: 'abc123456789',
+        branch: 'release',
+        repo: 'QuestPilot/Microsoft-Rewards-Bot',
+        packageJson: { version: '2.0.0' },
+        archiveUrl: 'https://example.test/archive.tgz',
+        checkedAt: new Date().toISOString()
     })
 
-    assert.throws(
-        () =>
-            updater.verifyManifest({
-                schemaVersion: 1,
-                channel: 'stable',
-                botVersion: '4.0.1'
-            }),
-        /Manifest signature missing/
-    )
+    const result = await updater.run()
+
+    assert.equal(result.status, 'current')
+})
+
+test('Docker never mutates local files and only reports update availability', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.isDocker = () => true
+    updater.fetchRemoteRelease = async () => ({
+        version: '2.0.0',
+        commitSha: 'abc123456789',
+        branch: 'release',
+        repo: 'QuestPilot/Microsoft-Rewards-Bot',
+        packageJson: { version: '2.0.0' },
+        archiveUrl: 'https://example.test/archive.tgz',
+        checkedAt: new Date().toISOString()
+    })
+    updater.applyRelease = async () => {
+        throw new Error('applyRelease must not run in Docker')
+    }
+
+    const result = await updater.run()
+
+    assert.equal(result.status, 'update-available')
+    assert.equal(result.docker, true)
+})
+
+test('check-only reports update availability without applying', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.fetchRemoteRelease = async () => ({
+        version: '2.0.0',
+        commitSha: 'abc123456789',
+        branch: 'release',
+        repo: 'QuestPilot/Microsoft-Rewards-Bot',
+        packageJson: { version: '2.0.0' },
+        archiveUrl: 'https://example.test/archive.tgz',
+        checkedAt: new Date().toISOString()
+    })
+    updater.applyRelease = async () => {
+        throw new Error('applyRelease must not run in check-only mode')
+    }
+
+    const result = await updater.run({ env: { MSRB_UPDATE_CHECK_ONLY: '1' } })
+
+    assert.equal(result.status, 'update-available')
+    assert.equal(result.checkOnly, true)
 })
 
 test('updater backup paths never include internal updater or dependency folders', () => {
@@ -177,5 +217,55 @@ test('dependency sync chooses npm ci when package-lock is present', () => {
         childProcess.spawnSync = originalSpawnSync
     }
 
-    assert.deepEqual(capturedArgs, ['ci', '--omit=optional'])
+    assert.deepEqual(capturedArgs, ['ci'])
+})
+
+test('applying release preserves user files and removes obsolete managed files', () => {
+    const root = tempRoot()
+    const source = tempRoot()
+    const backup = path.join(root, '.updates', 'backup')
+
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    fs.mkdirSync(path.join(root, 'plugins'), { recursive: true })
+    fs.mkdirSync(path.join(source, 'src'), { recursive: true })
+    fs.mkdirSync(path.join(source, 'plugins'), { recursive: true })
+
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(root, 'src', 'config.json'), '{"user":true}')
+    fs.writeFileSync(path.join(root, 'src', 'old.ts'), 'old')
+    fs.writeFileSync(path.join(root, 'plugins', 'plugins.jsonc'), '{"core":{"enabled":true}}')
+    fs.mkdirSync(path.join(root, 'sessions'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'sessions', 'keep.txt'), 'session')
+
+    fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    fs.writeFileSync(path.join(source, 'src', 'new.ts'), 'new')
+    fs.writeFileSync(path.join(source, 'src', 'config.example.json'), '{}')
+    fs.writeFileSync(path.join(source, 'plugins', 'catalog.json'), '{"plugins":[]}')
+
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.applyFromSourceRoot(source, backup)
+
+    assert.equal(fs.readFileSync(path.join(root, 'src', 'config.json'), 'utf8'), '{"user":true}')
+    assert.equal(fs.readFileSync(path.join(root, 'plugins', 'plugins.jsonc'), 'utf8'), '{"core":{"enabled":true}}')
+    assert.equal(fs.readFileSync(path.join(root, 'sessions', 'keep.txt'), 'utf8'), 'session')
+    assert.equal(fs.existsSync(path.join(root, 'src', 'old.ts')), false)
+    assert.equal(fs.readFileSync(path.join(root, 'src', 'new.ts'), 'utf8'), 'new')
+})
+
+test('failed release apply restores backed up user files', () => {
+    const root = tempRoot()
+    const source = tempRoot()
+    const backup = path.join(root, '.updates', 'backup')
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    fs.mkdirSync(path.join(source, 'src'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(root, 'src', 'config.json'), '{"user":true}')
+    fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.backupMutablePaths(backup)
+    fs.writeFileSync(path.join(root, 'src', 'config.json'), '{"broken":true}')
+    updater.restoreBackup(backup)
+
+    assert.equal(fs.readFileSync(path.join(root, 'src', 'config.json'), 'utf8'), '{"user":true}')
 })

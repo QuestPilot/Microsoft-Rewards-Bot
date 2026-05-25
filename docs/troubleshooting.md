@@ -4,15 +4,18 @@ Navigation: [Documentation index](./README.md) -> [Install and auto-updates](./u
 
 ## Auto-Update Fails
 
-The bot logs the update error and continues with the local version when the network or manifest is unavailable. It refuses to apply an update if the archive checksum is invalid.
+The bot logs the update error and continues with the local version when GitHub is unavailable.
 
-If a 4.0.0 install reports `Manifest signature missing` or `Manifest signature is invalid`, update once with the installer or by pulling the `release` branch manually. The original 4.0.0 updater required a private signing key that is no longer available, so it cannot accept the new public manifest by itself. After 4.0.1 is installed, future public updates use the GitHub manifest plus archive SHA-256 verification.
+The updater reads the `release` branch, compares `package.json`, and downloads the immutable tarball for that exact commit. It no longer uses `updates/stable.json` or signed manifests.
 
 Use:
 
 ```bash
 npm run update:check
+npm run update:doctor
 ```
+
+Docker never applies updates inside the container. If Docker logs that an update is available, pull or rebuild the image.
 
 ## Development Version Gets Replaced
 
@@ -36,13 +39,27 @@ npm run plugins
 
 The Plugin Desk shows whether the Core checksum matches `plugins/official-core.json`.
 
+For Docker, confirm that the final image contains:
+
+- `plugins/core/index.jsc`
+- `plugins/official-core.json`
+- `node_modules/microsoft-rewards-bot`
+
+Then check the runtime target:
+
+```bash
+node -p "process.versions.node + ' ' + process.platform + '/' + process.arch"
+```
+
+Core in Docker is supported on Node.js `24.15.0` with Linux `x64`. A `cachedDataRejected` error means the bytecode does not match the Node.js/V8 runtime. A segmentation fault during `require('./plugins/core/index.jsc')` happens before browser startup; adding browser or GTK packages is not the fix. Use the official Dockerfile and a Core release built for the Docker target.
+
 ## Core Dashboard Does Not Show A Machine
 
 The web dashboard is a Core-only feature. Check that `plugins/plugins.jsonc` enables Core and that the license prompt succeeds.
 
 If Core is active but the machine is still absent, check whether the dashboard service URL is reachable from the machine. The official release uses the default service; custom deployments can set `core.config.dashboardUrl`.
 
-The open-source bot no longer starts a local dashboard server.
+The public bot no longer starts a local dashboard server.
 
 ## Rewards Dashboard Automation Stops Working
 
@@ -59,6 +76,7 @@ For dashboard-specific checks, use [Dashboard testing](./dashboard-testing.md). 
 ## Related Pages
 
 - [Install and auto-updates](./updates.md)
+- [Docker](./docker.md)
 - [Node.js version](./node-version.md)
 - [Plugin system overview](./plugins.md)
 - [Official Core plugin](./core-plugin.md)

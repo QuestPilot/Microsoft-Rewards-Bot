@@ -4,13 +4,13 @@ This page documents how the official Core plugin behaves, what it covers, and ho
 
 ## Distribution Model
 
-The bot is open source, but the official Core plugin is proprietary and requires a paid license.
+The public bot repository is source-available, but the official Core plugin is proprietary and requires a paid license.
 
 Core is preinstalled in `plugins/core`, shipped as compiled bytecode, and trusted only when its checksum matches `plugins/official-core.json`.
 
 ## Coverage Model
 
-The open-source bot focuses on the stable Rewards workflow:
+The public edition focuses on the stable Rewards workflow:
 
 - Bing searches;
 - limited Daily Set processing;
@@ -89,11 +89,11 @@ The public repository includes only examples for local maintainer tooling. Real 
 
 The public plugin API cannot grant official Core entitlement and cannot register premium Core tasks. Only the signed official Core bytecode can unlock those paths in the official release.
 
-Because the open-source repository is modifiable, a fork can remove local limits from its own copy. The protected value is the maintained signed Core release, its license checks, and the premium automation that is not shipped as source.
+Because the source-available repository is modifiable, a local copy can remove local limits from its own files. The license does not permit public redistribution of those changes when they bypass, unlock, replace, emulate, or reproduce Core. The protected value is the maintained signed Core release, its license checks, and the premium automation that is not shipped as source.
 
 ## Release Checklist
 
-Before copying a new Core build into the open-source repo:
+Before copying a new Core build into the public repo:
 
 - verify that no database token, API token, private key, or local `.env` value is committed;
 - revoke any token that was ever shipped in bytecode or source;

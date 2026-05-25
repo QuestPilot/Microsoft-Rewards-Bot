@@ -81,7 +81,13 @@ RUN npm install -g rimraf
 COPY --from=builder /usr/src/microsoft-rewards-bot/dist ./dist
 COPY --from=builder /usr/src/microsoft-rewards-bot/package*.json ./
 COPY --from=builder /usr/src/microsoft-rewards-bot/node_modules ./node_modules
+COPY --from=builder /usr/src/microsoft-rewards-bot/plugins ./plugins
 COPY --from=builder /usr/src/microsoft-rewards-bot/scripts ./scripts
+
+# Core bytecode imports the public bot package by name. Keep the package alias
+# available after the production dependency reinstall in the builder stage.
+RUN rm -rf ./node_modules/microsoft-rewards-bot \
+    && cp -R ./dist ./node_modules/microsoft-rewards-bot
 
 # Copy runtime scripts with proper permissions from the start
 COPY --chmod=755 scripts/docker/run_daily.sh ./scripts/docker/run_daily.sh

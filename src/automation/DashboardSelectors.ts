@@ -2,7 +2,7 @@
  * Microsoft Rewards Bot — Core Selectors
  * Copyright (c) 2026 QuestPilot
  *
- * Licensed under the PolyForm Non-Commercial License 1.0.
+ * Licensed under the QuestPilot Source Available License 1.0.
  * See LICENSE for full terms.
  *
  * Core CSS selectors required for basic bot functionality (search, cookie consent, URLs).

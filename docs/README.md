@@ -9,6 +9,7 @@ The README is the quick entry point. This folder is the full guide, split by tas
 | If you want to... | Go here |
 | --- | --- |
 | Install the bot manually or understand what happens on launch | [Install and auto-updates](./updates.md) |
+| Run the bot in Docker | [Docker](./docker.md) |
 | Fix a Node.js version mismatch | [Node.js version](./node-version.md) |
 | Enable Core or a free optional plugin | [Plugin system overview](./plugins.md) |
 | Learn what Core adds before buying it | [Official Core plugin](./core-plugin.md) |
@@ -16,6 +17,7 @@ The README is the quick entry point. This folder is the full guide, split by tas
 | Build your own public plugin | [Create a plugin](./create-plugin.md) |
 | Look up exact plugin interfaces | [Plugin API reference](./plugin-api.md) |
 | Package or publish a plugin | [Plugin publishing](./plugin-marketplace.md) |
+| Understand licensing and allowed use | [Licensing and allowed use](./licensing.md) |
 | Diagnose launch, update, Core, or dashboard problems | [Troubleshooting](./troubleshooting.md) |
 
 ## Documentation Paths
@@ -23,6 +25,8 @@ The README is the quick entry point. This folder is the full guide, split by tas
 ### Users
 
 - [Install and auto-updates](./updates.md)
+- [Docker](./docker.md)
+- [Licensing and allowed use](./licensing.md)
 - [Node.js version](./node-version.md)
 - [Built-in scheduler](./scheduler.md)
 - [Troubleshooting](./troubleshooting.md)
