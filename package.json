@@ -26,6 +26,7 @@
         "prets-start": "node ./scripts/check-node-version.js",
         "update:doctor": "node ./scripts/update-doctor.js",
         "update:check": "node ./scripts/update-check.js --dry-run",
+        "core:release-check": "node ./scripts/check-core-release-artifact.js",
         "ts-start": "ts-node ./src/index.ts",
         "predev": "node ./scripts/check-node-version.js",
         "dev": "ts-node ./src/index.ts -dev",

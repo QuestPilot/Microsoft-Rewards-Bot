@@ -14,6 +14,7 @@ The README is the quick entry point. This folder is the full guide, split by tas
 | Enable Core or a free optional plugin | [Plugin system overview](./plugins.md) |
 | Learn what Core adds before buying it | [Official Core plugin](./core-plugin.md) |
 | Open or understand the official dashboard | [Core Dashboard](./dashboard.md) |
+| Understand Core obfuscation and release safety | [Core release security](./core-release-security.md) |
 | Build your own public plugin | [Create a plugin](./create-plugin.md) |
 | Look up exact plugin interfaces | [Plugin API reference](./plugin-api.md) |
 | Package or publish a plugin | [Plugin publishing](./plugin-marketplace.md) |
@@ -42,12 +43,14 @@ The README is the quick entry point. This folder is the full guide, split by tas
 
 - [Official Core plugin](./core-plugin.md)
 - [Core technical reference](./core-plugin-reference.md)
+- [Core release security](./core-release-security.md)
 - [Core Dashboard](./dashboard.md)
 - [Dashboard testing](./dashboard-testing.md)
 
 ### Maintainers
 
 - [Auto-update release checklist](./auto-update-release.md)
+- [Core release security](./core-release-security.md)
 - [Safety advisory](./safety-advisory.md)
 - [Selectors reference](./selectors-reference.md)
 

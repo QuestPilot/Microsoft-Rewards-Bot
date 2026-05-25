@@ -62,6 +62,8 @@ The long-term recommended scheduler is the built-in Node scheduler in `src/confi
 
 The official Core plugin is shipped as V8 bytecode through `bytenode`. That bytecode must match the runtime target. The supported Docker target is Node.js `24.15.0` on Linux `x64`.
 
+A `.jsc` built on Windows is not Docker-compatible. A `.jsc` built on Linux is not automatically Windows-compatible. Maintainers must publish a Core artifact built for the Docker target, or move Core to the multi-target layout described in [Core release security](./core-release-security.md).
+
 If Core fails with `Invalid or incompatible cached data (cachedDataRejected)`, the container is not running the Node.js/V8 build that matches the Core bytecode.
 
 If Core fails with `Segmentation fault (core dumped)` during `require('./plugins/core/index.jsc')`, do not add random Debian packages. That failure happens before browser automation starts and usually points to a bytecode/runtime target mismatch or a bytenode/V8 bytecode crash. Use the official Dockerfile target and an official Core release built for Linux `x64`.

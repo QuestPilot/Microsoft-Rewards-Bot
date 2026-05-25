@@ -12,6 +12,8 @@ Publish the `release` branch so existing local installs can detect a higher `pac
 - access to rebuild the official Core plugin when Core changes
 - write access to the official `release` branch
 
+Read [Core release security](./core-release-security.md) before publishing a Core artifact. It defines the obfuscation, bytecode target, and anti-leak rules.
+
 ## Preparation Steps
 
 1. Build and test the public bot.
@@ -23,6 +25,7 @@ npx tsc --noEmit
 npm test
 npm run test:dashboard:mock
 npm audit --audit-level=moderate
+npm run core:release-check
 npm run update:doctor
 ```
 
@@ -37,6 +40,8 @@ npm run build:release
 ```
 
 For Docker support, build the Core release artifact on Linux `x64` with Node.js `24.15.0`. The generated `official-core.json` records the bytecode target.
+
+Do not copy a Windows-built Core `.jsc` into a Docker/Linux release. `bytenode` bytecode is tied to Node/V8, OS, and architecture. Until Core uses the multi-target layout described in [Core release security](./core-release-security.md), a single `plugins/core/index.jsc` can only be treated as one official runtime target.
 
 3. Copy the Core release into the public repository when Core changed.
 
@@ -64,6 +69,7 @@ The updater reads `package.json` directly from `release`, then downloads the imm
 6. Validate after push.
 
 ```bash
+npm run core:release-check
 npm run update:check
 npm run update:doctor
 ```
@@ -73,6 +79,7 @@ Expected result:
 - local and remote versions are printed;
 - the release branch SHA is printed;
 - Core checksum values match;
+- Core release artifact check passes;
 - Docker users only receive an update notification.
 
 ## Preserved User Files
@@ -100,6 +107,8 @@ Managed project paths are mirrored from the release archive before copy. This re
 
 - Do not ship database tokens, API keys, private keys, or license backend secrets.
 - Do not publish source files from Core in `plugins/core`.
+- Do not publish Core `.ts`, sourcemap, or unobfuscated Core `dist/**/*.js` files.
 - Do not rebuild Core bytecode with another Node.js version.
+- Do not claim Windows, Linux, and Docker support from one single-target `.jsc`.
 - Do not rely on `updates/stable.json` or signed update manifests for the public channel.
 - Do not rely on obfuscation as secret storage.

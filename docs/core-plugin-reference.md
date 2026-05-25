@@ -8,6 +8,8 @@ The public bot repository is source-available, but the official Core plugin is p
 
 Core is preinstalled in `plugins/core`, shipped as compiled bytecode, and trusted only when its checksum matches `plugins/official-core.json`.
 
+See [Core release security](./core-release-security.md) for the obfuscation, bytecode target, and anti-leak rules used when publishing Core artifacts.
+
 ## Coverage Model
 
 The public edition focuses on the stable Rewards workflow:
@@ -95,6 +97,10 @@ The public plugin API cannot grant official Core entitlement and cannot register
 
 Because the source-available repository is modifiable, a local copy can remove local limits from its own files. The license does not permit public redistribution of those changes when they bypass, unlock, replace, emulate, or reproduce Core. The protected value is the maintained signed Core release, its license checks, and the premium automation that is not shipped as source.
 
+Bytecode and obfuscation are not secret storage. They provide commercial friction, not an unbreakable security boundary. Backend authority must remain in Core-API.
+
+`bytenode` bytecode is target-specific. A Windows-built `.jsc` is not a Docker/Linux artifact, even when Node.js is the same version. Reliable Windows + Linux + Docker support requires a multi-target Core package with one bytecode artifact per OS/architecture/Node target.
+
 ## Release Checklist
 
 Before copying a new Core build into the public repo:
@@ -105,4 +111,6 @@ Before copying a new Core build into the public repo:
 - rebuild Core using Node.js `24.15.0`;
 - copy only bytecode, package, and license artifacts;
 - verify that `plugins/official-core.json` matches `plugins/core/index.jsc`;
+- verify that the bytecode target matches the platform being published;
+- verify that no `.ts`, `.map`, source `dist/**/*.js`, `.env`, or private secret was copied into the public repository;
 - run the checks in [Dashboard testing](./dashboard-testing.md).

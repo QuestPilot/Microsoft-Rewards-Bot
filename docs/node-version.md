@@ -28,7 +28,7 @@ npm start
 
 ## Why This Is Strict
 
-The official Core plugin is distributed as V8 bytecode through `bytenode`. Bytecode is tied to Node.js/V8 compatibility. Running it on another Node.js version can fail at runtime or behave unpredictably.
+The official Core plugin is distributed as V8 bytecode through `bytenode`. Bytecode is tied to Node.js/V8 compatibility, operating system, and CPU architecture. Running it on another Node.js version or another runtime target can fail at runtime or behave unpredictably.
 
 For this reason, the official release refuses every Node.js version except 24.15.0 before loading the bot.
 
@@ -55,3 +55,5 @@ The supported protection model is:
 - license validation through your backend;
 - no server secrets in the shipped plugin;
 - public plugins cannot grant official Core entitlement.
+
+For maintainer release rules, see [Core release security](./core-release-security.md).
