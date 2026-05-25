@@ -1,3 +1,4 @@
 'use strict';
 require('bytenode');
-module.exports = require('./index.jsc');
+const target = process.env.MSRB_CORE_TARGET || process.platform + '-' + process.arch + '-node-' + process.versions.node;
+module.exports = require('./targets/' + target + '/index.jsc');

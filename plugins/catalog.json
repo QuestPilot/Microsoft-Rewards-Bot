@@ -1,27 +1,53 @@
 {
-  "plugins": [
-    {
-      "name": "core",
-      "version": "1.0.4",
-      "description": "Official Core plugin with premium Microsoft Rewards tasks and license validation.",
-      "license": "Proprietary",
-      "price": "paid",
-      "botVersionRange": ">=4.0.7",
-      "supportUrl": "https://discord.com/users/683712256243925066",
-      "purchaseUrl": "docs/core-plugin.md",
-      "sha256": "9e7434f9a9768618e140d0d2f56cb1f47260f34bf62e0b19e7956add3ca20cd2"
-    },
-    {
-      "name": "run-summary",
-      "version": "1.0.0",
-      "description": "Free local summaries for account run results, written to diagnostics/run-summary.",
-      "license": "MIT",
-      "price": "free",
-      "botVersionRange": ">=4.0.0",
-      "installUrl": "plugins/run-summary",
-      "supportUrl": "docs/plugins.md",
-      "purchaseUrl": "",
-      "sha256": "f9d34ce30f1ee9526e1d9f784bfae5ae5ebcb2a3ef50e421a2d78f157d9908f7"
-    }
-  ]
+    "plugins":  [
+                    {
+                        "name":  "core",
+                        "version":  "1.0.4",
+                        "description":  "Official Core plugin with premium Microsoft Rewards tasks and license validation.",
+                        "license":  "Proprietary",
+                        "price":  "paid",
+                        "botVersionRange":  "\u003e=4.0.7",
+                        "supportUrl":  "https://discord.com/users/683712256243925066",
+                        "purchaseUrl":  "docs/core-plugin.md",
+                        "sha256":  "",
+                        "targets":  {
+                                        "win32-x64-node-24.15.0":  {
+                                                                       "indexSha256":  "774f6fb5509ab4be24e335693ccbe8b2914afa668430d580e20c9bc258b5efe7",
+                                                                       "bytecodeTarget":  {
+                                                                                              "node":  "24.15.0",
+                                                                                              "platform":  "win32",
+                                                                                              "arch":  "x64"
+                                                                                          }
+                                                                   },
+                                        "linux-x64-node-24.15.0":  {
+                                                                       "indexSha256":  "9d383b24e5e473ee0d3d5a4c866247815b9026630b8ca49dd810d7ea4a7d75b7",
+                                                                       "bytecodeTarget":  {
+                                                                                              "node":  "24.15.0",
+                                                                                              "platform":  "linux",
+                                                                                              "arch":  "x64"
+                                                                                          }
+                                                                   },
+                                        "linux-arm64-node-24.15.0":  {
+                                                                         "indexSha256":  "7e4eb5925005a2ce352e9af2cf51671f7959402dc1d413fc25c2ac54d516f610",
+                                                                         "bytecodeTarget":  {
+                                                                                                "node":  "24.15.0",
+                                                                                                "platform":  "linux",
+                                                                                                "arch":  "arm64"
+                                                                                            }
+                                                                     }
+                                    }
+                    },
+                    {
+                        "name":  "run-summary",
+                        "version":  "1.0.0",
+                        "description":  "Free local summaries for account run results, written to diagnostics/run-summary.",
+                        "license":  "MIT",
+                        "price":  "free",
+                        "botVersionRange":  "\u003e=4.0.0",
+                        "installUrl":  "plugins/run-summary",
+                        "supportUrl":  "docs/plugins.md",
+                        "purchaseUrl":  "",
+                        "sha256":  "f9d34ce30f1ee9526e1d9f784bfae5ae5ebcb2a3ef50e421a2d78f157d9908f7"
+                    }
+                ]
 }
