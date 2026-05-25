@@ -480,7 +480,7 @@ class UpdateManager {
     }
 
     async downloadArchive(archiveUrl, archivePath) {
-        await download(archiveUrl, archivePath, 60_000, { accept: 'application/octet-stream' })
+        await download(archiveUrl, archivePath, 60_000, { accept: 'application/vnd.github+json' })
     }
 
     extractArchive(archivePath, extractDir) {

@@ -220,6 +220,13 @@ test('dependency sync chooses npm ci when package-lock is present', () => {
     assert.deepEqual(capturedArgs, ['ci'])
 })
 
+test('GitHub tarball download uses the GitHub API accept header', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'scripts', 'updater', 'UpdateManager.js'), 'utf8')
+    assert.match(source, /archiveUrl: this\.githubApiUrl\(`\/repos\/\$\{this\.repo\}\/tarball\/\$\{commitSha\}`\)/)
+    assert.match(source, /accept: 'application\/vnd\.github\+json'/)
+    assert.doesNotMatch(source, /downloadArchive[\s\S]+accept: 'application\/octet-stream'/)
+})
+
 test('applying release preserves user files and removes obsolete managed files', () => {
     const root = tempRoot()
     const source = tempRoot()
