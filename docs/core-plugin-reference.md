@@ -56,16 +56,20 @@ This lets Core support recurring campaign structures without hardcoding every sh
 
 ## Dashboard Behavior
 
-Core includes the official remote dashboard. It starts automatically after a successful license check and opens only an outbound connection to the official dashboard service. It does not expose a local HTTP server or bind to the user's local network.
+Core includes the official remote dashboard and background agent. It starts after a successful license check and opens only an outbound connection to the official dashboard service. It does not expose a local HTTP server or bind to the user's local network.
 
 Users sign in on the official dashboard domain with:
 
 1. their Core license key;
 2. Discord OAuth.
 
-The dashboard shows masked account status, run state, recent filtered logs, point summaries, and allowlisted actions such as starting a run when the bot is idle.
+The dashboard shows masked account status, run state, recent filtered logs, point summaries, version/update state, auto-start status, diagnostics, and allowlisted actions such as starting a run when the bot is idle.
 
-Dashboard commands are queued and acknowledged asynchronously, so a short delay after an action is expected.
+Dashboard commands are queued and acknowledged asynchronously, so a short delay after an action is expected. Live state is Redis-first: heartbeats, snapshots, logs, and command state stay in Redis with TTLs to protect Turso quota. Turso is used for license/auth state and durable audit records for mutations.
+
+Devices remain visible after going offline so users can inspect the last known state. Deleting a device from the dashboard removes live dashboard state only and does not revoke the license activation.
+
+Sensitive account/config mutations use encrypted command payloads. The dashboard encrypts for the selected device, Redis transports the encrypted payload, and the local bot decrypts and validates before writing local files.
 
 Maintainers can override the service URL for custom deployments:
 

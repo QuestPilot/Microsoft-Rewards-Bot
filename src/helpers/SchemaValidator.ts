@@ -29,6 +29,12 @@ const RedeemGoalSchema = z.object({
     redeemMode: z.enum(['auto', 'manual'])
 })
 
+const BackgroundAgentSchema = z.object({
+    enabled: z.boolean().default(true),
+    allowDashboardAutostart: z.boolean().default(true),
+    openConsole: z.boolean().default(true)
+})
+
 const SchedulerSchema = z.object({
     enabled: z.boolean().default(false),
     runOnStartup: z.boolean().default(true),
@@ -107,6 +113,7 @@ export const ConfigSchema = z.object({
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
     redeemGoal: RedeemGoalSchema.optional(),
+    backgroundAgent: BackgroundAgentSchema.optional(),
     scheduler: SchedulerSchema.optional(),
     safetyAdvisory: SafetyAdvisorySchema.optional()
 })
@@ -114,6 +121,7 @@ export const ConfigSchema = z.object({
 // Account
 export const AccountSchema = z.object({
     email: z.string(),
+    enabled: z.boolean().optional(),
     password: z.string(),
     totpSecret: z.string().optional(),
     recoveryEmail: z.string(),

@@ -32,7 +32,7 @@ async function main() {
     await updater.run()
 
     runNpm(['run', 'build'])
-    run(process.execPath, ['./dist/index.js'], 'bot')
+    run(process.execPath, ['./dist/index.js', ...process.argv.slice(2)], 'bot')
 }
 
 main().catch(error => {

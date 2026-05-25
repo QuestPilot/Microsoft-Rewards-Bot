@@ -14,9 +14,16 @@ export interface Config {
     consoleLogFilter: LogFilter
     webhook: ConfigWebhook
     redeemGoal?: ConfigRedeemGoal
+    backgroundAgent?: ConfigBackgroundAgent
     plugins?: ConfigPlugins
     scheduler?: ConfigScheduler
     safetyAdvisory?: ConfigSafetyAdvisory
+}
+
+export interface ConfigBackgroundAgent {
+    enabled: boolean
+    allowDashboardAutostart: boolean
+    openConsole: boolean
 }
 
 export interface ConfigScheduler {

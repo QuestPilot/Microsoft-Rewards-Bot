@@ -2,6 +2,8 @@
 
 The built-in scheduler lets the bot run immediately, finish all configured accounts, then wait inside the same process until the next daily run time. It works on Windows, macOS, Linux, and Docker without cron, systemd, Task Scheduler, or any third-party service.
 
+With Core enabled, the scheduler can run inside the background agent. In that mode the machine stays visible in the Core dashboard, waits silently between runs, and can still receive dashboard commands.
+
 ## Configuration
 
 Add or update this block in `src/config.json`:
@@ -37,3 +39,15 @@ With the example above, the bot runs immediately when launched. After it finishe
 For Docker, keep the container running. The scheduler is inside the Node.js process, so restarting the container also restarts the scheduler state.
 
 If you change `src/config.json` or `src/accounts.json`, restart the bot so the new settings are loaded.
+
+## Core Background Agent
+
+Core adds a dashboard-managed background mode:
+
+```bash
+npm start -- --background
+```
+
+On Windows, the dashboard can install a user Task Scheduler entry that starts this command at logon. On Linux, it can install a `systemd --user` service. Docker does not install auto-start entries; use the container restart policy instead.
+
+If `scheduler.enabled` is false, the background agent stays connected but does not run rewards until a dashboard command asks it to run. If `scheduler.enabled` is true, the scheduler controls when runs start.

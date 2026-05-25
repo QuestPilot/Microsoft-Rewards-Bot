@@ -25,6 +25,13 @@ import { PluginManager } from './core/PluginManager'
 import { checkSafetyAdvisory } from './core/SafetyAdvisory'
 import { formatScheduledRun, getNextScheduledRun, isSchedulerEnabled, waitUntil } from './core/Scheduler'
 import {
+    AgentRuntime,
+    attachToAgent,
+    confirmReplaceExistingAgent,
+    isAgentActive,
+    stopExistingAgent
+} from './core/AgentRuntime'
+import {
     ACCOUNT_SAFETY_WARNING_THRESHOLD,
     clearAccountSafetyWarningState,
     createAccountSafetyWarningState,
@@ -93,6 +100,7 @@ export class MicrosoftRewardsBot {
     public dashboardEvents: DashboardLog[] = []
     public dashboardRunState: 'idle' | 'checking' | 'running' | 'waiting' | 'finished' | 'blocked' | 'error' = 'idle'
     public dashboardStopRequested = false
+    public agentRuntime: AgentRuntime = new AgentRuntime()
 
     private pointsCanCollect = 0
 
@@ -140,6 +148,7 @@ export class MicrosoftRewardsBot {
         if (this.dashboardEvents.length > 500) {
             this.dashboardEvents.splice(0, this.dashboardEvents.length - 500)
         }
+        this.agentRuntime.publishLog(entry)
     }
 
     async initialize(): Promise<void> {
@@ -165,20 +174,21 @@ export class MicrosoftRewardsBot {
     }
 
     async run(): Promise<number> {
-        const totalAccounts = this.accounts.length
+        const enabledAccounts = this.accounts.filter(account => account.enabled !== false)
+        const totalAccounts = enabledAccounts.length
         const runStartTime = Date.now()
 
         if (this.config.clusters > 1) {
             if (cluster.isPrimary) {
                 this.logRunStart(totalAccounts)
-                return this.runMaster(runStartTime)
+                return this.runMaster(enabledAccounts, runStartTime)
             } else {
                 this.runWorker(runStartTime)
                 return 0
             }
         } else {
             this.logRunStart(totalAccounts)
-            await this.runTasks(this.accounts, runStartTime)
+                await this.runTasks(enabledAccounts, runStartTime)
             return 0
         }
     }
@@ -277,10 +287,10 @@ export class MicrosoftRewardsBot {
         )
     }
 
-    private runMaster(runStartTime: number): Promise<number> {
+    private runMaster(accounts: Account[], runStartTime: number): Promise<number> {
         void this.logger.info('main', 'CLUSTER-PRIMARY', `Primary process started | PID: ${process.pid}`)
 
-        const rawChunks = this.utils.chunkArray(this.accounts, this.config.clusters)
+        const rawChunks = this.utils.chunkArray(accounts, this.config.clusters)
         const accountChunks = rawChunks.filter(c => c && c.length > 0)
         this.activeWorkers = accountChunks.length
 
@@ -710,54 +720,101 @@ async function main(): Promise<void> {
     // Check before doing anything
     checkNodeVersion()
 
+    if (process.argv.includes('--attach')) {
+        process.exit(await attachToAgent())
+    }
+
+    if (await isAgentActive()) {
+        if (process.argv.includes('--stop-existing')) {
+            const stopped = await stopExistingAgent()
+            if (!stopped) {
+                console.error('[AGENT] Existing instance did not stop in time.')
+                process.exit(1)
+            }
+        } else if (await confirmReplaceExistingAgent()) {
+            const stopped = await stopExistingAgent()
+            if (!stopped) {
+                console.error('[AGENT] Existing instance did not stop in time.')
+                process.exit(1)
+            }
+        } else {
+            console.log('[AGENT] Existing instance left running. Exiting this launch.')
+            process.exit(0)
+        }
+    }
+
     const rewardsBot = new MicrosoftRewardsBot()
 
     process.on('beforeExit', () => {
+        void rewardsBot.agentRuntime.stop()
         void rewardsBot.pluginManager.destroyAll()
         void flushAllWebhooks()
     })
     process.on('SIGINT', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGINT received, flushing and exiting...')
+        await rewardsBot.agentRuntime.stop()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(130)
     })
     process.on('SIGTERM', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGTERM received, flushing and exiting...')
+        await rewardsBot.agentRuntime.stop()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(143)
     })
     process.on('uncaughtException', async error => {
         rewardsBot.logger.error('main', 'UNCAUGHT-EXCEPTION', error)
+        await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
         process.exit(1)
     })
     process.on('unhandledRejection', async reason => {
         rewardsBot.logger.error('main', 'UNHANDLED-REJECTION', reason as Error)
+        await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
         process.exit(1)
     })
 
     try {
+        if (rewardsBot.config.backgroundAgent?.enabled !== false) {
+            await rewardsBot.agentRuntime.start()
+        }
         await rewardsBot.initialize()
         if (cluster.isWorker) {
             await rewardsBot.run()
             return
         }
 
-        const exitCode = isSchedulerEnabled(rewardsBot.config.scheduler)
+        const exitCode = process.argv.includes('--background') && !isSchedulerEnabled(rewardsBot.config.scheduler)
+            ? await runBackgroundAgent(rewardsBot)
+            : isSchedulerEnabled(rewardsBot.config.scheduler)
             ? await runScheduled(rewardsBot)
             : await runSingle(rewardsBot)
 
+        await rewardsBot.agentRuntime.stop()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(exitCode)
     } catch (error) {
         rewardsBot.dashboardRunState = 'error'
         rewardsBot.logger.error('main', 'MAIN-ERROR', error as Error)
+        await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
     }
+}
+
+async function runBackgroundAgent(rewardsBot: MicrosoftRewardsBot): Promise<number> {
+    if (!rewardsBot.pluginManager.hasOfficialCoreEntitlement()) {
+        rewardsBot.logger.warn('main', 'AGENT', 'Background agent requires Core with a valid license.')
+        return 0
+    }
+
+    rewardsBot.dashboardRunState = 'idle'
+    rewardsBot.logger.info('main', 'AGENT', 'Background agent connected. Waiting for dashboard commands.')
+    await new Promise<void>(() => undefined)
+    return 0
 }
 
 async function runSingle(rewardsBot: MicrosoftRewardsBot): Promise<number> {

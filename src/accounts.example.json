@@ -1,6 +1,7 @@
 [
     {
         "email": "email_1",
+        "enabled": true,
         "password": "password_1",
         "totpSecret": "",
         "recoveryEmail": "",
@@ -20,6 +21,7 @@
     },
     {
         "email": "email_2",
+        "enabled": true,
         "password": "password_2",
         "totpSecret": "",
         "recoveryEmail": "",

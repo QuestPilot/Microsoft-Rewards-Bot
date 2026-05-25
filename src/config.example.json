@@ -76,6 +76,11 @@
         "skuOptionValue": "",
         "redeemMode": "auto"
     },
+    "backgroundAgent": {
+        "enabled": true,
+        "allowDashboardAutostart": true,
+        "openConsole": true
+    },
     "scheduler": {
         "enabled": false,
         "runOnStartup": true,
