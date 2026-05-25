@@ -1,9 +1,9 @@
 import semver from 'semver'
 import { z } from 'zod'
-import pkg from '../../package.json'
 
 import { Account } from '../types/Account'
 import { Config } from '../types/Config'
+import { getPackageMetadata } from './PackageMetadata'
 
 const NumberOrString = z.union([z.number(), z.string()])
 
@@ -150,6 +150,7 @@ export function validateAccounts(data: unknown): Account[] {
 
 export function checkNodeVersion(): void {
     try {
+        const pkg = getPackageMetadata()
         const requiredVersion = pkg.engines?.node
 
         if (!requiredVersion) {

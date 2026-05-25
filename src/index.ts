@@ -1,7 +1,6 @@
 import cluster, { Worker } from 'cluster'
 import type { BrowserContext, Cookie, Page } from 'patchright'
 import readline from 'readline'
-import pkg from '../package.json'
 
 import type { BrowserFingerprintWithHeaders } from 'fingerprint-generator'
 
@@ -11,6 +10,7 @@ import PageController from './automation/PageController'
 
 import { loadAccounts, loadConfig } from './helpers/ConfigLoader'
 import Helpers from './helpers/Helpers'
+import { getPackageMetadata } from './helpers/PackageMetadata'
 import { checkNodeVersion } from './helpers/SchemaValidator'
 import { IpcLog, LogService } from './notifications/LogService'
 
@@ -64,6 +64,8 @@ interface AccountStats {
 
 // Re-exported so callers that already import from this module keep working
 export { executionContext, getCurrentContext }
+
+const pkg = getPackageMetadata()
 
 async function flushAllWebhooks(timeoutMs = 5000): Promise<void> {
     await Promise.allSettled([flushDiscordQueue(timeoutMs), flushNtfyQueue(timeoutMs)])

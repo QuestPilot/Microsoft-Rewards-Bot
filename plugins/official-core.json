@@ -3,7 +3,7 @@
     "version":  "1.0.4",
     "targets":  {
                     "win32-x64-node-24.15.0":  {
-                                                   "indexSha256":  "774f6fb5509ab4be24e335693ccbe8b2914afa668430d580e20c9bc258b5efe7",
+                                                   "indexSha256":  "bdb7a7161129aa5f31cfe46a3b0c02e96bde8eeca808eb0412d5d7230285dedc",
                                                    "bytecodeTarget":  {
                                                                           "node":  "24.15.0",
                                                                           "platform":  "win32",
@@ -11,7 +11,7 @@
                                                                       }
                                                },
                     "linux-x64-node-24.15.0":  {
-                                                   "indexSha256":  "9d383b24e5e473ee0d3d5a4c866247815b9026630b8ca49dd810d7ea4a7d75b7",
+                                                   "indexSha256":  "1dd54772f148df8effefc749b01e2bbdc664b2dbf4b628da4e8a024062860fcb",
                                                    "bytecodeTarget":  {
                                                                           "node":  "24.15.0",
                                                                           "platform":  "linux",
@@ -19,7 +19,7 @@
                                                                       }
                                                },
                     "linux-arm64-node-24.15.0":  {
-                                                     "indexSha256":  "7e4eb5925005a2ce352e9af2cf51671f7959402dc1d413fc25c2ac54d516f610",
+                                                     "indexSha256":  "07547a76c6b6c1f4c21e76416b7cf98aa0d85fce6fe64a7cf9569af7c7ced333",
                                                      "bytecodeTarget":  {
                                                                             "node":  "24.15.0",
                                                                             "platform":  "linux",
