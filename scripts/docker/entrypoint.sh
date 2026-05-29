@@ -17,6 +17,10 @@ if [ -z "${CRON_SCHEDULE:-}" ]; then
   exit 1
 fi
 
+# 2.1 Perform an initial license check to ensure premium features are recognized immediately
+echo "[entrypoint] Performing initial license check..."
+node dist/index.js --license-check || echo "[entrypoint] WARNING: License check failed or returned non-zero exit code."
+
 # 3. Initial run without sleep if RUN_ON_START=true
 if [ "${RUN_ON_START:-false}" = "true" ]; then
   echo "[entrypoint] Starting initial run in background at $(date)"

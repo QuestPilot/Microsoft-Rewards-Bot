@@ -784,6 +784,17 @@ async function main(): Promise<void> {
             await rewardsBot.agentRuntime.start()
         }
         await rewardsBot.initialize()
+
+        if (process.argv.includes('--license-check')) {
+            const hasEntitlement = rewardsBot.pluginManager.hasOfficialCoreEntitlement()
+            if (hasEntitlement) {
+                console.log('[LICENSE] Official Core license recognized and active.')
+            } else {
+                console.warn('[LICENSE] Official Core license not recognized or inactive.')
+            }
+            process.exit(0)
+        }
+
         if (cluster.isWorker) {
             await rewardsBot.run()
             return

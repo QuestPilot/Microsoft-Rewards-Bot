@@ -19,6 +19,7 @@ services:
             CRON_SCHEDULE: '0 7 * * *'
             RUN_ON_START: 'true'
             SKIP_RANDOM_SLEEP: 'true'
+            LICENSE_KEY: 'MSRB-XXXX-XXXX-XXXX-XXXX' #  <---Fill in if you have premium Core lisence.
         healthcheck:
             test: ['CMD', 'sh', '-c', 'pgrep node > /dev/null || exit 1']
             interval: 60s
