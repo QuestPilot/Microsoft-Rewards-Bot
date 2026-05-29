@@ -12,7 +12,7 @@ Docker never self-updates. It only logs when a newer version exists. Update Dock
 
 The updater uses GitHub directly:
 
-1. read the latest commit SHA from `QuestPilot/Microsoft-Rewards-Bot#main`;
+1. read the latest commit SHA from the configured update branch;
 2. read `package.json` at that SHA;
 3. compare the remote version with the local `package.json`;
 4. download the immutable GitHub tarball for that SHA;
@@ -58,7 +58,7 @@ Useful environment variables:
 Use the supported public branch:
 
 ```bash
-git clone --branch main https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
+git clone https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
 cd Microsoft-Rewards-Bot
 npm install
 npm start

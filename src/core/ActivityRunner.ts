@@ -167,7 +167,7 @@ export default class ActivityRunner {
         this.bot.logger.warn(
             'main',
             'CORE-OPTIONAL',
-            `${feature} requires Core — skipping. ${detail} Learn more: https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/main/docs/core-plugin.md`
+            `${feature} requires Core — skipping. ${detail} Learn more: https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/HEAD/docs/core-plugin.md`
         )
     }
 }

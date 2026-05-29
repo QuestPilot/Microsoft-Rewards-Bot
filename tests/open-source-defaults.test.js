@@ -22,7 +22,7 @@ test('open-source premium fallbacks show concise Core hints', () => {
     const taskBase = fs.readFileSync(path.join(root, 'src/core/TaskBase.ts'), 'utf8')
 
     assert.match(runner, /CORE-OPTIONAL/)
-    assert.match(runner, /Learn more: https:\/\/github\.com\/QuestPilot\/Microsoft-Rewards-Bot\/blob\/main\/docs\/core-plugin\.md/)
+    assert.match(runner, /Learn more: https:\/\/github\.com\/QuestPilot\/Microsoft-Rewards-Bot\/blob\/HEAD\/docs\/core-plugin\.md/)
     assert.match(runner, /premiumHintsShown/)
     assert.match(taskBase, /Core unlocks full Daily Set coverage/)
 })

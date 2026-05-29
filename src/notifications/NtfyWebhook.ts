@@ -3,7 +3,7 @@ import PQueue from 'p-queue'
 import type { WebhookNtfyConfig } from '../types/Config'
 import type { LogLevel } from './LogService'
 
-const BOT_ICON_URL = 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/main/assets/logo.png'
+const BOT_ICON_URL = 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/assets/logo.png'
 
 const ntfyQueue = new PQueue({
     interval: 1000,

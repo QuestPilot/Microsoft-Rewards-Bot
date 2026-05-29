@@ -293,7 +293,7 @@ export class SearchOnBing extends TaskBase {
                 // Fetch from the repo directly so the user doesn't need to redownload the script for the new activities
                 const response = await this.bot.axios.request({
                     method: 'GET',
-                    url: 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/refs/heads/main/src/core/bing-search-activity-queries.json'
+                    url: 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/src/core/bing-search-activity-queries.json'
                 })
                 queries = response.data
 

@@ -7,7 +7,7 @@ The safety advisory check lets maintainers publish a small JSON file when runnin
 ```json
 "safetyAdvisory": {
   "enabled": true,
-  "url": "https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/main/safety-advisory.json",
+  "url": "https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/safety-advisory.json",
   "timeout": "10sec",
   "blockedBehavior": "prompt"
 }

