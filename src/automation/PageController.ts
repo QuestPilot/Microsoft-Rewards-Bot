@@ -100,31 +100,166 @@ export default class PageController {
             return JSON.parse(legacyMatch[1]) as DashboardData
         }
 
-        const nextChunks = html.matchAll(/self\.__next_f\.push\(\[\d+,"(.*?)"\]\)/gs)
-        for (const chunk of nextChunks) {
-            const raw = chunk[1]
-            if (!raw || !raw.includes('userStatus')) continue
+        const nextData = this.extractNextData(html)
+        if (nextData) {
+            const parsed = this.findDashboardData(nextData)
+            if (parsed) {
+                this.bot.logger.debug(
+                    this.bot.isMobile,
+                    'GET-DASHBOARD-DATA',
+                    'Extracted dashboard data from Next.js data script'
+                )
+                return parsed
+            }
+        }
 
-            try {
-                const unescaped = raw.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
-                const jsonMatch = unescaped.match(/\{[^{}]*"userStatus"\s*:\s*\{.*$/s)
-                if (jsonMatch) {
-                    const parsed = JSON.parse(jsonMatch[0])
-                    if (parsed?.userStatus) {
-                        this.bot.logger.debug(
-                            this.bot.isMobile,
-                            'GET-DASHBOARD-DATA',
-                            'Extracted dashboard data from Next.js hydration chunk'
-                        )
-                        return parsed as DashboardData
-                    }
-                }
-            } catch {
-                // This chunk did not contain valid dashboard JSON.
+        for (const chunk of this.extractNextFlightChunks(html)) {
+            const parsed = this.findDashboardData(chunk)
+            if (parsed) {
+                this.bot.logger.debug(
+                    this.bot.isMobile,
+                    'GET-DASHBOARD-DATA',
+                    'Extracted dashboard data from Next.js hydration chunk'
+                )
+                return parsed
             }
         }
 
         throw new Error('Dashboard data not found in HTML (tried legacy embed + Next.js chunks)')
+    }
+
+    private extractNextData(html: string): string | null {
+        const match = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/s)
+        return match?.[1] ? this.decodeHtmlEntities(match[1]) : null
+    }
+
+    private extractNextFlightChunks(html: string): string[] {
+        const chunks: string[] = []
+        const marker = 'self.__next_f.push('
+        let searchFrom = 0
+
+        while (searchFrom < html.length) {
+            const start = html.indexOf(marker, searchFrom)
+            if (start === -1) break
+
+            const argsStart = start + marker.length
+            const argsEnd = this.findBalancedEnd(html, argsStart - 1, '(', ')')
+            if (argsEnd === -1) {
+                searchFrom = argsStart
+                continue
+            }
+
+            const callArgs = html.slice(argsStart, argsEnd)
+            const decoded = this.decodeNextFlightCall(callArgs)
+            if (decoded) chunks.push(decoded)
+            searchFrom = argsEnd + 1
+        }
+
+        return chunks
+    }
+
+    private decodeNextFlightCall(callArgs: string): string | null {
+        try {
+            const parsed = JSON.parse(callArgs) as unknown
+            if (!Array.isArray(parsed)) return null
+
+            return parsed
+                .filter((part): part is string => typeof part === 'string')
+                .join('\n')
+        } catch {
+            const stringValues: string[] = []
+            const stringPattern = /"((?:\\.|[^"\\])*)"/gs
+
+            for (const match of callArgs.matchAll(stringPattern)) {
+                if (!match[1]) continue
+                try {
+                    stringValues.push(JSON.parse(`"${match[1]}"`) as string)
+                } catch {
+                    stringValues.push(match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'))
+                }
+            }
+
+            return stringValues.length > 0 ? stringValues.join('\n') : null
+        }
+    }
+
+    private findDashboardData(text: string): DashboardData | null {
+        const normalized = this.decodeHtmlEntities(text)
+        const markers = ['"userStatus"', '\\"userStatus\\"', 'userStatus']
+
+        for (const marker of markers) {
+            let markerIndex = normalized.indexOf(marker)
+            while (markerIndex !== -1) {
+                const parsed = this.parseObjectContainingMarker(normalized, markerIndex)
+                if (parsed?.userStatus) return parsed as unknown as DashboardData
+                markerIndex = normalized.indexOf(marker, markerIndex + marker.length)
+            }
+        }
+
+        return null
+    }
+
+    private parseObjectContainingMarker(text: string, markerIndex: number): Record<string, unknown> | null {
+        for (let start = markerIndex; start >= 0; start--) {
+            if (text[start] !== '{') continue
+
+            const end = this.findBalancedEnd(text, start, '{', '}')
+            if (end === -1 || end < markerIndex) continue
+
+            const candidate = text.slice(start, end + 1)
+            try {
+                const parsed = JSON.parse(candidate) as unknown
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    return parsed as Record<string, unknown>
+                }
+            } catch {
+                // Keep walking outward; flight payloads can contain nested objects before the dashboard root.
+            }
+        }
+
+        return null
+    }
+
+    private findBalancedEnd(text: string, start: number, open: string, close: string): number {
+        let depth = 0
+        let inString = false
+        let escaped = false
+
+        for (let i = start; i < text.length; i++) {
+            const char = text[i]
+
+            if (inString) {
+                if (escaped) {
+                    escaped = false
+                } else if (char === '\\') {
+                    escaped = true
+                } else if (char === '"') {
+                    inString = false
+                }
+                continue
+            }
+
+            if (char === '"') {
+                inString = true
+            } else if (char === open) {
+                depth++
+            } else if (char === close) {
+                depth--
+                if (depth === 0) return i
+            }
+        }
+
+        return -1
+    }
+
+    private decodeHtmlEntities(value: string): string {
+        return value
+            .replace(/&quot;/g, '"')
+            .replace(/&#34;/g, '"')
+            .replace(/&#x22;/gi, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
     }
 
     /**

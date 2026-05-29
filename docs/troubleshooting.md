@@ -6,7 +6,7 @@ Navigation: [Documentation index](./README.md) -> [Install and auto-updates](./u
 
 The bot logs the update error and continues with the local version when GitHub is unavailable.
 
-The updater reads the `release` branch, compares `package.json`, and downloads the immutable tarball for that exact commit. It no longer uses `updates/stable.json` or signed manifests.
+The updater reads the `main` branch, compares `package.json`, and downloads the immutable tarball for that exact commit. It no longer uses `updates/stable.json` or signed manifests.
 
 Use:
 
@@ -23,7 +23,7 @@ Use `npm run dev` or pass `-dev`. Auto-update is skipped in development mode.
 
 ## Npm Start Stops After The Update Check
 
-Use the latest `release` branch. Older 4.0.1 builds could stop after `Already up to date` when the Windows installer terminal did not expose `npm` correctly to the nested launcher. The launcher now uses npm's own executable path and prints a clear `[START]` error if a child process cannot start.
+Use the latest `main` branch. Older 4.0.1 builds could stop after `Already up to date` when the Windows installer terminal did not expose `npm` correctly to the nested launcher. The launcher now uses npm's own executable path and prints a clear `[START]` error if a child process cannot start.
 
 ## Sessions Are Lost After Build
 

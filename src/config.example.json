@@ -93,7 +93,7 @@
     },
     "safetyAdvisory": {
         "enabled": true,
-        "url": "https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/release/safety-advisory.json",
+        "url": "https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/main/safety-advisory.json",
         "timeout": "10sec",
         "blockedBehavior": "prompt"
     }

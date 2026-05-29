@@ -2,7 +2,7 @@
 
 Navigation: [Documentation index](./README.md) -> [Node.js version](./node-version.md) -> [Docker](./docker.md) -> [Troubleshooting](./troubleshooting.md)
 
-`npm start` checks the official GitHub `release` branch before building and launching the bot.
+`npm start` checks the official GitHub `main` branch before building and launching the bot.
 
 `npm run dev` and any launch using `-dev` skip auto-update so local development is not overwritten.
 
@@ -12,7 +12,7 @@ Docker never self-updates. It only logs when a newer version exists. Update Dock
 
 The updater uses GitHub directly:
 
-1. read the latest commit SHA from `QuestPilot/Microsoft-Rewards-Bot#release`;
+1. read the latest commit SHA from `QuestPilot/Microsoft-Rewards-Bot#main`;
 2. read `package.json` at that SHA;
 3. compare the remote version with the local `package.json`;
 4. download the immutable GitHub tarball for that SHA;
@@ -51,17 +51,17 @@ Useful environment variables:
 - `MSRB_AUTO_UPDATE=0`: disable update checks and updates.
 - `MSRB_UPDATE_CHECK_ONLY=1`: check and log only; do not apply updates.
 - `MSRB_UPDATE_REPO=QuestPilot/Microsoft-Rewards-Bot`: override the GitHub repo.
-- `MSRB_UPDATE_BRANCH=release`: override the update branch.
+- `MSRB_UPDATE_BRANCH=main`: override the update branch.
 
 ## Manual Install From Git
 
 Use the supported public branch:
 
 ```bash
-git clone --branch release https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
+git clone --branch main https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
 cd Microsoft-Rewards-Bot
 npm install
 npm start
 ```
 
-The `release` branch is the same source used by auto-update. Cloning another branch can install development files that do not match the public updater or compiled Core bytecode.
+The `main` branch is the same source used by auto-update. Cloning another branch can install development files that do not match the public updater or compiled Core bytecode.

@@ -95,14 +95,14 @@ test('config migrator adds missing keys without replacing user values', () => {
     assert.equal(accounts[0].saveFingerprint.mobile, false)
 })
 
-test('updater reports current when release branch version is not newer', async () => {
+test('updater reports current when main branch version is not newer', async () => {
     const root = tempRoot()
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '2.0.0' }))
     const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
     updater.fetchRemoteRelease = async () => ({
         version: '2.0.0',
         commitSha: 'abc123456789',
-        branch: 'release',
+        branch: 'main',
         repo: 'QuestPilot/Microsoft-Rewards-Bot',
         packageJson: { version: '2.0.0' },
         archiveUrl: 'https://example.test/archive.tgz',
@@ -122,7 +122,7 @@ test('Docker never mutates local files and only reports update availability', as
     updater.fetchRemoteRelease = async () => ({
         version: '2.0.0',
         commitSha: 'abc123456789',
-        branch: 'release',
+        branch: 'main',
         repo: 'QuestPilot/Microsoft-Rewards-Bot',
         packageJson: { version: '2.0.0' },
         archiveUrl: 'https://example.test/archive.tgz',
@@ -145,7 +145,7 @@ test('check-only reports update availability without applying', async () => {
     updater.fetchRemoteRelease = async () => ({
         version: '2.0.0',
         commitSha: 'abc123456789',
-        branch: 'release',
+        branch: 'main',
         repo: 'QuestPilot/Microsoft-Rewards-Bot',
         packageJson: { version: '2.0.0' },
         archiveUrl: 'https://example.test/archive.tgz',

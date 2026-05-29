@@ -4,13 +4,13 @@ This guide covers the files that make `npm start` detect and apply a public upda
 
 ## Goal
 
-Publish the `release` branch so existing local installs can detect a higher `package.json` version, download that exact commit archive, preserve user files, and replace managed project files.
+Publish the `main` branch so existing local installs can detect a higher `package.json` version, download that exact commit archive, preserve user files, and replace managed project files.
 
 ## Required Environment
 
 - Node.js `24.15.0`
 - access to rebuild the official Core plugin when Core changes
-- write access to the official `release` branch
+- write access to the official `main` branch
 
 Read [Core release security](./core-release-security.md) before publishing a Core artifact. It defines the obfuscation, bytecode target, and anti-leak rules.
 
@@ -50,9 +50,9 @@ npm run core:release-check
 
 Every target checksum in `plugins/official-core.json`, `plugins/core/package.json`, and `plugins/catalog.json` must match the bytecode file for that target.
 
-5. Commit and push the final release code to the `release` branch.
+5. Commit and push the final release code to the `main` branch.
 
-The updater reads `package.json` directly from `release`, then downloads the immutable tarball for that branch commit SHA. There is no second manifest commit.
+The updater reads `package.json` directly from `main`, then downloads the immutable tarball for that branch commit SHA. There is no second manifest commit.
 
 6. Validate after push.
 
@@ -65,7 +65,7 @@ npm run update:doctor
 Expected result:
 
 - local and remote versions are printed;
-- the release branch SHA is printed;
+- the main branch SHA is printed;
 - Core checksum values match;
 - Core release artifact check passes;
 - Docker users only receive an update notification.

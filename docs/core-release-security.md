@@ -119,7 +119,7 @@ Allowed Core artifact types:
 
 ## Release Gate
 
-Before pushing `release`, maintainers must verify:
+Before pushing `main`, maintainers must verify:
 
 ```bash
 npm run core:release-check

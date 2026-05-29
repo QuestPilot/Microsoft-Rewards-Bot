@@ -9,7 +9,7 @@ const CONFIG_PATH = path.join(PLUGINS_DIR, 'plugins.jsonc')
 const CATALOG_PATH = path.join(PLUGINS_DIR, 'catalog.json')
 const DEFAULT_PORT = Number(process.env.MSRB_PLUGINS_PORT ?? 4777)
 const UPDATE_REPO = process.env.MSRB_UPDATE_REPO || 'QuestPilot/Microsoft-Rewards-Bot'
-const UPDATE_BRANCH = process.env.MSRB_UPDATE_BRANCH || 'release'
+const UPDATE_BRANCH = process.env.MSRB_UPDATE_BRANCH || 'main'
 
 const IGNORED_PLUGIN_FILES = new Set(['README.md', 'plugins.jsonc', 'official-core.json', 'catalog.json'])
 

@@ -415,6 +415,15 @@ export class Search extends TaskBase {
             this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-CLICK', 'Attempting to click a random search result link')
 
             const searchPageUrl = page.url()
+            const resultCount = await page.locator(BING_SEARCH.resultLinks).count().catch(() => 0)
+            if (resultCount === 0) {
+                this.bot.logger.debug(
+                    isMobile,
+                    'SEARCH-RANDOM-CLICK',
+                    `No clickable organic result found | selector=${BING_SEARCH.resultLinks}`
+                )
+                return
+            }
 
             await this.bot.browser.utils.ghostClick(page, BING_SEARCH.resultLinks)
             await this.bot.utils.wait(this.bot.config.searchSettings.searchResultVisitTime)

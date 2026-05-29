@@ -59,13 +59,13 @@ async function main() {
 
     try {
         const remote = await updater.fetchRemoteRelease()
-        console.log(`[UPDATE-DOCTOR] remote release branch SHA: ${remote.commitSha}`)
+        console.log(`[UPDATE-DOCTOR] remote update branch SHA: ${remote.commitSha}`)
         console.log(`[UPDATE-DOCTOR] remote package version: ${remote.version}`)
         if (remote.version !== packageJson.version) {
-            console.warn('[UPDATE-DOCTOR] Local package.json does not match the release branch version.')
+            console.warn('[UPDATE-DOCTOR] Local package.json does not match the configured update branch version.')
         }
     } catch (error) {
-        console.warn(`[UPDATE-DOCTOR] Could not read GitHub release branch: ${error.message}`)
+        console.warn(`[UPDATE-DOCTOR] Could not read GitHub update branch: ${error.message}`)
     }
 
     console.log('[UPDATE-DOCTOR] GitHub updater metadata check complete.')

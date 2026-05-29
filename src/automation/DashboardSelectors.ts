@@ -50,7 +50,7 @@ export const BING_SEARCH = {
     /** Main search input */
     searchBar: '#sb_form_q',
     /** Organic search result links */
-    resultLinks: '#b_results .b_algo h2'
+    resultLinks: '#b_results .b_algo h2 a, #b_results .b_algo h2, main ol li h2 a'
 } as const
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
     "plugins":  [
                     {
                         "name":  "core",
-                        "version":  "1.0.4",
+                        "version":  "1.0.5",
                         "description":  "Official Core plugin with premium Microsoft Rewards tasks and license validation.",
                         "license":  "Proprietary",
                         "price":  "paid",
@@ -12,7 +12,7 @@
                         "sha256":  "",
                         "targets":  {
                                         "win32-x64-node-24.15.0":  {
-                                                                       "indexSha256":  "bdb7a7161129aa5f31cfe46a3b0c02e96bde8eeca808eb0412d5d7230285dedc",
+                                                                       "indexSha256":  "6b1d6bc69cb159d70fcd5c00c0192df98263e2c8445e412f7ddd2c763823e1ff",
                                                                        "bytecodeTarget":  {
                                                                                               "node":  "24.15.0",
                                                                                               "platform":  "win32",
@@ -20,7 +20,7 @@
                                                                                           }
                                                                    },
                                         "linux-x64-node-24.15.0":  {
-                                                                       "indexSha256":  "1dd54772f148df8effefc749b01e2bbdc664b2dbf4b628da4e8a024062860fcb",
+                                                                       "indexSha256":  "0fc2b913d2b356c004a508d4cce142051b54e7f0c8f3d591d924fa529d53366d",
                                                                        "bytecodeTarget":  {
                                                                                               "node":  "24.15.0",
                                                                                               "platform":  "linux",
@@ -28,7 +28,7 @@
                                                                                           }
                                                                    },
                                         "linux-arm64-node-24.15.0":  {
-                                                                         "indexSha256":  "07547a76c6b6c1f4c21e76416b7cf98aa0d85fce6fe64a7cf9569af7c7ced333",
+                                                                         "indexSha256":  "a3a42ed786163e2544ad66aa3d8f67fead691cd501de2afc1ddeceaa980f0809",
                                                                          "bytecodeTarget":  {
                                                                                                 "node":  "24.15.0",
                                                                                                 "platform":  "linux",
