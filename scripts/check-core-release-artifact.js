@@ -6,10 +6,17 @@ const ROOT = path.resolve(__dirname, '..')
 const CORE_DIR = path.join(ROOT, 'plugins', 'core')
 const OFFICIAL_CORE_PATH = path.join(ROOT, 'plugins', 'official-core.json')
 const CATALOG_PATH = path.join(ROOT, 'plugins', 'catalog.json')
+const CORE_API_POLICY_PATH = path.resolve(ROOT, '..', 'Core-API', 'config', 'core-version-policy.json')
 
 const FORBIDDEN_EXTENSIONS = new Set(['.ts', '.tsx', '.map', '.env', '.pem', '.key'])
 const FORBIDDEN_NAMES = new Set(['.env', '.env.local', '.env.production'])
 const ALLOWED_JS_FILES = new Set(['index.js'])
+const ALLOWED_TOP_LEVEL_CORE_FILES = new Set(['index.js', 'package.json', 'package-lock.json', 'LICENSE'])
+const REQUIRED_TARGETS = new Set([
+    'win32-x64-node-24.15.0',
+    'linux-x64-node-24.15.0',
+    'linux-arm64-node-24.15.0'
+])
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -43,27 +50,89 @@ function fail(message) {
     process.exitCode = 1
 }
 
+function assertSameVersion(label, actual, expected) {
+    if (actual !== expected) {
+        fail(`${label} version ${actual || '(missing)'} does not match Core package version ${expected}`)
+    }
+}
+
+function assertTargetSet(label, targets) {
+    const ids = new Set(Object.keys(targets || {}))
+    for (const required of REQUIRED_TARGETS) {
+        if (!ids.has(required)) {
+            fail(`${label} is missing required Core bytecode target ${required}`)
+        }
+    }
+    for (const id of ids) {
+        if (!REQUIRED_TARGETS.has(id)) {
+            fail(`${label} contains unsupported Core bytecode target ${id}`)
+        }
+    }
+}
+
+function assertTargetMetadata(targetId, target, sourceLabel) {
+    const match = targetId.match(/^(win32|linux)-(x64|arm64)-node-(\d+\.\d+\.\d+)$/)
+    if (!match) {
+        fail(`${sourceLabel} target id ${targetId} is not in platform-arch-node-version format`)
+        return
+    }
+
+    const [, platform, arch, node] = match
+    if (target.bytecodeTarget?.platform !== platform || target.bytecodeTarget?.arch !== arch || target.bytecodeTarget?.node !== node) {
+        fail(`${sourceLabel} ${targetId} bytecodeTarget metadata does not match its target id`)
+    }
+}
+
 function main() {
     if (!fs.existsSync(CORE_DIR)) {
         fail('plugins/core is missing')
         return
     }
 
+    const corePackage = readJson(path.join(CORE_DIR, 'package.json'))
+    const enforceSingleEntryBytecode = corePackage.msrb?.releaseShape === 'single-entry-bytecode'
     const files = walk(CORE_DIR)
     for (const file of files) {
+        const parts = file.relativePath.split('/')
         if (FORBIDDEN_NAMES.has(file.name.toLowerCase()) || FORBIDDEN_EXTENSIONS.has(file.extension)) {
             fail(`Forbidden Core artifact file: plugins/core/${file.relativePath}`)
         }
         if (file.extension === '.js' && !ALLOWED_JS_FILES.has(file.relativePath)) {
             fail(`Forbidden Core JavaScript source file: plugins/core/${file.relativePath}`)
         }
+        if (enforceSingleEntryBytecode) {
+            if (parts[0] === 'targets') {
+                if (parts.length !== 3 || parts[2] !== 'index.jsc' || !REQUIRED_TARGETS.has(parts[1])) {
+                    fail(`Forbidden Core target artifact shape: plugins/core/${file.relativePath}`)
+                }
+            } else if (file.extension === '.jsc') {
+                fail(`Forbidden legacy Core bytecode location: plugins/core/${file.relativePath}`)
+            } else if (parts.length !== 1 || !ALLOWED_TOP_LEVEL_CORE_FILES.has(parts[0])) {
+                fail(`Forbidden Core artifact file: plugins/core/${file.relativePath}`)
+            }
+        }
     }
 
     const officialCore = readJson(OFFICIAL_CORE_PATH)
-    const corePackage = readJson(path.join(CORE_DIR, 'package.json'))
     const catalog = readJson(CATALOG_PATH)
     const catalogCore = Array.isArray(catalog.plugins) ? catalog.plugins.find(plugin => plugin.name === 'core') : null
     const targets = officialCore.targets || corePackage.msrb?.targets || null
+    const coreVersion = corePackage.version
+
+    assertSameVersion('plugins/official-core.json', officialCore.version, coreVersion)
+    assertSameVersion('plugins/catalog.json core', catalogCore?.version, coreVersion)
+
+    if (fs.existsSync(CORE_API_POLICY_PATH)) {
+        const policy = readJson(CORE_API_POLICY_PATH)
+        if (policy.required_core_version !== coreVersion) {
+            fail(`Core-API required_core_version ${policy.required_core_version || '(missing)'} does not match Core package version ${coreVersion}`)
+        }
+        if (policy.minimum_core_version !== coreVersion) {
+            fail(`Core-API minimum_core_version ${policy.minimum_core_version || '(missing)'} does not match Core package version ${coreVersion}`)
+        }
+    } else {
+        console.warn('[CORE-RELEASE-CHECK] Core-API policy file not found beside this repository; skipping server version policy check.')
+    }
 
     if (targets && typeof targets === 'object') {
         if (!catalogCore?.targets || typeof catalogCore.targets !== 'object') {
@@ -71,12 +140,18 @@ function main() {
         }
         const packageTargets = corePackage.msrb?.targets || {}
         const catalogTargets = catalogCore?.targets || {}
+        assertTargetSet('plugins/official-core.json', officialCore.targets)
+        assertTargetSet('plugins/core/package.json', packageTargets)
+        assertTargetSet('plugins/catalog.json', catalogTargets)
         for (const [targetId, target] of Object.entries(targets)) {
             const indexJsc = path.join(CORE_DIR, 'targets', targetId, 'index.jsc')
             if (!fs.existsSync(indexJsc)) {
                 fail(`plugins/core/targets/${targetId}/index.jsc is missing`)
                 continue
             }
+            assertTargetMetadata(targetId, target, 'plugins/official-core.json')
+            assertTargetMetadata(targetId, packageTargets[targetId] || {}, 'plugins/core/package.json')
+            assertTargetMetadata(targetId, catalogTargets[targetId] || {}, 'plugins/catalog.json')
             const actualHash = sha256(indexJsc)
             if (target.indexSha256 !== actualHash) {
                 fail(`plugins/official-core.json ${targetId} indexSha256 does not match the target bytecode`)

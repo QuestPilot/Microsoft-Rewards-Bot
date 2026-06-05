@@ -118,7 +118,7 @@ export class LogService {
         if (level === 'error' && config.errorDiagnostics) {
             const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
             const error = message instanceof Error ? message : new Error(String(message))
-            errorDiagnostic(page, error)
+            errorDiagnostic(page, error, (msg) => this.warn(isMobile, 'DIAGNOSTIC', msg))
         }
 
         const consoleAllowed = this.shouldPassFilter(config.consoleLogFilter, level, cleanMsg)

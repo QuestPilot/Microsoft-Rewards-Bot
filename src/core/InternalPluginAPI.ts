@@ -53,6 +53,7 @@ export interface PremiumTaskMap {
     doRedeemGoal: (page: Page, config: ConfigRedeemGoal) => Promise<void>
     collectDashboardInfo: (page: Page) => Promise<DashboardInfo>
     doClaimPoints: (page: Page) => Promise<ClaimPointsResult>
+    doApplyCoupons: (page: Page) => Promise<ApplyCouponsResult>
     doTemporaryPunchcards: (page: Page) => Promise<TemporaryPunchcardsResult>
     syncStreakProtection: (page: Page, desiredEnabled: boolean) => Promise<StreakProtectionSyncResult>
 }
@@ -68,6 +69,19 @@ export interface ClaimPointsResult {
     claimed: boolean
     pointsClaimed: number
     entries: ClaimEntry[]
+}
+
+export interface AppliedCoupon {
+    title: string | null
+    pointsDiscount: number | null
+    expiresText: string | null
+}
+
+export interface ApplyCouponsResult {
+    available: number
+    applied: number
+    totalPointsDiscount: number
+    coupons: AppliedCoupon[]
 }
 
 export interface TemporaryPunchcardsResult {

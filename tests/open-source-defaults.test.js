@@ -15,6 +15,7 @@ test('public example config starts with Core-only workers disabled', () => {
     assert.equal(config.workers.doRedeemGoal, false)
     assert.equal(config.workers.doDashboardInfo, false)
     assert.equal(config.workers.doClaimPoints, false)
+    assert.equal(config.workers.doApplyCoupons, false)
 })
 
 test('open-source premium fallbacks show concise Core hints', () => {

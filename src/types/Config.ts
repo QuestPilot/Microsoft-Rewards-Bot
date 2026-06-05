@@ -91,6 +91,7 @@ export interface ConfigWorkers {
     doRedeemGoal: boolean
     doDashboardInfo: boolean
     doClaimPoints: boolean
+    doApplyCoupons: boolean
     enforceCoreStreakProtectionGate: boolean
 }
 
@@ -99,6 +100,12 @@ export interface ConfigWebhook {
     discord?: WebhookDiscordConfig
     ntfy?: WebhookNtfyConfig
     webhookLogFilter: LogFilter
+    runSummary?: WebhookRunSummaryConfig
+}
+
+export interface WebhookRunSummaryConfig {
+    enabled: boolean
+    includeCorePitch: boolean
 }
 
 export interface LogFilter {

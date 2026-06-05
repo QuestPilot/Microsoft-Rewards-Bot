@@ -86,4 +86,4 @@ npx tsc --noEmit
 npm audit --audit-level=moderate
 ```
 
-If Core was rebuilt, also verify `plugins/official-core.json` matches `plugins/core/index.jsc`.
+If Core was rebuilt, also run `npm run core:release-check`.

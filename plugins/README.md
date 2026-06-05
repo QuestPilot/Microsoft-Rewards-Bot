@@ -16,7 +16,7 @@ When `plugins/plugins.jsonc` exists, only the plugins listed there are eligible 
 ## Built-in Core Plugin
 
 `plugins/core/` contains the proprietary Core plugin that ships with the bot.
-It is compiled to V8 bytecode and loaded through the same plugin manager as third-party plugins.
+It is shipped as a compiled official artifact and loaded through the same plugin manager as third-party plugins.
 Its checksum is pinned in `plugins/official-core.json`; if it does not match, premium entitlement is not granted.
 
 ## Built-in Free Plugins

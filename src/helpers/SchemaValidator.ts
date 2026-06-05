@@ -69,7 +69,13 @@ const WebhookSchema = z.object({
             priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional()
         })
         .optional(),
-    webhookLogFilter: LogFilterSchema
+    webhookLogFilter: LogFilterSchema,
+    runSummary: z
+        .object({
+            enabled: z.boolean().default(false),
+            includeCorePitch: z.boolean().default(true)
+        })
+        .optional()
 })
 
 // Config
@@ -93,6 +99,7 @@ export const ConfigSchema = z.object({
         doRedeemGoal: z.boolean(),
         doDashboardInfo: z.boolean(),
         doClaimPoints: z.boolean(),
+        doApplyCoupons: z.boolean().default(false),
         enforceCoreStreakProtectionGate: z.boolean().default(true)
     }),
     searchOnBingLocalQueries: z.boolean(),
@@ -123,7 +130,14 @@ export const AccountSchema = z.object({
     email: z.string(),
     enabled: z.boolean().optional(),
     password: z.string(),
-    totpSecret: z.string().optional(),
+    totpSecret: z.string().optional().refine(
+        v => {
+            if (!v) return true
+            const normalized = v.replace(/\s/g, '').replace(/=+$/, '')
+            return /^[A-Za-z2-7]+$/.test(normalized) && normalized.length >= 16
+        },
+        { message: 'totpSecret appears invalid: expected a base32 string (A-Z, 2-7) of at least 16 characters' }
+    ),
     recoveryEmail: z.string(),
     geoLocale: z.string(),
     langCode: z.string(),

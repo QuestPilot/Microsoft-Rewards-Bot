@@ -60,6 +60,15 @@ interface AccountStats {
     duration: number
     success: boolean
     error?: string
+    coreStats?: CoreRunStats
+}
+
+interface CoreRunStats {
+    claimPoints: number
+    couponsAvailable: number
+    couponsApplied: number
+    couponPointsDiscount: number
+    featuresUsed: string[]
 }
 
 // Re-exported so callers that already import from this module keep working
@@ -71,6 +80,22 @@ async function flushAllWebhooks(timeoutMs = 5000): Promise<void> {
     await Promise.allSettled([flushDiscordQueue(timeoutMs), flushNtfyQueue(timeoutMs)])
 }
 
+function createEmptyCoreRunStats(): CoreRunStats {
+    return {
+        claimPoints: 0,
+        couponsAvailable: 0,
+        couponsApplied: 0,
+        couponPointsDiscount: 0,
+        featuresUsed: []
+    }
+}
+
+function addCoreFeature(stats: CoreRunStats, feature: string): void {
+    if (!stats.featuresUsed.includes(feature)) {
+        stats.featuresUsed.push(feature)
+    }
+}
+
 interface UserData {
     userName: string
     geoLocale: string
@@ -79,6 +104,7 @@ interface UserData {
     currentPoints: number
     gainedPoints: number
     dashboardInfo: DashboardInfo | null
+    coreStats: CoreRunStats
 }
 
 export class MicrosoftRewardsBot {
@@ -124,7 +150,8 @@ export class MicrosoftRewardsBot {
             initialPoints: 0,
             currentPoints: 0,
             gainedPoints: 0,
-            dashboardInfo: null
+            dashboardInfo: null,
+            coreStats: createEmptyCoreRunStats()
         }
         this.logger = new LogService(this)
         this.accounts = []
@@ -190,7 +217,7 @@ export class MicrosoftRewardsBot {
             }
         } else {
             this.logRunStart(totalAccounts)
-                await this.runTasks(enabledAccounts, runStartTime)
+            await this.runTasks(enabledAccounts, runStartTime)
             return 0
         }
     }
@@ -362,6 +389,7 @@ export class MicrosoftRewardsBot {
                         message: `Processed ${allAccountStats.length} account(s), collected +${totalCollectedPoints} points in ${totalDurationMinutes}min.`,
                         level: 'info'
                     })
+                    await this.sendRunSummary(allAccountStats, runStartTime)
                     await flushAllWebhooks()
                     resolve(code ?? 0)
                 }
@@ -422,9 +450,9 @@ export class MicrosoftRewardsBot {
 
                 this.axios = new HttpClient(account.proxy)
 
-                const result: { initialPoints: number; collectedPoints: number } | undefined = await this.Main(
-                    account
-                ).catch(error => {
+                const result:
+                    | { initialPoints: number; collectedPoints: number; coreStats: CoreRunStats }
+                    | undefined = await this.Main(account).catch(error => {
                     void this.logger.error(
                         true,
                         'FLOW',
@@ -446,7 +474,8 @@ export class MicrosoftRewardsBot {
                         finalPoints: accountFinalPoints,
                         collectedPoints: collectedPoints,
                         duration: parseFloat(durationSeconds),
-                        success: true
+                        success: true,
+                        coreStats: result.coreStats
                     })
 
                     this.logger.info(
@@ -522,15 +551,94 @@ export class MicrosoftRewardsBot {
                 level: 'info'
             })
 
+            await this.sendRunSummary(accountStats, runStartTime)
             await flushAllWebhooks()
         }
 
         return accountStats
     }
 
-    async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number }> {
+    private async sendRunSummary(accountStats: AccountStats[], runStartTime: number): Promise<void> {
+        const summaryConfig = this.config.webhook.runSummary
+        if (!summaryConfig?.enabled || cluster.isWorker) return
+
+        const message = this.buildRunSummaryMessage(
+            accountStats,
+            runStartTime,
+            summaryConfig.includeCorePitch !== false
+        )
+
+        const sends: Promise<void>[] = []
+        if (this.config.webhook.discord?.enabled && this.config.webhook.discord.url) {
+            sends.push(sendDiscord(this.config.webhook.discord.url, message, 'info'))
+        }
+        if (this.config.webhook.ntfy?.enabled && this.config.webhook.ntfy.url) {
+            sends.push(sendNtfy(this.config.webhook.ntfy, message, 'info'))
+        }
+
+        await Promise.allSettled(sends)
+    }
+
+    private buildRunSummaryMessage(accountStats: AccountStats[], runStartTime: number, includeCorePitch: boolean): string {
+        const totalAccounts = accountStats.length
+        const successfulAccounts = accountStats.filter(s => s.success).length
+        const failedAccounts = totalAccounts - successfulAccounts
+        const totalCollectedPoints = accountStats.reduce((sum, s) => sum + s.collectedPoints, 0)
+        const totalInitialPoints = accountStats.reduce((sum, s) => sum + s.initialPoints, 0)
+        const totalFinalPoints = accountStats.reduce((sum, s) => sum + s.finalPoints, 0)
+        const totalDurationMinutes = ((Date.now() - runStartTime) / 1000 / 60).toFixed(1)
+        const coreStats = this.aggregateCoreStats(accountStats)
+        const hasCore = this.pluginManager.hasOfficialCoreEntitlement()
+
+        const lines = [
+            'Microsoft Rewards Bot run complete',
+            `Accounts: ${totalAccounts} | Success: ${successfulAccounts} | Failed: ${failedAccounts}`,
+            `Points collected: +${totalCollectedPoints}`,
+            `Balance: ${totalInitialPoints} -> ${totalFinalPoints}`,
+            `Runtime: ${totalDurationMinutes}min`
+        ]
+
+        if (includeCorePitch) {
+            if (hasCore) {
+                lines.push(
+                    `Core impact: +${coreStats.claimPoints} claimed points | ${coreStats.couponsApplied}/${coreStats.couponsAvailable} coupon(s) applied | ${coreStats.couponPointsDiscount} estimated coupon-discount points`
+                )
+                lines.push(
+                    `Core features used: ${coreStats.featuresUsed.length ? coreStats.featuresUsed.join(', ') : 'none available this run'}`
+                )
+            } else {
+                lines.push(
+                    'Core inactive: premium dashboard scan unavailable, so extra-point/coupon estimates cannot be computed from the public workflow.'
+                )
+                lines.push(
+                    'Core adds claimable point cards, coupon application, app rewards, daily streak details, redeem goals, temporary punchcards, background agent, and remote dashboard control.'
+                )
+            }
+        }
+
+        return lines.join('\n')
+    }
+
+    private aggregateCoreStats(accountStats: AccountStats[]): CoreRunStats {
+        const aggregate = createEmptyCoreRunStats()
+        for (const account of accountStats) {
+            const stats = account.coreStats
+            if (!stats) continue
+            aggregate.claimPoints += stats.claimPoints
+            aggregate.couponsAvailable += stats.couponsAvailable
+            aggregate.couponsApplied += stats.couponsApplied
+            aggregate.couponPointsDiscount += stats.couponPointsDiscount
+            for (const feature of stats.featuresUsed) {
+                addCoreFeature(aggregate, feature)
+            }
+        }
+        return aggregate
+    }
+
+    async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number; coreStats: CoreRunStats }> {
         const accountEmail = account.email
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`)
+        this.userData.coreStats = createEmptyCoreRunStats()
 
         let mobileSession: BrowserSession | null = null
         let mobileContextClosed = false
@@ -605,10 +713,27 @@ export class MicrosoftRewardsBot {
                     } | App: ${appEarnable?.totalEarnablePoints ?? 0} | ${accountEmail} | locale: ${this.userData.geoLocale}`
                 )
 
+                if (this.config.workers.doApplyCoupons) {
+                    const couponResult = await this.activities.doApplyCoupons(this.mainMobilePage)
+                    this.userData.coreStats.couponsAvailable += couponResult.available
+                    this.userData.coreStats.couponsApplied += couponResult.applied
+                    this.userData.coreStats.couponPointsDiscount += couponResult.totalPointsDiscount
+                    if (couponResult.applied > 0) {
+                        addCoreFeature(this.userData.coreStats, 'Coupons')
+                        this.logger.info(
+                            'main',
+                            'COUPONS',
+                            `Applied ${couponResult.applied}/${couponResult.available} coupon(s) | Estimated discount: ${couponResult.totalPointsDiscount} points`
+                        )
+                    }
+                }
+
                 // Claim ready dashboard points before spending time on other activities.
                 if (this.config.workers.doClaimPoints) {
                     const claimResult = await this.activities.doClaimPoints(this.mainMobilePage)
                     if (claimResult.claimed) {
+                        this.userData.coreStats.claimPoints += claimResult.pointsClaimed
+                        addCoreFeature(this.userData.coreStats, 'Claimable point cards')
                         this.logger.info(
                             'main',
                             'CLAIM-POINTS',
@@ -693,7 +818,8 @@ export class MicrosoftRewardsBot {
 
                 return {
                     initialPoints,
-                    collectedPoints: collectedPoints || 0
+                    collectedPoints: collectedPoints || 0,
+                    coreStats: this.userData.coreStats
                 }
             })
         } finally {

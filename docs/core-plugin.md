@@ -9,6 +9,7 @@ Core is the premium layer for Microsoft Rewards Bot. The open-source bot handles
 Core is built for users who want:
 
 - broader Rewards coverage when Microsoft changes dashboard surfaces;
+- automatic handling for ready-to-claim points and dashboard coupons;
 - a remote dashboard to monitor machines, runs, accounts, versions, and logs;
 - Windows/Linux background startup without keeping a terminal open;
 - Docker-compatible Core support on the official Linux x64 Node.js target;
@@ -25,11 +26,13 @@ Core is especially useful for desktop users who do not want to understand termin
 | Daily Set | Limited | Full maintained coverage |
 | Simple activities and quizzes | Yes | Yes |
 | Claimable point cards | No | Yes |
+| Dashboard coupons | No | Yes |
 | Daily streak details | No | Yes |
 | Streak protection sync | No | Yes |
 | App rewards | No | Yes |
 | Redeem goal automation | No | Yes |
 | Temporary quest pages | No | Best effort |
+| Final webhook summary with Core impact | Basic run logs | Yes, includes Core points and coupon impact |
 | Remote dashboard | No | Yes |
 | Background agent | No | Yes |
 | Dashboard account editor | No | Yes, encrypted to the local bot |
@@ -55,6 +58,32 @@ From the dashboard, users can:
 - request a sanitized diagnostics bundle.
 
 The dashboard is tied to a valid Core license and Discord login.
+
+## Rewards Coverage
+
+Core can inspect the newer Rewards dashboard surfaces that are not part of the stable public workflow:
+
+- claim ready-to-claim point cards when the card shows a value greater than zero;
+- open the Coupons panel when `Coupon (N)` shows one or more available coupons;
+- apply each visible `Apply coupon` action and log the coupon title, expiry, and estimated point discount;
+- add Core impact lines to the optional final Discord/Ntfy run summary.
+
+Enable the relevant workers in `src/config.json`:
+
+```jsonc
+"workers": {
+  "doClaimPoints": true,
+  "doApplyCoupons": true
+},
+"webhook": {
+  "runSummary": {
+    "enabled": true,
+    "includeCorePitch": true
+  }
+}
+```
+
+The final summary uses the existing `webhook.discord` and `webhook.ntfy` destinations. When Core is active, it reports claimed points, applied coupons, and estimated coupon-discount points. When Core is inactive, it does not invent a number; it reports that premium dashboard estimation was unavailable.
 
 ## Background Agent
 

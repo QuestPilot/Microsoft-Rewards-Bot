@@ -74,6 +74,8 @@ const DEFAULT_OBSOLETE_PATHS = [
     'src/core/DashboardServer.ts'
 ]
 
+const UPDATE_STRATEGIES = new Set(['auto', 'git', 'archive'])
+
 function pathToPosix(relativePath) {
     return relativePath.replace(/\\/g, '/')
 }
@@ -98,6 +100,51 @@ function mkdirp(dir) {
 
 function rmrf(target) {
     fs.rmSync(target, { recursive: true, force: true })
+}
+
+function runCommand(command, args, options = {}) {
+    const result = childProcess.spawnSync(command, args, {
+        cwd: options.cwd,
+        stdio: options.stdio ?? 'pipe',
+        shell: false,
+        encoding: 'utf8'
+    })
+
+    if (result.error) {
+        throw new Error(`${options.label ?? command} failed: ${result.error.message}`)
+    }
+
+    if (result.status !== 0) {
+        const output = [result.stderr, result.stdout].filter(Boolean).join('\n').trim()
+        throw new Error(`${options.label ?? command} failed with exit code ${result.status}${output ? `: ${output}` : ''}`)
+    }
+
+    return result.stdout ?? ''
+}
+
+function resolveNpmInvocation(env = process.env, nodePath = process.execPath) {
+    if (env.npm_execpath) {
+        return {
+            command: nodePath,
+            argsPrefix: [env.npm_execpath],
+            label: 'npm'
+        }
+    }
+
+    const portableNpm = path.join(path.dirname(nodePath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
+    if (fs.existsSync(portableNpm)) {
+        return {
+            command: nodePath,
+            argsPrefix: [portableNpm],
+            label: 'npm'
+        }
+    }
+
+    return {
+        command: process.platform === 'win32' ? 'npm.cmd' : 'npm',
+        argsPrefix: [],
+        label: 'npm'
+    }
 }
 
 function readJson(filePath) {
@@ -172,6 +219,36 @@ function removeObsoletePaths(root, obsoletePaths = DEFAULT_OBSOLETE_PATHS, exclu
         if (!fs.existsSync(target)) continue
         rmrf(target)
         removeEmptyParents(path.dirname(target), root)
+    }
+}
+
+function normalizeRepoUrl(value) {
+    return String(value || '')
+        .trim()
+        .replace(/^git@github\.com:/i, 'https://github.com/')
+        .replace(/^https?:\/\/github\.com\//i, 'github.com/')
+        .replace(/\.git$/i, '')
+        .replace(/\/+$/g, '')
+        .toLowerCase()
+}
+
+function remoteMatchesRepo(remoteUrl, repo) {
+    const normalizedRemote = normalizeRepoUrl(remoteUrl)
+    const normalizedRepo = normalizeRepoUrl(repo)
+    return normalizedRemote === normalizedRepo || normalizedRemote.endsWith(`/${normalizedRepo}`)
+}
+
+function assertSafeBranchName(branch) {
+    if (
+        typeof branch !== 'string' ||
+        !/^[A-Za-z0-9._/-]+$/.test(branch) ||
+        branch.startsWith('/') ||
+        branch.endsWith('/') ||
+        branch.includes('..') ||
+        branch.includes('//') ||
+        branch.endsWith('.lock')
+    ) {
+        throw new Error(`Unsafe update branch name: ${branch}`)
     }
 }
 
@@ -370,10 +447,12 @@ class UpdateManager {
             }
 
             this.assertCompatibleNode(remote.packageJson)
-            await this.applyRelease(remote)
+            const applyResult = await this.applyRelease(remote)
             this.syncDependencies()
-            this.logger.log(`[UPDATER] Updated to ${remote.version}`)
-            return { status: 'updated', remote }
+            this.verifyAppliedRelease(remote)
+            this.packageJson = readJson(path.join(this.root, 'package.json'))
+            this.logger.log(`[UPDATER] Updated to ${remote.version} via ${applyResult.strategy}`)
+            return { status: 'updated', remote, strategy: applyResult.strategy }
         } catch (error) {
             this.logger.warn(`[UPDATER] Update check failed: ${error.message}`)
             return { status: 'failed', error }
@@ -435,6 +514,86 @@ class UpdateManager {
     }
 
     async applyRelease(remote) {
+        const strategy = this.resolveUpdateStrategy()
+        if (strategy !== 'archive' && this.canUseGitUpdate()) {
+            return this.applyGitRelease(remote)
+        }
+
+        if (strategy === 'git') {
+            throw new Error('MSRB_UPDATE_STRATEGY=git requested, but this install is not a compatible Git working tree')
+        }
+
+        return this.applyArchiveRelease(remote)
+    }
+
+    resolveUpdateStrategy(env = process.env) {
+        const strategy = env.MSRB_UPDATE_STRATEGY ?? 'auto'
+        if (!UPDATE_STRATEGIES.has(strategy)) {
+            throw new Error(`Unsupported MSRB_UPDATE_STRATEGY=${strategy}. Use auto, git, or archive.`)
+        }
+        return strategy
+    }
+
+    canUseGitUpdate() {
+        if (!fs.existsSync(path.join(this.root, '.git'))) return false
+
+        try {
+            runCommand('git', ['--version'], { label: 'git --version' })
+            const remoteUrl = this.git(['remote', 'get-url', 'origin']).trim()
+            return remoteMatchesRepo(remoteUrl, this.repo)
+        } catch (error) {
+            this.logger.warn(`[UPDATER] Git update unavailable, falling back to archive: ${error.message}`)
+            return false
+        }
+    }
+
+    git(args, options = {}) {
+        return runCommand('git', args, {
+            cwd: this.root,
+            stdio: options.stdio,
+            label: `git ${args.join(' ')}`
+        })
+    }
+
+    async applyGitRelease(remote) {
+        assertSafeBranchName(this.branch)
+
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const backupDir = path.join(this.updatesDir, stamp, 'backup')
+        mkdirp(backupDir)
+
+        const before = this.git(['rev-parse', 'HEAD']).trim()
+        const remoteRef = `refs/remotes/origin/${this.branch}`
+
+        this.logger.log(`[UPDATER] Applying update with Git reset to ${remote.commitSha.slice(0, 12)}`)
+        this.backupMutablePaths(backupDir)
+
+        try {
+            this.git(['fetch', '--prune', 'origin', `+refs/heads/${this.branch}:${remoteRef}`], { stdio: 'pipe' })
+            const fetchedSha = this.git(['rev-parse', remoteRef]).trim()
+            if (fetchedSha !== remote.commitSha) {
+                throw new Error(`Fetched ${fetchedSha.slice(0, 12)} but GitHub reported ${remote.commitSha.slice(0, 12)}`)
+            }
+
+            this.git(['reset', '--hard', remote.commitSha], { stdio: 'pipe' })
+            this.git(['clean', '-ffd', '--', ...DEFAULT_MANAGED_PATHS], { stdio: 'pipe' })
+            this.restoreBackup(backupDir)
+            migrateUserFiles(this.root, this.logger)
+            this.verifyAppliedRelease(remote)
+            return { strategy: 'git', before, after: remote.commitSha }
+        } catch (error) {
+            this.logger.warn(`[UPDATER] Git apply failed, rolling back: ${error.message}`)
+            try {
+                this.git(['reset', '--hard', before], { stdio: 'pipe' })
+            } catch (rollbackError) {
+                this.logger.warn(`[UPDATER] Git rollback reset failed: ${rollbackError.message}`)
+            }
+            this.restoreBackup(backupDir)
+            throw error
+        }
+    }
+
+    async applyArchiveRelease(remote) {
         const stamp = new Date().toISOString().replace(/[:.]/g, '-')
         const workDir = path.join(this.updatesDir, stamp)
         const archivePath = path.join(workDir, `${this.repo.replace(/[^\w.-]+/g, '-')}-${remote.commitSha}.tar.gz`)
@@ -448,10 +607,13 @@ class UpdateManager {
         await this.downloadArchive(remote.archiveUrl, archivePath)
         this.extractArchive(archivePath, extractDir)
         const sourceRoot = findExtractedRoot(extractDir)
+        this.verifySourceRootRelease(sourceRoot, remote)
 
         try {
             this.applyFromSourceRoot(sourceRoot, backupDir)
             migrateUserFiles(this.root, this.logger)
+            this.verifyAppliedRelease(remote)
+            return { strategy: 'archive' }
         } catch (error) {
             this.logger.warn(`[UPDATER] Apply failed, rolling back: ${error.message}`)
             this.restoreBackup(backupDir)
@@ -479,6 +641,30 @@ class UpdateManager {
         pruneManagedPaths(sourceRoot, this.root, options.managedPaths ?? DEFAULT_MANAGED_PATHS, excludes)
         removeObsoletePaths(this.root, options.obsoletePaths ?? DEFAULT_OBSOLETE_PATHS, excludes)
         copyReleaseTree(sourceRoot, this.root, excludes)
+    }
+
+    verifySourceRootRelease(sourceRoot, remote) {
+        const packagePath = path.join(sourceRoot, 'package.json')
+        if (!fs.existsSync(packagePath)) {
+            throw new Error('Downloaded release is missing package.json')
+        }
+
+        const packageJson = readJson(packagePath)
+        if (packageJson.version !== remote.version) {
+            throw new Error(`Downloaded release version ${packageJson.version || 'unknown'} does not match remote ${remote.version}`)
+        }
+    }
+
+    verifyAppliedRelease(remote) {
+        const packagePath = path.join(this.root, 'package.json')
+        if (!fs.existsSync(packagePath)) {
+            throw new Error('Update verification failed: local package.json is missing')
+        }
+
+        const packageJson = readJson(packagePath)
+        if (packageJson.version !== remote.version) {
+            throw new Error(`Update verification failed: local package.json is ${packageJson.version || 'unknown'}, expected ${remote.version}`)
+        }
     }
 
     backupMutablePaths(backupDir, excludes = DEFAULT_EXCLUDES) {
@@ -511,10 +697,14 @@ class UpdateManager {
     }
 
     syncDependencies() {
-        const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
         const args = fs.existsSync(path.join(this.root, 'package-lock.json')) ? ['ci'] : ['install']
-        this.logger.log(`[UPDATER] Syncing dependencies with npm ${args.join(' ')}`)
-        const result = childProcess.spawnSync(npm, args, { cwd: this.root, stdio: 'inherit', shell: false })
+        const npm = resolveNpmInvocation()
+        this.logger.log(`[UPDATER] Syncing dependencies with ${npm.label} ${args.join(' ')}`)
+        const result = childProcess.spawnSync(npm.command, [...npm.argsPrefix, ...args], {
+            cwd: this.root,
+            stdio: 'inherit',
+            shell: false
+        })
         if (result.error) throw new Error(`Dependency sync failed: ${result.error.message}`)
         if (result.status !== 0) throw new Error(`Dependency sync failed with exit code ${result.status}`)
     }
@@ -533,5 +723,6 @@ module.exports = {
     findExtractedRoot,
     isExcluded,
     pruneManagedPaths,
+    resolveNpmInvocation,
     requestJson
 }

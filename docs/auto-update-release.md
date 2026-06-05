@@ -1,10 +1,10 @@
 # Release Update Checklist
 
-This guide covers the files that make `npm start` detect and apply a public update.
+This guide covers the files that make `npm start` detect, apply, and verify a public update.
 
 ## Goal
 
-Publish the `main` branch so existing local installs can detect a higher `package.json` version, download that exact commit archive, preserve user files, and replace managed project files.
+Publish the `main` branch so existing local installs can detect a higher `package.json` version, apply that exact commit through Git or the immutable commit archive, preserve user files, replace managed project files, and verify that the local `package.json` actually changed.
 
 ## Required Environment
 
@@ -12,7 +12,7 @@ Publish the `main` branch so existing local installs can detect a higher `packag
 - access to rebuild the official Core plugin when Core changes
 - write access to the official `main` branch
 
-Read [Core release security](./core-release-security.md) before publishing a Core artifact. It defines the obfuscation, bytecode target, and anti-leak rules.
+Read [Core release integrity](./core-release-security.md) before publishing a Core artifact. It defines the public anti-leak and checksum rules.
 
 ## Preparation Steps
 
@@ -31,9 +31,7 @@ npm run update:doctor
 
 2. Rebuild the official Core plugin with the private maintainer release pipeline when Core changed.
 
-For Docker support, build the Core release artifact on Linux `x64` with Node.js `24.15.0`. The generated `official-core.json` records the bytecode target.
-
-Do not copy a Windows-built Core `.jsc` into a Docker/Linux release. `bytenode` bytecode is tied to Node/V8, OS, and architecture. Until Core uses the multi-target layout described in [Core release security](./core-release-security.md), a single `plugins/core/index.jsc` can only be treated as one official runtime target.
+Use the private maintainer pipeline for all supported Core runtime targets. Do not manually copy Core files between target folders.
 
 3. Copy the Core release into the public repository when Core changed.
 
@@ -52,7 +50,7 @@ Every target checksum in `plugins/official-core.json`, `plugins/core/package.jso
 
 5. Commit and push the final release code to the `main` branch.
 
-The updater reads `package.json` directly from `main`, then downloads the immutable tarball for that branch commit SHA. There is no second manifest commit.
+The updater reads `package.json` directly from `main`, then applies that exact branch commit. Git installs use `fetch` plus `reset --hard`; archive installs download the immutable tarball for the same commit SHA. There is no second manifest commit.
 
 6. Validate after push.
 
@@ -66,6 +64,8 @@ Expected result:
 
 - local and remote versions are printed;
 - the main branch SHA is printed;
+- successful non-Docker updates print the apply strategy;
+- failed local version verification reports `Update verification failed` instead of claiming success;
 - Core checksum values match;
 - Core release artifact check passes;
 - Docker users only receive an update notification.
@@ -89,7 +89,7 @@ The updater must preserve:
 - `plugins/*/node_modules`
 - `plugins/*/.cache`
 
-Managed project paths are mirrored from the release archive before copy. This removes old source files that no longer exist in the release while preserving the user-owned paths above.
+Managed project paths are mirrored from Git or the release archive before copy. This removes old source files that no longer exist in the release while preserving the user-owned paths above.
 
 ## What Not To Do
 
@@ -97,6 +97,5 @@ Managed project paths are mirrored from the release archive before copy. This re
 - Do not publish source files from Core in `plugins/core`.
 - Do not publish Core `.ts`, sourcemap, or unobfuscated Core `dist/**/*.js` files.
 - Do not rebuild Core bytecode with another Node.js version.
-- Do not claim Windows, Linux, and Docker support from one single-target `.jsc`.
+- Do not claim Windows, Linux, Docker, or ARM64 support unless the matching official target artifact is present.
 - Do not rely on `updates/stable.json` or signed update manifests for the public channel.
-- Do not rely on obfuscation as secret storage.

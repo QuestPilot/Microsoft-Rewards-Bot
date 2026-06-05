@@ -1,4 +1,5 @@
 const assert = require('assert/strict')
+const childProcess = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -10,11 +11,35 @@ const {
     DEFAULT_EXCLUDES,
     DEFAULT_MANAGED_PATHS,
     DEFAULT_OBSOLETE_PATHS,
-    UpdateManager
+    UpdateManager,
+    resolveNpmInvocation
 } = require('../scripts/updater/UpdateManager')
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-updater-'))
+}
+
+function hasGit() {
+    const result = childProcess.spawnSync('git', ['--version'], { stdio: 'pipe' })
+    return result.status === 0
+}
+
+function git(cwd, args) {
+    const result = childProcess.spawnSync('git', args, {
+        cwd,
+        stdio: 'pipe',
+        encoding: 'utf8',
+        shell: false
+    })
+    if (result.status !== 0) {
+        throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`)
+    }
+    return result.stdout.trim()
+}
+
+function commitAll(cwd, message) {
+    git(cwd, ['add', '.'])
+    git(cwd, ['-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-m', message])
 }
 
 test('updater skips dev mode and explicit opt-out', () => {
@@ -161,6 +186,48 @@ test('check-only reports update availability without applying', async () => {
     assert.equal(result.checkOnly, true)
 })
 
+test('updater refuses to report updated when local package version did not change', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.fetchRemoteRelease = async () => ({
+        version: '2.0.0',
+        commitSha: 'abc123456789',
+        branch: 'main',
+        repo: 'QuestPilot/Microsoft-Rewards-Bot',
+        packageJson: { version: '2.0.0' },
+        archiveUrl: 'https://example.test/archive.tgz',
+        checkedAt: new Date().toISOString()
+    })
+    updater.applyRelease = async () => ({ strategy: 'test-noop' })
+    updater.syncDependencies = () => {}
+
+    const result = await updater.run()
+
+    assert.equal(result.status, 'failed')
+    assert.match(result.error.message, /Update verification failed/)
+})
+
+test('archive strategy is used when git is unavailable', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    let archiveApplied = false
+    updater.applyArchiveRelease = async () => {
+        archiveApplied = true
+        return { strategy: 'archive' }
+    }
+
+    const result = await updater.applyRelease({
+        version: '2.0.0',
+        commitSha: 'abc123456789',
+        packageJson: { version: '2.0.0' }
+    })
+
+    assert.equal(archiveApplied, true)
+    assert.equal(result.strategy, 'archive')
+})
+
 test('updater backup paths never include internal updater or dependency folders', () => {
     const updater = new UpdateManager({ root: process.cwd(), logger: { log() {}, warn() {} } })
     const backupPaths = updater.getBackupPaths([
@@ -217,7 +284,25 @@ test('dependency sync chooses npm ci when package-lock is present', () => {
         childProcess.spawnSync = originalSpawnSync
     }
 
-    assert.deepEqual(capturedArgs, ['ci'])
+    assert.equal(capturedArgs.at(-1), 'ci')
+})
+
+test('updater resolves npm from portable Node runtime before global npm', () => {
+    const root = tempRoot()
+    try {
+        const nodePath = path.join(root, 'runtime', 'node.exe')
+        const npmPath = path.join(root, 'runtime', 'node_modules', 'npm', 'bin', 'npm-cli.js')
+        fs.mkdirSync(path.dirname(npmPath), { recursive: true })
+        fs.writeFileSync(nodePath, '')
+        fs.writeFileSync(npmPath, '')
+
+        const npm = resolveNpmInvocation({}, nodePath)
+
+        assert.equal(npm.command, nodePath)
+        assert.deepEqual(npm.argsPrefix, [npmPath])
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+    }
 })
 
 test('GitHub tarball download uses the GitHub API accept header', () => {
@@ -257,6 +342,53 @@ test('applying release preserves user files and removes obsolete managed files',
     assert.equal(fs.readFileSync(path.join(root, 'sessions', 'keep.txt'), 'utf8'), 'session')
     assert.equal(fs.existsSync(path.join(root, 'src', 'old.ts')), false)
     assert.equal(fs.readFileSync(path.join(root, 'src', 'new.ts'), 'utf8'), 'new')
+})
+
+test('git updater resets to the target commit and restores user config files', async t => {
+    if (!hasGit()) {
+        t.skip('git is not available')
+        return
+    }
+
+    const remoteWork = tempRoot()
+    const cloneRoot = tempRoot()
+
+    fs.mkdirSync(path.join(remoteWork, 'src'), { recursive: true })
+    fs.mkdirSync(path.join(remoteWork, 'plugins'), { recursive: true })
+    git(remoteWork, ['init', '-b', 'main'])
+    fs.writeFileSync(path.join(remoteWork, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(remoteWork, 'src', 'old.ts'), 'old')
+    fs.writeFileSync(path.join(remoteWork, 'src', 'config.example.json'), '{"remote":1}')
+    fs.writeFileSync(path.join(remoteWork, 'plugins', 'plugins.jsonc'), '{"core":{"enabled":false}}')
+    commitAll(remoteWork, 'v1')
+
+    git(path.dirname(cloneRoot), ['clone', remoteWork, cloneRoot])
+    fs.writeFileSync(path.join(cloneRoot, 'src', 'config.json'), '{"user":true}')
+    fs.writeFileSync(path.join(cloneRoot, 'plugins', 'plugins.jsonc'), '{"core":{"enabled":true}}')
+
+    fs.rmSync(path.join(remoteWork, 'src', 'old.ts'), { force: true })
+    fs.writeFileSync(path.join(remoteWork, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    fs.writeFileSync(path.join(remoteWork, 'src', 'new.ts'), 'new')
+    fs.writeFileSync(path.join(remoteWork, 'src', 'config.example.json'), '{"remote":1,"added":2}')
+    fs.writeFileSync(path.join(remoteWork, 'plugins', 'plugins.jsonc'), '{"core":{"enabled":false,"remote":true}}')
+    commitAll(remoteWork, 'v2')
+    const commitSha = git(remoteWork, ['rev-parse', 'HEAD'])
+
+    const updater = new UpdateManager({ root: cloneRoot, logger: { log() {}, warn() {} } })
+    const result = await updater.applyGitRelease({
+        version: '2.0.0',
+        commitSha,
+        packageJson: { version: '2.0.0' }
+    })
+
+    assert.equal(result.strategy, 'git')
+    assert.equal(JSON.parse(fs.readFileSync(path.join(cloneRoot, 'package.json'), 'utf8')).version, '2.0.0')
+    const config = JSON.parse(fs.readFileSync(path.join(cloneRoot, 'src', 'config.json'), 'utf8'))
+    assert.equal(config.user, true)
+    assert.equal(config.added, 2)
+    assert.equal(fs.readFileSync(path.join(cloneRoot, 'plugins', 'plugins.jsonc'), 'utf8'), '{"core":{"enabled":true}}')
+    assert.equal(fs.existsSync(path.join(cloneRoot, 'src', 'old.ts')), false)
+    assert.equal(fs.readFileSync(path.join(cloneRoot, 'src', 'new.ts'), 'utf8'), 'new')
 })
 
 test('failed release apply restores backed up user files', () => {

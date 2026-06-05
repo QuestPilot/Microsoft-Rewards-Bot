@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { writeJsonAtomic } from './AtomicFile'
 
 export const ACCOUNT_SAFETY_WARNING_THRESHOLD = 4
 export const ACCOUNT_SAFETY_WARNING_SUPPRESSION_DAYS = 30
@@ -81,8 +82,7 @@ export async function writeAccountSafetyWarningState(
     state: AccountSafetyWarningState,
     filePath = getAccountSafetyWarningStatePath()
 ): Promise<void> {
-    await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
-    await fs.promises.writeFile(filePath, JSON.stringify(state, null, 2))
+    await writeJsonAtomic(filePath, state)
 }
 
 export async function clearAccountSafetyWarningState(filePath = getAccountSafetyWarningStatePath()): Promise<void> {

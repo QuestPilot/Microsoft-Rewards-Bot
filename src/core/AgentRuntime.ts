@@ -6,6 +6,7 @@ import path from 'path'
 import readline from 'readline'
 
 import type { DashboardLog } from '../types/Dashboard'
+import { writeJsonAtomic } from '../helpers/AtomicFile'
 
 const STATE_DIR = '.core'
 const STATE_FILE = 'agent.json'
@@ -16,6 +17,7 @@ export interface AgentRuntimeState {
     token: string
     startedAt: string
     cwd: string
+    version: 1
 }
 
 interface AgentClient {
@@ -51,6 +53,7 @@ export class AgentRuntime {
 
         this.server = server
         this.state = {
+            version: 1,
             pid: process.pid,
             port: address.port,
             token,
@@ -58,7 +61,7 @@ export class AgentRuntime {
             cwd: process.cwd()
         }
 
-        await fs.promises.writeFile(agentStatePath(), JSON.stringify(this.state, null, 2))
+        await writeJsonAtomic(agentStatePath(), this.state)
     }
 
     async stop(): Promise<void> {
@@ -112,7 +115,10 @@ export class AgentRuntime {
                     authed = true
                 }
 
-                if (message.type === 'attach') {
+                if (message.type === 'ping') {
+                    socket.write(JSON.stringify({ type: 'pong', pid: process.pid, cwd: process.cwd() }) + '\n')
+                    socket.end()
+                } else if (message.type === 'attach') {
                     client = { socket, mode: 'logs' }
                     this.clients.add(client)
                     socket.write(JSON.stringify({ type: 'attached', pid: process.pid }) + '\n')
@@ -131,16 +137,29 @@ export class AgentRuntime {
 
 export async function readAgentState(): Promise<AgentRuntimeState | null> {
     const state = parseJson<AgentRuntimeState>(await fs.promises.readFile(agentStatePath(), 'utf8').catch(() => ''))
-    if (!state || !state.port || !state.token || !state.pid) return null
+    if (!state || state.version !== 1 || !state.port || !state.token || !state.pid || state.cwd !== process.cwd()) {
+        await fs.promises.rm(agentStatePath(), { force: true }).catch(() => undefined)
+        return null
+    }
     return state
 }
 
 export async function isAgentActive(state?: AgentRuntimeState | null): Promise<boolean> {
     const currentState = state ?? (await readAgentState())
     if (!currentState) return false
-    return sendAgentMessage(currentState, { type: 'ping' }, 1000)
-        .then(() => true)
+    const active = await sendAgentMessage<{ type?: string; pid?: number; cwd?: string }>(
+        currentState,
+        { type: 'ping' },
+        1000
+    )
+        .then(response => response?.type === 'pong' && response.pid === currentState.pid && response.cwd === currentState.cwd)
         .catch(() => false)
+
+    if (!active && currentState.cwd === process.cwd()) {
+        await fs.promises.rm(agentStatePath(), { force: true }).catch(() => undefined)
+    }
+
+    return active
 }
 
 export async function stopExistingAgent(): Promise<boolean> {
@@ -158,6 +177,10 @@ export async function attachToAgent(): Promise<number> {
     const state = await readAgentState()
     if (!state) {
         console.error('[AGENT] No running background instance found.')
+        return 1
+    }
+    if (!(await isAgentActive(state))) {
+        console.error('[AGENT] Background instance state was stale and has been cleared.')
         return 1
     }
 
@@ -204,24 +227,54 @@ export function agentStateDir(): string {
     return path.resolve(process.cwd(), STATE_DIR)
 }
 
-function sendAgentMessage(state: AgentRuntimeState, message: Record<string, unknown>, timeoutMs: number): Promise<void> {
+function sendAgentMessage<T = unknown>(
+    state: AgentRuntimeState,
+    message: Record<string, unknown>,
+    timeoutMs: number
+): Promise<T | null> {
     return new Promise((resolve, reject) => {
         const socket = net.connect({ host: '127.0.0.1', port: state.port })
+        socket.setEncoding('utf8')
+        let buffer = ''
+        let settled = false
         const timeout = setTimeout(() => {
+            settled = true
             socket.destroy()
             reject(new Error('Agent IPC timeout'))
         }, timeoutMs)
 
-        socket.on('connect', () => {
-            socket.write(JSON.stringify({ token: state.token, ...message }) + '\n')
+        const finish = (value: T | null) => {
+            if (settled) return
+            settled = true
             clearTimeout(timeout)
             socket.end()
-            resolve()
+            resolve(value)
+        }
+
+        socket.on('connect', () => {
+            socket.write(JSON.stringify({ token: state.token, ...message }) + '\n')
+            if (message.type === 'shutdown') {
+                finish(null)
+            }
+        })
+        socket.on('data', chunk => {
+            buffer += chunk
+            let newline = buffer.indexOf('\n')
+            while (newline >= 0) {
+                const line = buffer.slice(0, newline)
+                buffer = buffer.slice(newline + 1)
+                const response = parseJson<T>(line)
+                finish(response)
+                newline = buffer.indexOf('\n')
+            }
         })
         socket.on('error', error => {
+            if (settled) return
+            settled = true
             clearTimeout(timeout)
             reject(error)
         })
+        socket.on('close', () => finish(null))
     })
 }
 

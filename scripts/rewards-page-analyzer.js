@@ -142,14 +142,86 @@ function contextAround(text, index, radius = 900) {
     return text.slice(Math.max(0, index - radius), Math.min(text.length, index + radius))
 }
 
+function findBalancedEnd(text, start, open, close) {
+    let depth = 0
+    let inString = false
+    let escaped = false
+
+    for (let i = start; i < text.length; i++) {
+        const char = text[i]
+
+        if (inString) {
+            if (escaped) escaped = false
+            else if (char === '\\') escaped = true
+            else if (char === '"') inString = false
+            continue
+        }
+
+        if (char === '"') inString = true
+        else if (char === open) depth++
+        else if (char === close) {
+            depth--
+            if (depth === 0) return i
+        }
+    }
+
+    return -1
+}
+
+function extractJsonArraysAfterKey(text, key) {
+    const arrays = []
+    const marker = `"${key}":[`
+    let searchFrom = 0
+
+    while (searchFrom < text.length) {
+        const markerIndex = text.indexOf(marker, searchFrom)
+        if (markerIndex === -1) break
+
+        const start = markerIndex + `"${key}":`.length
+        const end = findBalancedEnd(text, start, '[', ']')
+        if (end === -1) {
+            searchFrom = markerIndex + marker.length
+            continue
+        }
+
+        try {
+            const parsed = JSON.parse(text.slice(start, end + 1))
+            if (Array.isArray(parsed)) arrays.push(parsed)
+        } catch {
+            /* Keep scanning. */
+        }
+
+        searchFrom = end + 1
+    }
+
+    return arrays
+}
+
 function extractRewardsActivities(text) {
     const activities = []
+
+    for (const items of extractJsonArraysAfterKey(text, 'dailySetItems')) {
+        for (const item of items) {
+            if (!item || typeof item !== 'object' || !item.offerId) continue
+            activities.push({
+                type: 'dailyset',
+                offerId: item.offerId,
+                hash: item.hash,
+                destination: item.destination,
+                destinationUrl: item.destination,
+                title: item.title,
+                points: item.points,
+                isCompleted: item.isCompleted
+            })
+        }
+    }
 
     for (const match of text.matchAll(/"type"\s*:\s*"([^"]+)"[\s\S]{0,1200}?"model"\s*:\s*\{/g)) {
         if (match.index === undefined || !match[1]) continue
         const context = contextAround(text, match.index, 2200)
         const offerId = readStringField(context, 'offerId') ?? readStringField(context, 'activationOfferId')
         const hash = readStringField(context, 'hash') ?? readStringField(context, 'activationHash')
+        if (offerId && activities.some(activity => activity.offerId === offerId)) continue
         activities.push({
             type: match[1],
             offerId: offerId && offerId !== '$undefined' ? offerId : undefined,

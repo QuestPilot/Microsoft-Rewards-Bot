@@ -41,7 +41,8 @@ The Plugin Desk shows whether the Core checksum matches `plugins/official-core.j
 
 For Docker, confirm that the final image contains:
 
-- `plugins/core/index.jsc`
+- `plugins/core/index.js`
+- the matching `plugins/core/targets/<target>/index.jsc`
 - `plugins/official-core.json`
 - `node_modules/microsoft-rewards-bot`
 
@@ -51,7 +52,7 @@ Then check the runtime target:
 node -p "process.versions.node + ' ' + process.platform + '/' + process.arch"
 ```
 
-Core in Docker is supported on Node.js `24.15.0` with Linux `x64`. A `cachedDataRejected` error means the bytecode does not match the Node.js/V8 runtime. A segmentation fault during `require('./plugins/core/index.jsc')` happens before browser startup; adding browser or GTK packages is not the fix. Use the official Dockerfile and a Core release built for the Docker target.
+Core in Docker is supported on Node.js `24.15.0` with Linux `x64`. If Core fails before browser startup, use the official Dockerfile target and an official Core release built for the Docker target.
 
 ## Core Dashboard Does Not Show A Machine
 

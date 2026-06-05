@@ -44,15 +44,13 @@ export class Quiz extends TaskBase {
                 `Prepared quiz headers | offerId=${offerId} | cookieLength=${this.cookieHeader.length} | fingerprintHeaderKeys=${Object.keys(this.fingerprintHeader).length}`
             )
 
-            // 8-question quiz
+            // 8-question quiz — not supported in the legacy API path
             if (promotion.activityProgressMax === 80) {
                 this.bot.logger.warn(
                     this.bot.isMobile,
                     'QUIZ',
-                    `Detected 8-question quiz (activityProgressMax=80), marking as completed | offerId=${offerId}`
+                    `Detected 8-question quiz (activityProgressMax=80), skipping (not supported) | offerId=${offerId}`
                 )
-
-                // Not implemented
                 return
             }
 

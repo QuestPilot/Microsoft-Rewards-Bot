@@ -26,21 +26,26 @@ export function getNextScheduledRun(config: ConfigScheduler, now = new Date()): 
     )
 
     if (baseTarget <= now) {
-        const nextDay = new Date(Date.UTC(currentParts.year, currentParts.month - 1, currentParts.day + 1))
-        const nextParts = getZonedParts(nextDay, config.timezone)
-        baseTarget = zonedTimeToDate(nextParts.year, nextParts.month, nextParts.day, hour, minute, config.timezone)
+        baseTarget = nextZonedDayTarget(currentParts, hour, minute, config.timezone)
     }
 
     const minDelay = helpers.stringToNumber(config.randomDelay.min)
     const maxDelay = helpers.stringToNumber(config.randomDelay.max)
     const safeMin = Math.max(0, Math.min(minDelay, maxDelay))
     const safeMax = Math.max(safeMin, maxDelay)
-    const jitterMs = safeMax === safeMin ? safeMin : helpers.randomNumber(safeMin, safeMax)
+    let jitterMs = randomJitter(safeMin, safeMax)
+    let target = new Date(baseTarget.getTime() + jitterMs)
+
+    if (target <= now) {
+        baseTarget = nextZonedDayTarget(currentParts, hour, minute, config.timezone)
+        jitterMs = randomJitter(safeMin, safeMax)
+        target = new Date(baseTarget.getTime() + jitterMs)
+    }
 
     return {
         baseTarget,
         jitterMs,
-        target: new Date(baseTarget.getTime() + jitterMs)
+        target
     }
 }
 
@@ -113,6 +118,21 @@ function getZonedParts(date: Date, timeZone: string) {
         minute: value('minute'),
         second: value('second')
     }
+}
+
+function nextZonedDayTarget(
+    currentParts: ReturnType<typeof getZonedParts>,
+    hour: number,
+    minute: number,
+    timeZone: string
+): Date {
+    const nextDay = new Date(Date.UTC(currentParts.year, currentParts.month - 1, currentParts.day + 1))
+    const nextParts = getZonedParts(nextDay, timeZone)
+    return zonedTimeToDate(nextParts.year, nextParts.month, nextParts.day, hour, minute, timeZone)
+}
+
+function randomJitter(safeMin: number, safeMax: number): number {
+    return safeMax === safeMin ? safeMin : helpers.randomNumber(safeMin, safeMax)
 }
 
 function zonedTimeToDate(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): Date {

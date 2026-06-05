@@ -5,9 +5,30 @@ import path from 'path'
 
 import type { Account, ConfigSaveFingerprint } from '../types/Account'
 import type { Config } from '../types/Config'
+import { writeJsonAtomic } from './AtomicFile'
 import { validateAccounts, validateConfig } from './SchemaValidator'
 
 let configCache: Config
+
+function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
+}
+
+function readJsonFile<T>(filePath: string, label: string): T {
+    try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T
+    } catch (error) {
+        throw new Error(`[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`)
+    }
+}
+
+async function readJsonFileAsync<T>(filePath: string, label: string): Promise<T> {
+    try {
+        return JSON.parse(await fs.promises.readFile(filePath, 'utf-8')) as T
+    } catch (error) {
+        throw new Error(`[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`)
+    }
+}
 
 function getSessionDir(sessionPath: string, email: string): string {
     return path.resolve(process.cwd(), sessionPath, email)
@@ -55,14 +76,13 @@ export function loadAccounts(): Account[] {
             : ['accounts.json', 'accounts.example.json']
 
         const accountDir = resolveFirstExistingFile(accountCandidates, 'accounts file')
-        const accounts = fs.readFileSync(accountDir, 'utf-8')
-        const accountsData = JSON.parse(accounts)
+        const accountsData = readJsonFile<Account[]>(accountDir, 'accounts file')
 
         validateAccounts(accountsData)
 
         return accountsData
     } catch (error) {
-        throw new Error(error as string)
+        throw new Error(errorMessage(error))
     }
 }
 
@@ -73,16 +93,14 @@ export function loadConfig(): Config {
         }
 
         const configDir = resolveFirstExistingFile(['config.json', 'config.example.json'], 'config file')
-        const config = fs.readFileSync(configDir, 'utf-8')
-
-        const configData = JSON.parse(config)
+        const configData = readJsonFile<Config>(configDir, 'config file')
         validateConfig(configData)
 
         configCache = configData
 
         return configData
     } catch (error) {
-        throw new Error(error as string)
+        throw new Error(errorMessage(error))
     }
 }
 
@@ -103,8 +121,7 @@ export async function loadSessionData(
 
         let cookies: Cookie[] = []
         if (fs.existsSync(cookieFile)) {
-            const cookiesData = await fs.promises.readFile(cookieFile, 'utf-8')
-            cookies = JSON.parse(cookiesData)
+            cookies = await readJsonFileAsync<Cookie[]>(cookieFile, cookiesFileName)
         }
 
         const fingerprintFileName = isMobile ? 'session_fingerprint_mobile.json' : 'session_fingerprint_desktop.json'
@@ -113,8 +130,7 @@ export async function loadSessionData(
         let fingerprint!: BrowserFingerprintWithHeaders
         const shouldLoadFingerprint = isMobile ? saveFingerprint.mobile : saveFingerprint.desktop
         if (shouldLoadFingerprint && fs.existsSync(fingerprintFile)) {
-            const fingerprintData = await fs.promises.readFile(fingerprintFile, 'utf-8')
-            fingerprint = JSON.parse(fingerprintData)
+            fingerprint = await readJsonFileAsync<BrowserFingerprintWithHeaders>(fingerprintFile, fingerprintFileName)
         }
 
         // Load localStorage/sessionStorage data
@@ -123,8 +139,7 @@ export async function loadSessionData(
 
         let storageState: StorageOrigin[] | undefined
         if (fs.existsSync(storageFile)) {
-            const storageData = await fs.promises.readFile(storageFile, 'utf-8')
-            storageState = JSON.parse(storageData)
+            storageState = await readJsonFileAsync<StorageOrigin[]>(storageFile, storageFileName)
         }
 
         return {
@@ -133,7 +148,7 @@ export async function loadSessionData(
             storageState: storageState
         }
     } catch (error) {
-        throw new Error(error as string)
+        throw new Error(errorMessage(error))
     }
 }
 
@@ -151,11 +166,11 @@ export async function saveSessionData(
             await fs.promises.mkdir(sessionDir, { recursive: true })
         }
 
-        await fs.promises.writeFile(path.join(sessionDir, cookiesFileName), JSON.stringify(cookies))
+        await writeJsonAtomic(path.join(sessionDir, cookiesFileName), cookies, 0)
 
         return sessionDir
     } catch (error) {
-        throw new Error(error as string)
+        throw new Error(errorMessage(error))
     }
 }
 
@@ -173,11 +188,11 @@ export async function saveFingerprintData(
             await fs.promises.mkdir(sessionDir, { recursive: true })
         }
 
-        await fs.promises.writeFile(path.join(sessionDir, fingerprintFileName), JSON.stringify(fingerpint))
+        await writeJsonAtomic(path.join(sessionDir, fingerprintFileName), fingerpint, 0)
 
         return sessionDir
     } catch (error) {
-        throw new Error(error as string)
+        throw new Error(errorMessage(error))
     }
 }
 
@@ -195,8 +210,8 @@ export async function saveStorageState(
             await fs.promises.mkdir(sessionDir, { recursive: true })
         }
 
-        await fs.promises.writeFile(path.join(sessionDir, storageFileName), JSON.stringify(storageState))
+        await writeJsonAtomic(path.join(sessionDir, storageFileName), storageState, 0)
     } catch (error) {
-        throw new Error(error as string)
+        throw new Error(errorMessage(error))
     }
 }

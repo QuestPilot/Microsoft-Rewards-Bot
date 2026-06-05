@@ -18,6 +18,7 @@
         "doRedeemGoal": false,
         "doDashboardInfo": false,
         "doClaimPoints": false,
+        "doApplyCoupons": false,
         "enforceCoreStreakProtectionGate": true
     },
     "searchOnBingLocalQueries": true,
@@ -68,6 +69,10 @@
             "levels": ["error"],
             "keywords": ["starting account", "select number", "collected"],
             "regexPatterns": []
+        },
+        "runSummary": {
+            "enabled": false,
+            "includeCorePitch": true
         }
     },
     "redeemGoal": {
