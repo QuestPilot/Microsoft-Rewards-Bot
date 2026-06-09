@@ -63,6 +63,16 @@ function isUiChild(argv = process.argv, env = process.env) {
     return argv.includes('--ui-child') || env.MSRB_UI_CHILD === '1'
 }
 
+function isDockerRuntime(fsApi = fs) {
+    if (process.platform === 'win32') return false
+    if (fsApi.existsSync('/.dockerenv')) return true
+    try {
+        return /docker|containerd|kubepods/i.test(fsApi.readFileSync('/proc/1/cgroup', 'utf8'))
+    } catch {
+        return false
+    }
+}
+
 function readConfig(root = ROOT) {
     try {
         return JSON.parse(fs.readFileSync(path.join(root, 'src', 'config.json'), 'utf8'))
@@ -72,14 +82,22 @@ function readConfig(root = ROOT) {
 }
 
 function terminalModeEnabled(config = readConfig()) {
-    return config?.terminal?.enabled !== false
+    return config?.terminal?.enabled === true
+}
+
+function hasGuiEnvironment(env = process.env) {
+    if (env.MSRB_FORCE_APP_WINDOW === '1') return true
+    if (env.MSRB_NO_APP_WINDOW === '1' || env.CI === 'true' || env.CI === '1' || env.FORCE_HEADLESS === '1') return false
+    if (isDockerRuntime()) return false
+    if (process.platform === 'linux') return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY)
+    return true
 }
 
 function shouldLaunchInterface(argv = process.argv, env = process.env, root = ROOT) {
     if (isBackgroundLaunch(argv) || isAttachLaunch(argv) || isTerminalForced(argv, env) || isUiChild(argv, env)) {
         return false
     }
-    return !terminalModeEnabled(readConfig(root))
+    return hasGuiEnvironment(env) && !terminalModeEnabled(readConfig(root))
 }
 
 function shouldRunUpdater(argv = process.argv, env = process.env) {
@@ -101,8 +119,18 @@ function runNpm(args) {
     run(npm.command, [...npm.argsPrefix, ...args], `${npm.label} ${args.join(' ')}`)
 }
 
-function runInterface() {
-    run(process.execPath, ['./scripts/user-interface.js'], 'interface')
+function launchAppWindow() {
+    const child = childProcess.spawn(process.execPath, ['./scripts/app-window.js'], {
+        cwd: ROOT,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: {
+            ...process.env,
+            MSRB_TERMINAL_MODE: '0'
+        }
+    })
+    child.unref()
 }
 
 async function main() {
@@ -119,7 +147,8 @@ async function main() {
         console.log('[START] Background launch: using existing dist build.')
     }
     if (shouldLaunchInterface()) {
-        runInterface()
+        console.log('[START] Opening app window. Use npm start -- --terminal for developer logs.')
+        launchAppWindow()
         return
     }
     run(process.execPath, ['./dist/index.js', ...process.argv.slice(2)], 'bot')
@@ -134,13 +163,16 @@ if (require.main === module) {
 
 module.exports = {
     hasBuiltRuntime,
+    hasGuiEnvironment,
     isBackgroundLaunch,
     isAttachLaunch,
+    isDockerRuntime,
     isTerminalForced,
     isUiChild,
     readConfig,
     resolveNpmInvocation,
     shouldBuildRuntime,
+    launchAppWindow,
     shouldLaunchInterface,
     shouldRunUpdater,
     terminalModeEnabled

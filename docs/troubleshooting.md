@@ -22,9 +22,9 @@ If another terminal started an update at the same time, the updater waits on `.u
 
 Use `npm run update:repair` when the installed files look inconsistent but the local `package.json` version already matches the remote `main` version. Repair mode re-applies the current official commit while preserving `src/config.json`, `src/accounts.json`, `plugins/plugins.jsonc`, sessions, logs, diagnostics, and custom plugin folders.
 
-## Simple Interface Or Terminal
+## App Window Or Terminal
 
-The bot starts in terminal mode by default. If `src/config.json` contains:
+The bot starts in app window mode by default. The default user config contains:
 
 ```jsonc
 "terminal": {
@@ -32,13 +32,15 @@ The bot starts in terminal mode by default. If `src/config.json` contains:
 }
 ```
 
-`npm start` opens the simple local interface instead. Use this for normal, non-technical runs. If support asks for detailed logs, run:
+`npm start` opens the visual app window. Use this for normal, non-technical runs. If support asks for detailed logs, run:
 
 ```bash
 npm start -- --terminal
 ```
 
-The interface can accept a Core license prompt or an empty response, but developer diagnostics are still easier in terminal mode.
+The interface can accept a Core license prompt or an empty response, but developer diagnostics are still easier in terminal mode. On systems launched from an existing terminal, the launcher detaches the app process and returns the prompt; it does not forcibly close a terminal window that the user opened manually.
+
+Docker, CI, and forced-headless launches stay in terminal mode automatically. Use `MSRB_NO_APP_WINDOW=1` if a desktop machine should also skip the app window.
 
 ## Development Version Gets Replaced
 

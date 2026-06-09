@@ -17,7 +17,7 @@ Core is built for users who want:
 
 Core is especially useful for desktop users who do not want to understand terminals. Once configured, the bot can start silently with the computer, appear in the dashboard, and wait for scheduler runs or manual dashboard commands.
 
-The public bot also includes a simple local interface mode. Set `terminal.enabled` to `false` in `src/config.json` if you want `npm start` to show a clean status page instead of raw terminal output. Keep terminal mode enabled when you need detailed support logs.
+The public bot also includes an app window mode, enabled by default with `terminal.enabled` set to `false` in `src/config.json`. Keep terminal mode enabled only when you need detailed support logs.
 
 ## Open Source vs Core
 
@@ -31,7 +31,6 @@ The public bot also includes a simple local interface mode. Set `terminal.enable
 | Daily streak details | No | Yes |
 | Streak protection sync | No | Yes |
 | App rewards | No | Yes |
-| Redeem goal automation | No | Yes |
 | Temporary quest pages | No | Best effort |
 | Final webhook summary with Core impact | Basic run logs | Yes, includes Core points and coupon impact |
 | Remote dashboard | No | Yes |

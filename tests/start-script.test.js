@@ -55,26 +55,35 @@ test('start script resolves npm from portable Node runtime before global npm', (
     }
 })
 
-test('terminal mode config controls the local interface launcher', () => {
+test('terminal mode config controls the app window launcher', () => {
     const root = tempRoot()
     try {
         fs.mkdirSync(path.join(root, 'src'), { recursive: true })
         fs.writeFileSync(path.join(root, 'src', 'config.json'), JSON.stringify({ terminal: { enabled: false } }))
 
         assert.equal(startScript.terminalModeEnabled(startScript.readConfig(root)), false)
-        assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], {}, root), true)
+        assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { MSRB_FORCE_APP_WINDOW: '1' }, root), true)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--terminal'], {}, root), false)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--background'], {}, root), false)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--attach'], {}, root), false)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--ui-child'], {}, root), false)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { MSRB_TERMINAL_MODE: '1' }, root), false)
+        assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { CI: 'true' }, root), false)
+        assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { FORCE_HEADLESS: '1' }, root), false)
     } finally {
         fs.rmSync(root, { recursive: true, force: true })
     }
 })
 
-test('terminal mode stays enabled by default', () => {
-    assert.equal(startScript.terminalModeEnabled(null), true)
-    assert.equal(startScript.terminalModeEnabled({}), true)
+test('app window launcher can be explicitly disabled or forced by environment', () => {
+    assert.equal(startScript.hasGuiEnvironment({ MSRB_FORCE_APP_WINDOW: '1', CI: 'true' }), true)
+    assert.equal(startScript.hasGuiEnvironment({ MSRB_NO_APP_WINDOW: '1' }), false)
+    assert.equal(startScript.hasGuiEnvironment({ CI: '1' }), false)
+    assert.equal(startScript.hasGuiEnvironment({ FORCE_HEADLESS: '1' }), false)
+})
+
+test('app window mode is the default when terminal mode is not explicitly enabled', () => {
+    assert.equal(startScript.terminalModeEnabled(null), false)
+    assert.equal(startScript.terminalModeEnabled({}), false)
     assert.equal(startScript.terminalModeEnabled({ terminal: { enabled: true } }), true)
 })

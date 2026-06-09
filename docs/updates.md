@@ -66,11 +66,9 @@ npm run update:repair
 npm run update:doctor
 ```
 
-## Terminal Or Simple Interface
+## Terminal Or App Window
 
-By default, `npm start` uses the terminal. This is the best mode for setup, debugging, and support.
-
-Users who prefer a simple visual view can set:
+By default, `npm start` opens the app window. It is the best mode for normal users and is already enabled in `config.example.json`:
 
 ```jsonc
 "terminal": {
@@ -78,15 +76,21 @@ Users who prefer a simple visual view can set:
 }
 ```
 
-Then `npm start` opens a local interface with the current step, Core status, accounts, points, coupons, and a small input box for license or prompt responses. Raw technical logs stay out of the main view. To force the classic terminal for one launch, run:
+This opens a desktop-style app window with the current step, Core status, accounts, points, coupons, start/stop controls, and a small input box for license or prompt responses. The launcher starts it detached so a terminal can close or return to the prompt after startup.
+
+To force the classic terminal for one launch, run:
 
 ```bash
 npm start -- --terminal
 ```
 
+Docker, CI, and forced-headless launches keep terminal mode automatically because they cannot open a desktop window.
+
 Useful environment variables:
 
 - `MSRB_AUTO_UPDATE=0`: disable update checks and updates.
+- `MSRB_NO_APP_WINDOW=1`: keep terminal mode even when `terminal.enabled` is `false`.
+- `MSRB_FORCE_APP_WINDOW=1`: force the app window on a desktop machine.
 - `MSRB_UPDATE_CHECK_ONLY=1`: check and log only; do not apply updates.
 - `MSRB_UPDATE_FORCE=1`: re-apply the current remote version when local and remote versions are equal.
 - `MSRB_UPDATE_LOCK_WAIT_MS=120000`: maximum time to wait for another updater process before continuing with the local version.

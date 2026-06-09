@@ -13,7 +13,7 @@ test('Core documentation stays public-facing and current', () => {
 
     assert.match(overview, /paid, proprietary plugin/)
     assert.match(overview, /Core Panel/)
-    assert.match(overview, /terminal\.enabled/)
+    assert.match(overview, /app window mode/)
     assert.match(overview, /recognize coupons that already show `Applied`/)
     assert.match(overview, /coupon names/)
     assert.match(reference, /skips cards already marked `Applied`/)
