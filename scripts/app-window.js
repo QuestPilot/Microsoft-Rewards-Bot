@@ -7,6 +7,9 @@ const path = require('path')
 const ROOT = path.resolve(__dirname, '..')
 const PORT = Number.parseInt(process.env.MSRB_APP_PORT || '0', 10)
 const APP_TITLE = 'Rewards Bot'
+const APP_ICON_PATH = path.join(ROOT, 'assets', 'logo.png')
+const APP_WINDOW_WIDTH = 1500
+const APP_WINDOW_HEIGHT = 930
 
 const state = {
     status: 'Starting',
@@ -181,6 +184,20 @@ function sendInput(value) {
     return true
 }
 
+function serveAppIcon(res) {
+    if (!fs.existsSync(APP_ICON_PATH)) {
+        res.writeHead(404)
+        res.end('Icon not found')
+        return
+    }
+
+    res.writeHead(200, {
+        'content-type': 'image/png',
+        'cache-control': 'public, max-age=3600'
+    })
+    fs.createReadStream(APP_ICON_PATH).pipe(res)
+}
+
 function html() {
     return `<!doctype html>
 <html lang="en">
@@ -188,6 +205,9 @@ function html() {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${APP_TITLE}</title>
+  <link rel="icon" type="image/png" href="/app-icon.png">
+  <link rel="apple-touch-icon" href="/app-icon.png">
+  <link rel="manifest" href="/manifest.json">
   <style>
     :root {
       --night: #040912;
@@ -219,14 +239,14 @@ function html() {
     button, input { font: inherit; }
     .shell {
       display: grid;
-      grid-template-columns: 220px 1fr;
-      width: min(1360px, calc(100vw - 48px));
-      height: min(820px, calc(100vh - 48px));
-      margin: 24px auto;
-      border: 1px solid rgba(93, 153, 219, .36);
-      border-radius: 18px;
-      background: rgba(4, 11, 22, .84);
-      box-shadow: var(--shadow);
+      grid-template-columns: 242px minmax(0, 1fr);
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: rgba(4, 11, 22, .9);
+      box-shadow: none;
       overflow: hidden;
     }
     aside {
@@ -242,6 +262,13 @@ function html() {
       padding-bottom: 24px;
       border-bottom: 1px solid var(--line-soft);
       text-align: center;
+    }
+    .brand-logo {
+      width: 74px;
+      height: 74px;
+      border-radius: 22px;
+      object-fit: cover;
+      box-shadow: 0 18px 46px rgba(30, 155, 255, .34);
     }
     .bot-mark {
       width: 64px;
@@ -281,6 +308,7 @@ function html() {
       border-radius: 10px;
       color: #c9dcf7;
       border: 1px solid transparent;
+      user-select: none;
     }
     nav div.active {
       color: white;
@@ -288,6 +316,23 @@ function html() {
       background: linear-gradient(90deg, rgba(30, 155, 255, .28), rgba(30, 155, 255, .08));
     }
     .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--blue); }
+    .nav-icon {
+      width: 20px;
+      height: 20px;
+      display: grid;
+      place-items: center;
+      color: currentColor;
+      opacity: .92;
+    }
+    .nav-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .side-card {
       margin-top: auto;
       position: absolute;
@@ -301,44 +346,125 @@ function html() {
     }
     .side-card strong { display: block; font-size: 13px; margin-bottom: 8px; }
     .side-card span { color: var(--green); font-size: 12px; }
-    main { padding: 24px; overflow: auto; }
+    main {
+      display: grid;
+      grid-template-rows: minmax(210px, 250px) minmax(0, 1fr) 28px;
+      gap: 16px;
+      min-width: 0;
+      min-height: 0;
+      padding: 24px 28px 14px;
+      overflow: hidden;
+    }
     .hero {
-      min-height: 210px;
+      min-height: 0;
       border: 1px solid var(--line);
       border-radius: 16px;
-      padding: 34px 36px;
+      padding: 28px 32px;
       background:
-        radial-gradient(circle at 76% 48%, rgba(46, 232, 255, .22), transparent 28%),
+        radial-gradient(circle at 78% 50%, rgba(46, 232, 255, .26), transparent 29%),
+        radial-gradient(circle at 92% 24%, rgba(30, 155, 255, .22), transparent 24%),
         linear-gradient(135deg, rgba(12, 32, 58, .92), rgba(4, 10, 21, .94));
       position: relative;
       overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 430px;
+      align-items: center;
+      gap: 28px;
     }
     .hero:after {
       content: "";
       position: absolute;
-      right: 56px;
-      top: 34px;
-      width: 220px;
-      height: 150px;
+      right: 48px;
+      top: 18px;
+      width: 310px;
+      height: 190px;
       border-radius: 50%;
-      border: 18px solid rgba(30, 155, 255, .2);
-      box-shadow: inset 0 0 0 20px rgba(46, 232, 255, .08), 0 0 60px rgba(30, 155, 255, .26);
+      border: 22px solid rgba(30, 155, 255, .2);
+      box-shadow: inset 0 0 0 24px rgba(46, 232, 255, .08), 0 0 60px rgba(30, 155, 255, .26);
       transform: rotate(-18deg);
     }
-    .hero h2 { position: relative; margin: 0; font-size: 42px; line-height: 1.06; letter-spacing: 0; max-width: 520px; }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 126px minmax(0, 1fr);
+      gap: 24px;
+      align-items: center;
+    }
+    .hero-logo {
+      width: 126px;
+      height: 126px;
+      border-radius: 34px;
+      object-fit: cover;
+      filter: drop-shadow(0 28px 40px rgba(30, 155, 255, .28));
+    }
+    .hero h2 { position: relative; margin: 0; font-size: clamp(34px, 3.2vw, 48px); line-height: 1.04; letter-spacing: 0; max-width: 520px; }
     .hero h2 span { color: var(--cyan); }
     .hero p { position: relative; color: #c4d6ef; max-width: 470px; margin: 16px 0 0; line-height: 1.6; }
     .chips { display: flex; gap: 10px; margin-top: 22px; position: relative; }
     .chip { border: 1px solid var(--line-soft); border-radius: 999px; padding: 8px 12px; color: #dbeafe; background: rgba(5, 16, 30, .65); font-size: 13px; }
+    .hero-visual {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      min-height: 170px;
+      display: grid;
+      place-items: center;
+    }
+    .hero-orbit {
+      width: min(340px, 100%);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 18px solid rgba(30, 155, 255, .22);
+      display: grid;
+      place-items: center;
+      box-shadow: inset 0 0 0 28px rgba(46, 232, 255, .06), 0 26px 70px rgba(30, 155, 255, .22);
+    }
+    .hero-cube {
+      width: 84px;
+      height: 84px;
+      border-radius: 20px;
+      background: linear-gradient(145deg, #2ee8ff, #1e67ff 62%, #0d2254);
+      transform: rotate(45deg);
+      box-shadow: 0 20px 48px rgba(30, 155, 255, .42);
+    }
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(230px, .95fr) minmax(330px, 1.18fr) minmax(280px, 1.05fr);
+      grid-template-rows: minmax(0, 1fr) minmax(0, .92fr);
+      gap: 14px;
+      min-height: 0;
+    }
     .grid { display: grid; grid-template-columns: 1.05fr 1.25fr 1fr; gap: 14px; margin-top: 14px; }
     .panel {
       border: 1px solid var(--line);
       border-radius: 14px;
       background: linear-gradient(180deg, rgba(9, 24, 43, .92), rgba(5, 13, 26, .92));
       padding: 18px;
-      min-height: 172px;
+      min-height: 0;
+      overflow: hidden;
     }
     .panel h3 { margin: 0 0 14px; font-size: 16px; }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .panel-head h3 { margin: 0; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(47, 210, 125, .28);
+      border-radius: 999px;
+      padding: 7px 10px;
+      color: #bdf8d8;
+      background: rgba(47, 210, 125, .11);
+      font-size: 13px;
+      white-space: nowrap;
+    }
     .status-ring {
       width: 88px;
       height: 88px;
@@ -352,6 +478,11 @@ function html() {
     .status-ring:after { content: ""; width: 62px; height: 62px; background: var(--panel); border-radius: 50%; }
     .status-ring i { position: absolute; width: 22px; height: 22px; background: var(--blue); border-radius: 6px; z-index: 1; }
     .center { text-align: center; }
+    .status-card {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      align-items: center;
+    }
     .muted { color: var(--muted); }
     .progress-list { display: grid; gap: 12px; }
     .row { display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: center; color: #dceaff; font-size: 14px; }
@@ -360,6 +491,34 @@ function html() {
     .points { display: grid; place-items: center; text-align: center; min-height: 130px; }
     .points strong { font-size: 34px; }
     .points span { color: var(--muted); }
+    .overview-card {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    .coin-mark {
+      width: 54px;
+      height: 54px;
+      margin: 4px auto 10px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #ffd36a, #f4a629);
+      box-shadow: inset 0 -10px 0 rgba(158, 88, 10, .24), 0 16px 34px rgba(247, 200, 92, .2);
+    }
+    .mini-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      margin-top: 16px;
+    }
+    .mini-stat {
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      padding: 12px;
+      background: rgba(14, 31, 54, .72);
+      text-align: center;
+    }
+    .mini-stat strong { font-size: 15px; }
+    .mini-stat span { display: block; margin-top: 4px; font-size: 12px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
     .account { display: flex; align-items: center; gap: 14px; }
     .avatar { width: 54px; height: 54px; border-radius: 18px; display: grid; place-items: center; background: linear-gradient(145deg, #1d4ed8, #2ee8ff); font-weight: 800; }
@@ -373,6 +532,41 @@ function html() {
       border: 1px solid var(--line-soft);
       border-radius: 10px;
       background: rgba(14, 31, 54, .78);
+    }
+    .quick-actions {
+      display: grid;
+      gap: 10px;
+    }
+    .quick-action {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 14px;
+      padding: 14px;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: rgba(14, 31, 54, .78);
+      color: #eaf4ff;
+      text-align: left;
+      font-weight: 700;
+    }
+    .quick-action small {
+      display: block;
+      color: var(--muted);
+      font-weight: 500;
+      margin-top: 3px;
+    }
+    .quick-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+      background: rgba(30, 155, 255, .12);
+      border: 1px solid rgba(46, 232, 255, .24);
+      flex: 0 0 auto;
     }
     .controls {
       display: grid;
@@ -405,36 +599,91 @@ function html() {
     form { display: flex; gap: 10px; margin-top: 12px; }
     input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: rgba(2, 8, 18, .68); color: white; }
     button { border: 0; border-radius: 10px; background: linear-gradient(135deg, var(--blue), #4f7cff); color: white; padding: 12px 14px; font-weight: 800; cursor: pointer; }
+    .app-footer {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      align-items: center;
+      gap: 22px;
+      color: #b9cae7;
+      font-size: 13px;
+      min-height: 0;
+    }
+    .footer-status {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    @media (max-width: 1240px) {
+      main { overflow: auto; grid-template-rows: auto auto auto; }
+      .hero { grid-template-columns: 1fr; }
+      .hero-visual { display: none; }
+      .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; }
+    }
     @media (max-width: 980px) {
       .shell { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 32px); }
       aside { display: none; }
-      .grid, .two { grid-template-columns: 1fr; }
+      main { min-height: 100vh; overflow: auto; grid-template-rows: auto auto auto; }
+      .hero { grid-template-columns: 1fr; }
+      .hero-content { grid-template-columns: 86px 1fr; }
+      .hero-logo { width: 86px; height: 86px; border-radius: 24px; }
+      .hero-visual { display: none; }
+      .grid, .two, .dashboard-grid { grid-template-columns: 1fr; grid-template-rows: none; }
       .hero h2 { font-size: 34px; }
+      .app-footer { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <div class="shell">
     <aside>
-      <div class="brand"><div class="bot-mark"></div><div><h1>Rewards Bot</h1><p>with Core Plugin</p></div></div>
-      <nav><div class="active"><span class="dot"></span>Dashboard</div><div><span class="dot"></span>Accounts</div><div><span class="dot"></span>Activity</div><div><span class="dot"></span>Settings</div></nav>
+      <div class="brand"><img class="brand-logo" src="/app-icon.png" alt=""><div><h1>Rewards Bot</h1><p>with Core Plugin</p></div></div>
+      <nav>
+        <div class="active"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9 20v-5h6v5"></path></svg></span>Dashboard</div>
+        <div><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c1.8-4 13.2-4 15 0"></path></svg></span>Accounts</div>
+        <div><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 18 9 12l4 3 7-9"></path><path d="M17 6h3v3"></path></svg></span>Activity</div>
+        <div><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 3v3"></path><path d="M12 18v3"></path><path d="M4.8 6.8 7 9"></path><path d="m17 15 2.2 2.2"></path><path d="M3 12h3"></path><path d="M18 12h3"></path><circle cx="12" cy="12" r="3"></circle></svg></span>Settings</div>
+        <div><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M5 20V10"></path><path d="M12 20V4"></path><path d="M19 20v-7"></path></svg></span>Statistics</div>
+        <div><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg></span>About</div>
+      </nav>
       <div class="side-card"><strong>Core Plugin</strong><span id="side-core">Checking</span></div>
     </aside>
     <main>
       <section class="hero">
-        <h2>Automate more.<br><span>Earn more.</span></h2>
-        <p>The open-source Microsoft Rewards bot, presented as a clean desktop experience for everyday users.</p>
-        <div class="chips"><div class="chip">Open Source</div><div class="chip">Powered by Core</div><div class="chip" id="hero-status">Starting</div></div>
+        <div class="hero-content">
+          <img class="hero-logo" src="/app-icon.png" alt="">
+          <div>
+            <h2>Automate more.<br><span>Earn more.</span></h2>
+            <p>The open-source Microsoft Rewards bot that goes further with Core.</p>
+            <div class="chips"><div class="chip">Open Source</div><div class="chip">Powered by Core</div><div class="chip" id="hero-status">Starting</div></div>
+          </div>
+        </div>
+        <div class="hero-visual"><div class="hero-orbit"><div class="hero-cube"></div></div></div>
       </section>
-      <section class="grid">
-        <div class="panel center"><h3>Bot Status</h3><div class="status-ring" id="ring" style="--progress:6"><i></i></div><strong id="status">Starting</strong><p class="muted" id="detail">Preparing the run</p><span class="pill" id="run-pill">Launching</span></div>
-        <div class="panel"><h3>Today's Progress</h3><div class="progress-list"><div class="row"><span>Search points</span><div class="bar"><span id="search-bar" style="width:40%"></span></div><b id="points">-</b></div><div class="row"><span>Daily set</span><div class="bar"><span style="width:100%"></span></div><b>Ready</b></div><div class="row"><span>Coupons</span><div class="bar"><span id="coupon-bar" style="width:15%"></span></div><b id="coupons">-</b></div></div></div>
-        <div class="panel points"><div><strong id="core">Checking</strong><br><span>Core status</span><div class="controls"><button id="start-run">Start Run</button><button class="secondary" id="stop-run">Stop</button></div></div></div>
-      </section>
-      <section class="two">
+      <section class="dashboard-grid">
+        <div class="panel center status-card">
+          <div class="panel-head"><h3>Bot Status</h3><span class="status-badge" id="run-pill">Launching</span></div>
+          <div><div class="status-ring" id="ring" style="--progress:6"><i></i></div><strong id="status">Starting</strong><p class="muted" id="detail">Preparing the run</p></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Today's Progress</h3><strong id="points">-</strong></div>
+          <div class="progress-list">
+            <div class="row"><span>Search points</span><div class="bar"><span id="search-bar" style="width:40%"></span></div><b>Auto</b></div>
+            <div class="row"><span>Daily set</span><div class="bar"><span style="width:100%"></span></div><b>Ready</b></div>
+            <div class="row"><span>PC search</span><div class="bar"><span style="width:65%"></span></div><b>Queue</b></div>
+            <div class="row"><span>Mobile search</span><div class="bar"><span style="width:65%"></span></div><b>Queue</b></div>
+            <div class="row"><span>Coupons</span><div class="bar"><span id="coupon-bar" style="width:15%"></span></div><b id="coupons">-</b></div>
+          </div>
+        </div>
+        <div class="panel overview-card">
+          <div class="panel-head"><h3>Points Overview</h3></div>
+          <div class="points"><div><div class="coin-mark"></div><strong id="core">Checking</strong><br><span>Core status</span></div></div>
+          <div class="mini-stats"><div class="mini-stat"><strong id="points-copy">-</strong><span>Claimed this run</span></div><div class="mini-stat"><strong id="coupons-copy">-</strong><span>Coupons</span></div></div>
+        </div>
         <div class="panel"><h3>Active Account</h3><div class="account"><div class="avatar" id="avatar">A1</div><div><strong id="account">No account loaded</strong><p class="muted" id="account-state">Waiting</p></div></div><form id="input-form"><input id="input" autocomplete="off" placeholder="License key or empty response"><button>Continue</button></form></div>
-        <div class="panel"><h3>Recent Activity</h3><div class="activity" id="logs"></div></div>
+        <div class="panel"><div class="panel-head"><h3>Recent Activity</h3><span class="muted">Live</span></div><div class="activity" id="logs"></div></div>
+        <div class="panel"><h3>Quick Actions</h3><div class="quick-actions"><button class="quick-action" id="start-run"><span class="quick-icon">&#9654;</span><span>Run daily set now<small>Start the rewards run</small></span></button><button class="quick-action secondary" id="stop-run"><span class="quick-icon">&#9632;</span><span>Stop safely<small>Stop the current bot process</small></span></button></div></div>
       </section>
+      <footer class="app-footer"><div class="footer-status"><span class="dot"></span><span id="footer-status">Bot starting</span></div><span>Next run from scheduler</span><span>Version 4.0.26</span><span>Built with Core</span></footer>
     </main>
   </div>
   <script>
@@ -446,7 +695,9 @@ function html() {
       runPill: byId('run-pill'),
       core: byId('core'),
       points: byId('points'),
+      pointsCopy: byId('points-copy'),
       coupons: byId('coupons'),
+      couponsCopy: byId('coupons-copy'),
       account: byId('account'),
       avatar: byId('avatar'),
       input: byId('input'),
@@ -456,6 +707,7 @@ function html() {
       searchBar: byId('search-bar'),
       couponBar: byId('coupon-bar'),
       accountState: byId('account-state'),
+      footerStatus: byId('footer-status'),
       startRun: byId('start-run'),
       stopRun: byId('stop-run')
     };
@@ -468,11 +720,14 @@ function html() {
         ui.core.textContent = data.metrics.core || '-';
         ui.sideCore.textContent = data.metrics.core || '-';
         ui.points.textContent = data.metrics.points === null ? '-' : '+' + data.metrics.points;
+        ui.pointsCopy.textContent = data.metrics.points === null ? '-' : '+' + data.metrics.points;
         ui.coupons.textContent = data.metrics.coupons || '-';
+        ui.couponsCopy.textContent = data.metrics.coupons || '-';
         ui.ring.style.setProperty('--progress', data.metrics.progress || 6);
         ui.searchBar.style.width = Math.min(100, Math.max(12, data.metrics.progress || 6)) + '%';
         ui.couponBar.style.width = data.metrics.coupons ? '100%' : '15%';
         ui.runPill.textContent = data.isRunning ? 'Running' : 'Ready';
+        ui.footerStatus.textContent = data.isRunning ? 'Bot running' : 'Bot ' + String(data.status).toLowerCase();
         ui.startRun.disabled = data.isRunning;
         ui.stopRun.disabled = !data.isRunning;
         const active = data.activeAccount || (data.accounts[0] && data.accounts[0].email) || 'No account loaded';
@@ -506,6 +761,24 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/') {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
         res.end(html())
+        return
+    }
+    if (req.method === 'GET' && req.url === '/app-icon.png') {
+        serveAppIcon(res)
+        return
+    }
+    if (req.method === 'GET' && req.url === '/manifest.json') {
+        res.writeHead(200, { 'content-type': 'application/manifest+json' })
+        res.end(
+            JSON.stringify({
+                name: APP_TITLE,
+                short_name: APP_TITLE,
+                display: 'standalone',
+                background_color: '#040912',
+                theme_color: '#071425',
+                icons: [{ src: '/app-icon.png', sizes: '512x512', type: 'image/png' }]
+            })
+        )
         return
     }
     if (req.method === 'GET' && req.url === '/api/state') {
@@ -549,19 +822,33 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
     const address = server.address()
     const url = `http://127.0.0.1:${address.port}`
-    openAppWindow(url)
-    startBot()
+    if (process.env.MSRB_APP_NO_OPEN !== '1') openAppWindow(url)
+    if (process.env.MSRB_APP_NO_BOT !== '1') startBot()
 })
 
 function openAppWindow(url) {
     const browser = resolveAppBrowser()
     if (browser) {
+        const profileDir = path.join(os.tmpdir(), 'microsoft-rewards-bot-app')
         childProcess
-            .spawn(browser.command, [...browser.args, `--app=${url}`, '--window-size=1360,860'], {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true
-            })
+            .spawn(
+                browser.command,
+                [
+                    ...browser.args,
+                    `--app=${url}`,
+                    `--window-size=${APP_WINDOW_WIDTH},${APP_WINDOW_HEIGHT}`,
+                    '--start-maximized',
+                    '--no-first-run',
+                    '--disable-extensions',
+                    `--user-data-dir=${profileDir}`,
+                    process.platform === 'linux' ? '--class=RewardsBot' : ''
+                ].filter(Boolean),
+                {
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsHide: true
+                }
+            )
             .unref()
         return
     }
@@ -572,25 +859,40 @@ function openAppWindow(url) {
 function resolveAppBrowser() {
     if (process.env.MSRB_APP_BROWSER) return { command: process.env.MSRB_APP_BROWSER, args: [] }
 
+    const bundled = resolveBundledChromium()
+    if (bundled) return bundled
+
     const candidates =
         process.platform === 'win32'
             ? [
-                  path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-                  path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
                   path.join(process.env.ProgramFiles || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-                  path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe')
+                  path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+                  path.join(process.env.ProgramFiles || '', 'Chromium', 'Application', 'chrome.exe'),
+                  path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+                  path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe')
               ]
             : process.platform === 'darwin'
               ? [
-                    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
                     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-                    '/Applications/Chromium.app/Contents/MacOS/Chromium'
+                    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+                    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
                 ]
-              : ['microsoft-edge', 'google-chrome', 'chromium', 'chromium-browser']
+              : ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge']
 
     for (const candidate of candidates) {
         if (path.isAbsolute(candidate) && fs.existsSync(candidate)) return { command: candidate, args: [] }
         if (!path.isAbsolute(candidate) && commandExists(candidate)) return { command: candidate, args: [] }
+    }
+    return null
+}
+
+function resolveBundledChromium() {
+    try {
+        const { chromium } = require('patchright')
+        const executablePath = chromium.executablePath()
+        if (executablePath && fs.existsSync(executablePath)) return { command: executablePath, args: [] }
+    } catch {
+        return null
     }
     return null
 }

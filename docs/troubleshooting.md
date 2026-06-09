@@ -42,6 +42,8 @@ The interface can accept a Core license prompt or an empty response, but develop
 
 Docker, CI, and forced-headless launches stay in terminal mode automatically. Use `MSRB_NO_APP_WINDOW=1` if a desktop machine should also skip the app window.
 
+The app window first tries the bundled Chromium runtime used by the bot, then Chrome/Chromium, then Edge as a last desktop fallback. It uses the Rewards Bot logo as the page icon, but a browser-based app window can still show the browser's taskbar identity on some systems. A fully custom taskbar icon requires a packaged native shell.
+
 ## Development Version Gets Replaced
 
 Use `npm run dev` or pass `-dev`. Auto-update is skipped in development mode.
