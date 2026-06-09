@@ -26,7 +26,6 @@ Core adds the maintained premium layer for newer or faster-changing dashboard su
 - app rewards;
 - streak details;
 - streak protection sync;
-- redeem goal automation;
 - best-effort handling for temporary quest and punchcard pages under `/earn/quest/...`;
 - advanced side-panel automation;
 - final Discord/Ntfy run summaries with Core impact metrics;

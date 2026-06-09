@@ -13,7 +13,6 @@ export interface Config {
     proxy: ConfigProxy
     consoleLogFilter: LogFilter
     webhook: ConfigWebhook
-    redeemGoal?: ConfigRedeemGoal
     backgroundAgent?: ConfigBackgroundAgent
     terminal?: ConfigTerminal
     plugins?: ConfigPlugins
@@ -52,16 +51,6 @@ export interface ConfigPlugins {
     }
 }
 
-export interface ConfigRedeemGoal {
-    enabled: boolean
-    /** Full SKU URL, e.g. "https://rewards.bing.com/redeem/sku/000499012010" */
-    skuUrl: string
-    /** SKU option value to select in the dropdown, e.g. "000499012011" for 800 Robux */
-    skuOptionValue?: string
-    /** Redeem mode: "auto" = auto-redeem when enough points, "manual" = track goal only */
-    redeemMode: 'auto' | 'manual'
-}
-
 export type QueryEngine = 'google' | 'wikipedia' | 'reddit' | 'local'
 
 export interface ConfigSearchSettings {
@@ -93,7 +82,6 @@ export interface ConfigWorkers {
     doDailyCheckIn: boolean
     doReadToEarn: boolean
     doDailyStreak: boolean
-    doRedeemGoal: boolean
     doDashboardInfo: boolean
     doClaimPoints: boolean
     doApplyCoupons: boolean

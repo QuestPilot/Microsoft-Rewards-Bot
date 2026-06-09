@@ -5,17 +5,20 @@ const test = require('node:test')
 
 const root = path.join(__dirname, '..')
 
-test('public example config starts with Core-only workers disabled', () => {
+test('public example config starts with user-friendly Core-ready workers enabled', () => {
     const config = JSON.parse(fs.readFileSync(path.join(root, 'src/config.example.json'), 'utf8'))
 
-    assert.equal(config.workers.doAppPromotions, false)
-    assert.equal(config.workers.doDailyCheckIn, false)
-    assert.equal(config.workers.doReadToEarn, false)
-    assert.equal(config.workers.doDailyStreak, false)
-    assert.equal(config.workers.doRedeemGoal, false)
-    assert.equal(config.workers.doDashboardInfo, false)
-    assert.equal(config.workers.doClaimPoints, false)
-    assert.equal(config.workers.doApplyCoupons, false)
+    assert.equal(config.workers.doAppPromotions, true)
+    assert.equal(config.workers.doDailyCheckIn, true)
+    assert.equal(config.workers.doReadToEarn, true)
+    assert.equal(config.workers.doDailyStreak, true)
+    assert.equal(config.workers.doDashboardInfo, true)
+    assert.equal(config.workers.doClaimPoints, true)
+    assert.equal(config.workers.doApplyCoupons, true)
+    assert.equal(Object.hasOwn(config.workers, 'doRedeemGoal'), false)
+    assert.equal(Object.hasOwn(config, 'redeemGoal'), false)
+    assert.equal(Object.hasOwn(config, 'safetyAdvisory'), false)
+    assert.equal(config.terminal.enabled, false)
 })
 
 test('open-source premium fallbacks show concise Core hints', () => {

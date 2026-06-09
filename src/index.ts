@@ -805,11 +805,6 @@ export class MicrosoftRewardsBot {
                     await this.activities.syncStreakProtection(this.mainMobilePage, desiredEnabled)
                 }
 
-                // Redeem Goal: set auto-redeem goal if configured
-                if (this.config.workers.doRedeemGoal && this.config.redeemGoal?.enabled) {
-                    await this.activities.doRedeemGoal(this.mainMobilePage, this.config.redeemGoal)
-                }
-
                 const searchPoints = await this.browser.func.getSearchPoints()
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true)
 

@@ -11,11 +11,11 @@ import { StreakProtectionGate } from './tasks/browser/StreakProtectionGate'
 
 // Types
 import type { Promotion } from '../types/AppDashboardData'
-import type { ConfigRedeemGoal } from '../types/Config'
 import type { BasePromotion, DashboardData, FindClippyPromotion, PurplePromotionalItem } from '../types/DashboardData'
 import type {
     ApplyCouponsResult,
     ClaimPointsResult,
+    CoreRedeemGoalConfig,
     DailyStreakInfo,
     DashboardInfo,
     PremiumTaskMap,
@@ -109,7 +109,7 @@ export default class ActivityRunner {
         return null
     }
 
-    doRedeemGoal = async (page: Page, config: ConfigRedeemGoal): Promise<void> => {
+    doRedeemGoal = async (page: Page, config: CoreRedeemGoalConfig): Promise<void> => {
         if (this.premiumTasks.doRedeemGoal) {
             return this.premiumTasks.doRedeemGoal(page, config)
         }

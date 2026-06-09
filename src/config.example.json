@@ -9,16 +9,15 @@
         "doDailySet": true,
         "doSpecialPromotions": true,
         "doMorePromotions": true,
-        "doAppPromotions": false,
+        "doAppPromotions": true,
         "doDesktopSearch": true,
         "doMobileSearch": true,
-        "doDailyCheckIn": false,
-        "doReadToEarn": false,
-        "doDailyStreak": false,
-        "doRedeemGoal": false,
-        "doDashboardInfo": false,
-        "doClaimPoints": false,
-        "doApplyCoupons": false,
+        "doDailyCheckIn": true,
+        "doReadToEarn": true,
+        "doDailyStreak": true,
+        "doDashboardInfo": true,
+        "doClaimPoints": true,
+        "doApplyCoupons": true,
         "enforceCoreStreakProtectionGate": true
     },
     "searchOnBingLocalQueries": true,
@@ -75,19 +74,13 @@
             "includeCorePitch": true
         }
     },
-    "redeemGoal": {
-        "enabled": false,
-        "skuUrl": "",
-        "skuOptionValue": "",
-        "redeemMode": "auto"
-    },
     "backgroundAgent": {
         "enabled": true,
         "allowDashboardAutostart": true,
         "openConsole": true
     },
     "terminal": {
-        "enabled": true
+        "enabled": false
     },
     "scheduler": {
         "enabled": false,
@@ -98,11 +91,5 @@
             "min": "0min",
             "max": "30min"
         }
-    },
-    "safetyAdvisory": {
-        "enabled": true,
-        "url": "https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/safety-advisory.json",
-        "timeout": "10sec",
-        "blockedBehavior": "prompt"
     }
 }

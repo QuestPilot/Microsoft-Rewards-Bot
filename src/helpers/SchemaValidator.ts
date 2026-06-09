@@ -22,13 +22,6 @@ const DelaySchema = z.object({
 
 const QueryEngineSchema = z.enum(['google', 'wikipedia', 'reddit', 'local'])
 
-const RedeemGoalSchema = z.object({
-    enabled: z.boolean(),
-    skuUrl: z.string(),
-    skuOptionValue: z.string().optional(),
-    redeemMode: z.enum(['auto', 'manual'])
-})
-
 const BackgroundAgentSchema = z.object({
     enabled: z.boolean().default(true),
     allowDashboardAutostart: z.boolean().default(true),
@@ -100,10 +93,9 @@ export const ConfigSchema = z.object({
         doDailyCheckIn: z.boolean(),
         doReadToEarn: z.boolean(),
         doDailyStreak: z.boolean(),
-        doRedeemGoal: z.boolean(),
         doDashboardInfo: z.boolean(),
         doClaimPoints: z.boolean(),
-        doApplyCoupons: z.boolean().default(false),
+        doApplyCoupons: z.boolean().default(true),
         enforceCoreStreakProtectionGate: z.boolean().default(true)
     }),
     searchOnBingLocalQueries: z.boolean(),
@@ -123,7 +115,6 @@ export const ConfigSchema = z.object({
     }),
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
-    redeemGoal: RedeemGoalSchema.optional(),
     backgroundAgent: BackgroundAgentSchema.optional(),
     terminal: TerminalSchema.optional(),
     scheduler: SchedulerSchema.optional(),
