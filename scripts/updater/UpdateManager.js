@@ -1,4 +1,5 @@
 const childProcess = require('child_process')
+const crypto = require('crypto')
 const fs = require('fs')
 const https = require('https')
 const path = require('path')
@@ -75,6 +76,10 @@ const DEFAULT_OBSOLETE_PATHS = [
 ]
 
 const UPDATE_STRATEGIES = new Set(['auto', 'git', 'archive'])
+const UPDATE_LOCK_FILE = 'update.lock'
+const DEFAULT_UPDATE_LOCK_WAIT_MS = 2 * 60 * 1000
+const DEFAULT_UPDATE_LOCK_STALE_MS = 30 * 60 * 1000
+const UPDATE_LOCK_POLL_MS = 500
 
 function pathToPosix(relativePath) {
     return relativePath.replace(/\\/g, '/')
@@ -390,6 +395,25 @@ function color(code, value) {
     return `\u001b[${code}m${value}\u001b[0m`
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function positiveInteger(value, fallback) {
+    const parsed = Number.parseInt(String(value ?? ''), 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+}
+
+function isProcessAlive(pid) {
+    if (!Number.isInteger(pid) || pid <= 0) return false
+    try {
+        process.kill(pid, 0)
+        return true
+    } catch (error) {
+        return error?.code === 'EPERM'
+    }
+}
+
 class UpdateManager {
     constructor(options = {}) {
         this.root = options.root ?? path.resolve(__dirname, '..', '..')
@@ -418,41 +442,63 @@ class UpdateManager {
 
     async run(options = {}) {
         const env = options.env ?? process.env
-        const skip = this.shouldSkip(options.argv ?? process.argv, env)
+        const argv = options.argv ?? process.argv
+        const skip = this.shouldSkip(argv, env)
         if (skip.skip) {
             this.logger.log(`[UPDATER] Skipped (${skip.reason})`)
             return { status: 'skipped', reason: skip.reason }
         }
 
+        const force = this.shouldForceUpdate(options, env, argv)
         this.logger.log(`[UPDATER] Checking ${this.repo}#${this.branch}`)
 
         try {
             const remote = await this.fetchRemoteRelease()
             this.logRemote(remote)
 
-            if (!this.isNewer(remote.version)) {
+            const docker = this.isDocker()
+            const initialDecision = this.updateDecision(remote, force && !docker)
+
+            if (!initialDecision.apply) {
                 this.logger.log(`[UPDATER] Already up to date (${this.packageJson.version})`)
                 migrateUserFiles(this.root, this.logger)
                 return { status: 'current', remote }
             }
 
-            if (this.isDocker()) {
+            if (docker) {
                 this.logDockerUpdateAvailable(remote)
                 return { status: 'update-available', remote, docker: true }
             }
 
             if (options.dryRun || env.MSRB_UPDATE_DRY_RUN === '1' || env.MSRB_UPDATE_CHECK_ONLY === '1') {
-                this.logger.log(`[UPDATER] Check only: would update ${this.packageJson.version} -> ${remote.version}`)
-                return { status: 'update-available', remote, checkOnly: true }
+                const action = initialDecision.reason === 'forced' ? 'repair from' : 'update to'
+                this.logger.log(`[UPDATER] Check only: would ${action} ${remote.version}`)
+                return { status: 'update-available', remote, checkOnly: true, forced: initialDecision.reason === 'forced' }
             }
 
-            this.assertCompatibleNode(remote.packageJson)
-            const applyResult = await this.applyRelease(remote)
-            this.syncDependencies()
-            this.verifyAppliedRelease(remote)
-            this.packageJson = readJson(path.join(this.root, 'package.json'))
-            this.logger.log(`[UPDATER] Updated to ${remote.version} via ${applyResult.strategy}`)
-            return { status: 'updated', remote, strategy: applyResult.strategy }
+            return await this.withUpdateLock(async () => {
+                this.packageJson = readJson(path.join(this.root, 'package.json'))
+                const decision = this.updateDecision(remote, force)
+
+                if (!decision.apply) {
+                    this.logger.log(`[UPDATER] Already updated by another process (${this.packageJson.version})`)
+                    migrateUserFiles(this.root, this.logger)
+                    return { status: 'current', remote }
+                }
+
+                this.assertCompatibleNode(remote.packageJson)
+                const applyResult = await this.applyRelease(remote)
+                this.syncDependencies()
+                this.verifyAppliedRelease(remote)
+                this.packageJson = readJson(path.join(this.root, 'package.json'))
+                const forced = decision.reason === 'forced'
+                this.logger.log(
+                    forced
+                        ? `[UPDATER] Repaired ${remote.version} via ${applyResult.strategy}`
+                        : `[UPDATER] Updated to ${remote.version} via ${applyResult.strategy}`
+                )
+                return { status: 'updated', remote, strategy: applyResult.strategy, forced }
+            }, { env })
         } catch (error) {
             this.logger.warn(`[UPDATER] Update check failed: ${error.message}`)
             return { status: 'failed', error }
@@ -494,6 +540,26 @@ class UpdateManager {
         return semver.gt(remoteVersion, this.packageJson.version)
     }
 
+    updateDecision(remote, force = false) {
+        const semver = require('semver')
+        if (semver.gt(remote.version, this.packageJson.version)) {
+            return { apply: true, reason: 'newer' }
+        }
+        if (force && semver.eq(remote.version, this.packageJson.version)) {
+            return { apply: true, reason: 'forced' }
+        }
+        return { apply: false, reason: 'current' }
+    }
+
+    shouldForceUpdate(options = {}, env = process.env, argv = process.argv) {
+        return (
+            options.force === true ||
+            env.MSRB_UPDATE_FORCE === '1' ||
+            argv.includes('--force-update') ||
+            argv.includes('--repair-update')
+        )
+    }
+
     assertCompatibleNode(packageJson) {
         const range = packageJson?.engines?.node
         if (!range) return
@@ -532,6 +598,90 @@ class UpdateManager {
             throw new Error(`Unsupported MSRB_UPDATE_STRATEGY=${strategy}. Use auto, git, or archive.`)
         }
         return strategy
+    }
+
+    async withUpdateLock(callback, options = {}) {
+        const lock = await this.acquireUpdateLock(options)
+        if (!lock.acquired) {
+            const owner = lock.lock?.pid ? `pid ${lock.lock.pid}` : 'another process'
+            this.logger.warn(`[UPDATER] Update lock is still active (${owner}); continuing with the local version.`)
+            return { status: 'skipped', reason: 'update lock active' }
+        }
+
+        try {
+            return await callback()
+        } finally {
+            this.releaseUpdateLock(lock)
+        }
+    }
+
+    async acquireUpdateLock(options = {}) {
+        const env = options.env ?? process.env
+        const waitMs = positiveInteger(options.waitMs ?? env.MSRB_UPDATE_LOCK_WAIT_MS, DEFAULT_UPDATE_LOCK_WAIT_MS)
+        const staleMs = positiveInteger(options.staleMs ?? env.MSRB_UPDATE_LOCK_STALE_MS, DEFAULT_UPDATE_LOCK_STALE_MS)
+        const startedAt = Date.now()
+        const token = crypto.randomUUID()
+        const lockPath = this.updateLockPath()
+
+        mkdirp(this.updatesDir)
+
+        while (true) {
+            try {
+                const lock = {
+                    version: 1,
+                    token,
+                    pid: process.pid,
+                    cwd: this.root,
+                    createdAt: new Date().toISOString()
+                }
+                fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`, { flag: 'wx' })
+                return { acquired: true, lock, path: lockPath }
+            } catch (error) {
+                if (error.code !== 'EEXIST') throw error
+            }
+
+            const lock = this.readUpdateLock()
+            if (this.isUpdateLockStale(lock, staleMs)) {
+                fs.rmSync(lockPath, { force: true })
+                continue
+            }
+
+            if (Date.now() - startedAt >= waitMs) {
+                return { acquired: false, lock, path: lockPath }
+            }
+
+            await sleep(Math.min(UPDATE_LOCK_POLL_MS, Math.max(0, waitMs - (Date.now() - startedAt))))
+        }
+    }
+
+    releaseUpdateLock(lockHandle) {
+        if (!lockHandle?.acquired) return
+        const current = this.readUpdateLock()
+        if (current?.token !== lockHandle.lock?.token) return
+        fs.rmSync(lockHandle.path || this.updateLockPath(), { force: true })
+    }
+
+    readUpdateLock() {
+        try {
+            return JSON.parse(fs.readFileSync(this.updateLockPath(), 'utf8'))
+        } catch {
+            return null
+        }
+    }
+
+    isUpdateLockStale(lock, staleMs = DEFAULT_UPDATE_LOCK_STALE_MS) {
+        if (!lock || typeof lock !== 'object') return true
+        if (lock.cwd && path.resolve(String(lock.cwd)) !== path.resolve(this.root)) return true
+
+        const createdAt = Date.parse(String(lock.createdAt || ''))
+        const ageMs = Number.isFinite(createdAt) ? Date.now() - createdAt : Infinity
+        if (ageMs > staleMs) return true
+
+        return !isProcessAlive(Number(lock.pid))
+    }
+
+    updateLockPath() {
+        return path.join(this.updatesDir, UPDATE_LOCK_FILE)
     }
 
     canUseGitUpdate() {

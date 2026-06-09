@@ -793,6 +793,21 @@ export class MicrosoftRewardsBot {
                 const searchPoints = await this.browser.func.getSearchPoints()
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true)
 
+                // Microsoft's Next.js dashboard no longer exposes the search-point counters,
+                // so missingSearchPoints reports 0 and the search manager would skip every
+                // search. When the counters are absent, schedule searches with an estimated
+                // target — the search task measures real gains from the balance and stops at
+                // Microsoft's daily cap, so the estimate only needs to be positive.
+                if (!this.browser.func.hasSearchCounters(searchPoints)) {
+                    missingSearchPoints.mobilePoints = missingSearchPoints.mobilePoints || 90
+                    missingSearchPoints.desktopPoints = missingSearchPoints.desktopPoints || 90
+                    this.logger.warn(
+                        'main',
+                        'POINTS',
+                        'Search counters unavailable — scheduling searches with estimated targets (real gains measured by balance)'
+                    )
+                }
+
                 this.cookies.mobile = await initialContext.cookies()
 
                 const { mobilePoints, desktopPoints } = await this.searchManager.doSearches(

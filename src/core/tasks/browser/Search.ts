@@ -65,6 +65,15 @@ export class Search extends TaskBase {
             await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
             await this.bot.browser.utils.tryDismissAllMessages(page)
 
+            // When Microsoft serves the Next.js dashboard, the legacy search-point
+            // counters are absent, so missingSearchPoints() reports 0 and the
+            // counter-driven loop below would stop after a single search. Detect
+            // that case and fall back to a balance-driven, count-based search run
+            // (the available-points balance is still recoverable from the HTML).
+            if (!this.bot.browser.func.hasSearchCounters(searchCounters)) {
+                return await this.runCountBasedSearch(page, queries, queryCore, langCode, locale, isMobile, startBalance)
+            }
+
             let stagnantLoop = 0
             const stagnantLoopMax = 10
 
@@ -260,6 +269,109 @@ export class Search extends TaskBase {
                 `Error in doSearch | message=${error instanceof Error ? error.message : String(error)}`
             )
             return totalGainedPoints
+        }
+    }
+
+    /**
+     * Fallback search runner used when Microsoft no longer exposes the search-point
+     * counters (Next.js dashboard migration). Progress can't be read from counters,
+     * so we measure real gains from the available-points balance and keep searching
+     * until Microsoft stops awarding points (the daily cap) or a safety cap is hit.
+     */
+    private async runCountBasedSearch(
+        page: Page,
+        queries: string[],
+        queryCore: QueryProvider,
+        langCode: string,
+        locale: string,
+        isMobile: boolean,
+        startBalance: number
+    ): Promise<number> {
+        // Safety cap kept well above Microsoft's daily search allowance so the
+        // natural stop is the balance plateau, not this number.
+        const maxSearches = isMobile ? 25 : 40
+        // Stop once the balance hasn't moved for this many consecutive searches.
+        const plateauLimit = 8
+
+        let totalGainedPoints = 0
+        let plateau = 0
+        let pool = [...queries]
+        let prevBalance = await this.safeGetBalance(startBalance)
+
+        this.bot.logger.warn(
+            isMobile,
+            'SEARCH-BING',
+            `Search point counters unavailable (Microsoft dashboard migration) — running count-based fallback | maxSearches=${maxSearches} | startBalance=${prevBalance}`
+        )
+
+        for (let i = 0; i < maxSearches; i++) {
+            if (i >= pool.length) {
+                const extra = await queryCore.queryManager({
+                    shuffle: true,
+                    related: true,
+                    langCode,
+                    geoLocale: locale,
+                    sourceOrder: this.bot.config.searchSettings.queryEngines
+                })
+                pool = [...new Set([...pool, ...extra].map(q => q.trim()).filter(Boolean))]
+                if (i >= pool.length) break // no more queries available
+            }
+
+            const query = pool[i] as string
+
+            await this.bingSearch(page, query, isMobile)
+
+            const newBalance = await this.safeGetBalance(prevBalance)
+            const gainedPoints = Math.max(0, newBalance - prevBalance)
+
+            if (gainedPoints > 0) {
+                plateau = 0
+                prevBalance = newBalance
+                totalGainedPoints += gainedPoints
+                this.bot.userData.currentPoints = newBalance
+                this.bot.userData.gainedPoints = (this.bot.userData.gainedPoints ?? 0) + gainedPoints
+
+                this.bot.logger.info(
+                    isMobile,
+                    'SEARCH-BING',
+                    `gainedPoints=${gainedPoints} | query="${query}" | balance=${newBalance} | search ${i + 1}/${maxSearches}`,
+                    'green'
+                )
+            } else {
+                plateau++
+                this.bot.logger.info(
+                    isMobile,
+                    'SEARCH-BING',
+                    `No points gained ${plateau}/${plateauLimit} | query="${query}" | search ${i + 1}/${maxSearches}`
+                )
+
+                if (plateau >= plateauLimit) {
+                    this.bot.logger.info(
+                        isMobile,
+                        'SEARCH-BING',
+                        'Balance plateaued — assuming daily search cap reached, stopping fallback searches'
+                    )
+                    break
+                }
+            }
+        }
+
+        const finalBalance = Number(this.bot.userData.currentPoints ?? startBalance)
+        this.bot.logger.info(
+            isMobile,
+            'SEARCH-BING',
+            `Completed count-based searches | startBalance=${startBalance} | newBalance=${finalBalance} | gained=${totalGainedPoints}`
+        )
+
+        return totalGainedPoints
+    }
+
+    /** Read the current points balance, tolerating transient lookup failures. */
+    private async safeGetBalance(fallback: number): Promise<number> {
+        try {
+            return await this.bot.browser.func.getCurrentPoints()
+        } catch {
+            return fallback
         }
     }
 

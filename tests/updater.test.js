@@ -186,6 +186,80 @@ test('check-only reports update availability without applying', async () => {
     assert.equal(result.checkOnly, true)
 })
 
+test('force update re-applies the current remote version as a repair', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    let applied = false
+    updater.fetchRemoteRelease = async () => ({
+        version: '2.0.0',
+        commitSha: 'abc123456789',
+        branch: 'main',
+        repo: 'QuestPilot/Microsoft-Rewards-Bot',
+        packageJson: { version: '2.0.0' },
+        archiveUrl: 'https://example.test/archive.tgz',
+        checkedAt: new Date().toISOString()
+    })
+    updater.applyRelease = async () => {
+        applied = true
+        return { strategy: 'archive' }
+    }
+    updater.syncDependencies = () => {}
+
+    const result = await updater.run({ force: true })
+
+    assert.equal(applied, true)
+    assert.equal(result.status, 'updated')
+    assert.equal(result.forced, true)
+})
+
+test('active update lock prevents concurrent mutation', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    fs.mkdirSync(path.dirname(updater.updateLockPath()), { recursive: true })
+    fs.writeFileSync(
+        updater.updateLockPath(),
+        JSON.stringify({
+            version: 1,
+            token: 'active-lock',
+            pid: process.pid,
+            cwd: root,
+            createdAt: new Date().toISOString()
+        })
+    )
+
+    const lock = await updater.acquireUpdateLock({ waitMs: 10, staleMs: 60_000, env: {} })
+
+    assert.equal(lock.acquired, false)
+})
+
+test('stale update lock is removed and replaced', async () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    fs.mkdirSync(path.dirname(updater.updateLockPath()), { recursive: true })
+    fs.writeFileSync(
+        updater.updateLockPath(),
+        JSON.stringify({
+            version: 1,
+            token: 'stale-lock',
+            pid: process.pid,
+            cwd: root,
+            createdAt: new Date(Date.now() - 60_000).toISOString()
+        })
+    )
+
+    const lock = await updater.acquireUpdateLock({ waitMs: 10, staleMs: 1, env: {} })
+
+    try {
+        assert.equal(lock.acquired, true)
+        assert.notEqual(lock.lock.token, 'stale-lock')
+    } finally {
+        updater.releaseUpdateLock(lock)
+    }
+})
+
 test('updater refuses to report updated when local package version did not change', async () => {
     const root = tempRoot()
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))

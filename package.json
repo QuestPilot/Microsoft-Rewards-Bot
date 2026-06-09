@@ -26,6 +26,7 @@
         "prets-start": "node ./scripts/check-node-version.js",
         "update:doctor": "node ./scripts/update-doctor.js",
         "update:check": "node ./scripts/update-check.js --dry-run",
+        "update:repair": "node ./scripts/update-check.js --force",
         "core:release-check": "node ./scripts/check-core-release-artifact.js",
         "ts-start": "ts-node ./src/index.ts",
         "predev": "node ./scripts/check-node-version.js",
@@ -41,6 +42,7 @@
         "plugins": "node ./scripts/plugins-marketplace.js",
         "analyze:pages": "node ./scripts/rewards-page-analyzer.js",
         "diagnostics:dashboard:live": "node ./scripts/dashboard-live-diagnostics.js",
+        "capture:pages": "node ./scripts/capture-rewards-pages.js",
         "test": "node --test",
         "test:dashboard:mock": "npm run build && node -e \"process.env.MSRB_DASHBOARD_MOCK_TEST='1'; require('child_process').execFileSync(process.execPath, ['--test', 'tests/rewards-side-panel.test.js'], { stdio: 'inherit', env: process.env })\""
     },

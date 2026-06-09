@@ -15,6 +15,15 @@ import { URLS } from './DashboardSelectors'
 export default class PageController {
     private bot: MicrosoftRewardsBot
 
+    /**
+     * Once the legacy JSON dashboard API (`/api/getuserinfo`) fails, Microsoft has
+     * almost certainly migrated the account to the Next.js dashboard for this session.
+     * Re-hitting the dead endpoint on every points lookup wastes axios retries and
+     * floods the logs with identical warnings, so we remember the outage and route
+     * straight to the HTML dashboard for the remainder of the run.
+     */
+    private dashboardApiUnavailable = false
+
     constructor(bot: MicrosoftRewardsBot) {
         this.bot = bot
     }
@@ -30,66 +39,83 @@ export default class PageController {
      * @returns {DashboardData} Object of user bing rewards dashboard data
      */
     async getDashboardData(): Promise<DashboardData> {
-        try {
-            const request: AxiosRequestConfig = {
-                url: URLS.dashboardApi,
-                method: 'GET',
-                timeout: 15_000,
-                'axios-retry': { retries: 2 },
-                headers: {
-                    ...(this.bot.fingerprint?.headers ?? {}),
-                    Cookie: this.buildCookieHeader(this.bot.cookies.mobile, [
-                        'bing.com',
-                        'live.com',
-                        'microsoftonline.com'
-                    ]),
-                    Referer: 'https://rewards.bing.com/',
-                    Origin: 'https://rewards.bing.com'
-                }
-            } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
-
-            const response = await this.bot.axios.request(request)
-
-            if (response.data?.dashboard) {
-                return response.data.dashboard as DashboardData
-            }
-            throw new Error('Dashboard data missing from API response')
-        } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'API failed, trying HTML fallback')
-
+        // Skip the legacy JSON API entirely once it has failed this session (Next.js migration).
+        if (!this.dashboardApiUnavailable) {
             try {
                 const request: AxiosRequestConfig = {
-                    url: this.bot.config.baseURL,
+                    url: URLS.dashboardApi,
                     method: 'GET',
                     timeout: 15_000,
                     'axios-retry': { retries: 2 },
                     headers: {
                         ...(this.bot.fingerprint?.headers ?? {}),
-                        Cookie: this.buildCookieHeader(this.bot.cookies.mobile),
+                        Cookie: this.buildCookieHeader(this.bot.cookies.mobile, [
+                            'bing.com',
+                            'live.com',
+                            'microsoftonline.com'
+                        ]),
                         Referer: 'https://rewards.bing.com/',
                         Origin: 'https://rewards.bing.com'
                     }
                 } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
 
                 const response = await this.bot.axios.request(request)
-                return this.parseDashboardHtml(String(response.data))
+
+                if (response.data?.dashboard) {
+                    return response.data.dashboard as DashboardData
+                }
+                throw new Error('Dashboard data missing from API response')
             } catch {
+                this.dashboardApiUnavailable = true
                 this.bot.logger.warn(
                     this.bot.isMobile,
                     'GET-DASHBOARD-DATA',
-                    'HTML fallback failed, trying browser session fallback'
+                    'Direct JSON API unavailable (account migrated to Next.js dashboard) — using HTML parser for the rest of this session'
                 )
             }
+        }
 
-            try {
-                const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
-                await page.goto(this.bot.config.baseURL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
-                const html = await page.content()
-                return this.parseDashboardHtml(html)
-            } catch (fallbackError) {
-                this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data')
-                throw fallbackError
-            }
+        return this.getDashboardDataFromHtml()
+    }
+
+    /**
+     * Recover dashboard data without the legacy JSON API: first by fetching the
+     * dashboard HTML over axios, then (if that fails) by reading the already-open
+     * browser page. Both paths feed {@link parseDashboardHtml}.
+     */
+    private async getDashboardDataFromHtml(): Promise<DashboardData> {
+        try {
+            const request: AxiosRequestConfig = {
+                url: this.bot.config.baseURL,
+                method: 'GET',
+                timeout: 15_000,
+                'axios-retry': { retries: 2 },
+                headers: {
+                    ...(this.bot.fingerprint?.headers ?? {}),
+                    Cookie: this.buildCookieHeader(this.bot.cookies.mobile),
+                    Referer: 'https://rewards.bing.com/',
+                    Origin: 'https://rewards.bing.com'
+                }
+            } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
+
+            const response = await this.bot.axios.request(request)
+            return this.parseDashboardHtml(String(response.data))
+        } catch {
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'GET-DASHBOARD-DATA',
+                'HTML fetch failed, trying browser session fallback'
+            )
+        }
+
+        try {
+            const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
+            await page.goto(this.bot.config.baseURL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
+            const html = await page.content()
+            return this.parseDashboardHtml(html)
+        } catch (fallbackError) {
+            this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data')
+            throw fallbackError
         }
     }
 
@@ -533,6 +559,15 @@ export default class PageController {
     }
 
     /**
+     * Whether the dashboard actually exposed usable search-point counters.
+     * Microsoft's Next.js dashboard omits them; when this returns false, callers
+     * fall back to a balance-driven search run instead of the counter-delta logic.
+     */
+    hasSearchCounters(counters: Counters): boolean {
+        return (counters.pcSearch?.length ?? 0) > 0 || (counters.mobileSearch?.length ?? 0) > 0
+    }
+
+    /**
      * Get total earnable points with web browser
      */
     async getBrowserEarnablePoints(): Promise<BrowserEarnablePoints> {
@@ -602,7 +637,12 @@ export default class PageController {
                 return { readToEarn: 0, checkIn: 0, totalEarnablePoints: 0 }
             }
 
-            const eligibleOffers = ['ENUS_readarticle3_30points', 'Gamification_Sapphire_DailyCheckIn']
+            // Match by promotion `type` rather than a hardcoded offerid. The
+            // read-to-earn offerid is locale-prefixed (e.g. ENUS_/FRFR_), so an
+            // offerid allowlist silently excluded every non-US account. The loop
+            // below already discriminates by `attrs.type`, making this the safe,
+            // locale-agnostic source of truth.
+            const eligibleTypes = ['msnreadearn', 'checkin']
 
             const request: AxiosRequestConfig = {
                 url: 'https://prod.rewardsplatform.microsoft.com/dapi/me?channel=SAAndroid&options=613',
@@ -618,7 +658,7 @@ export default class PageController {
             const response = await this.bot.axios.request(request)
             const userData: AppUserData = response.data
             const eligibleActivities = userData.response.promotions.filter(x =>
-                eligibleOffers.includes(x.attributes.offerid ?? '')
+                eligibleTypes.includes(x.attributes?.type ?? '')
             )
 
             let readToEarn = 0

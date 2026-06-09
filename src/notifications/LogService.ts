@@ -22,7 +22,31 @@ function platformText(platform: Platform): DashboardPlatform {
 }
 
 function platformBadge(platform: Platform): string {
-    return platform === 'main' ? chalk.bgCyan('MAIN') : platform ? chalk.bgBlue('MOBILE') : chalk.bgMagenta('DESKTOP')
+    let name = ''
+    let colorFn = chalk.cyan
+    if (platform === 'main') {
+        name = 'SYSTEM '
+        colorFn = chalk.cyan
+    } else if (platform) {
+        name = 'MOBILE '
+        colorFn = chalk.blue
+    } else {
+        name = 'DESKTOP'
+        colorFn = chalk.magenta
+    }
+    return `${chalk.gray('[')}${colorFn(name)}${chalk.gray(']')}`
+}
+
+function formatTimestamp(): string {
+    const now = new Date()
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    const yyyy = now.getFullYear()
+    const mm = pad(now.getMonth() + 1)
+    const dd = pad(now.getDate())
+    const hh = pad(now.getHours())
+    const min = pad(now.getMinutes())
+    const ss = pad(now.getSeconds())
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`
 }
 
 function getColorFn(color?: ColorKey): ChalkFn | null {
@@ -71,7 +95,7 @@ export class LogService {
         message: string | Error,
         color?: ColorKey
     ): void {
-        const now = new Date().toLocaleString()
+        const now = formatTimestamp()
         const formatted = formatMessage(message)
 
         const userName = this.bot.userData.userName ? this.bot.userData.userName : 'MAIN'
@@ -95,7 +119,6 @@ export class LogService {
         })
 
         const badge = platformBadge(isMobile)
-        const consoleStr = `[${now}] [${userName}] [${levelTag}] ${badge} [${title}] ${formatted}`
 
         let logColor: ColorKey | undefined = color
 
@@ -115,6 +138,35 @@ export class LogService {
             }
         }
 
+        // Format console output beautifully
+        const timeStr = chalk.gray(`[${now}]`)
+        const userStr = `${chalk.gray('[')}${chalk.cyan(userName)}${chalk.gray(']')}`
+        
+        let levelStr = ''
+        switch (level) {
+            case 'info':
+                levelStr = chalk.bold.green('INFO ')
+                break
+            case 'warn':
+                levelStr = chalk.bold.yellow('WARN ')
+                break
+            case 'error':
+                levelStr = chalk.bold.red('ERROR')
+                break
+            case 'debug':
+                levelStr = chalk.bold.magenta('DEBUG')
+                break
+        }
+        levelStr = `${chalk.gray('[')}${levelStr}${chalk.gray(']')}`
+
+        const titleStr = `${chalk.gray('[')}${chalk.bold.white(title)}${chalk.gray(']')}`
+        const platformStr = badge
+        
+        const colorFn = getColorFn(logColor)
+        const msgStr = colorFn ? colorFn(formatted) : formatted
+
+        const consoleStr = `${timeStr} ${userStr} ${levelStr} ${platformStr} ${titleStr} ${msgStr}`
+
         if (level === 'error' && config.errorDiagnostics) {
             const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
             const error = message instanceof Error ? message : new Error(String(message))
@@ -125,7 +177,7 @@ export class LogService {
         const webhookAllowed = this.shouldPassFilter(config.webhook.webhookLogFilter, level, cleanMsg)
 
         if (consoleAllowed) {
-            consoleOut(level, consoleStr, getColorFn(logColor))
+            consoleOut(level, consoleStr, null)
         }
 
         if (!webhookAllowed) {

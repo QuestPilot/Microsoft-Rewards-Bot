@@ -89,18 +89,18 @@ Use this README as the front door, then jump directly into the page that matches
 
 | Goal | Documentation Link |
 | --- | --- |
-| **Install, update, or understand `npm start**` | 📁 [Install and Auto-Updates](https://www.google.com/search?q=docs/updates.md) |
-| **Run the bot inside an isolated container** | 🐳 [Docker Deployment](https://www.google.com/search?q=docs/docker.md) |
-| **Verify or upgrade the Node.js runtime** | 🟢 [Node.js Version Reference](https://www.google.com/search?q=docs/node-version.md) |
-| **Enable, disable, or inspect running plugins** | 🔌 [Plugin System Overview](https://www.google.com/search?q=docs/plugins.md) |
-| **Build a public or private plugin** | 🛠️ [Create a Plugin](https://www.google.com/search?q=docs/create-plugin.md) & [Plugin API Reference](https://www.google.com/search?q=docs/plugin-api.md) |
-| **Understand the premium core plugin features** | 💎 [Official Core Plugin](https://www.google.com/search?q=docs/core-plugin.md) |
-| **Understand Core limitations and built-in security** | 🔒 [Core Technical Reference](https://www.google.com/search?q=docs/core-plugin-reference.md) |
-| **Use and configure the official web dashboard** | 🌐 [Core Dashboard](https://www.google.com/search?q=docs/dashboard.md) |
-| **Fix common launch, installation or update issues** | 🩺 [Troubleshooting Guide](https://www.google.com/search?q=docs/troubleshooting.md) |
-| **Understand licensing and allowed personal use** | 📄 [License](https://www.google.com/search?q=LICENSE) | [Commercial Use](https://www.google.com/search?q=COMMERCIAL.md) | [Trademark Policy](https://www.google.com/search?q=TRADEMARK.md) |
+| **Install, update, or understand `npm start`** | 📁 [Install and Auto-Updates](docs/updates.md) |
+| **Run the bot inside an isolated container** | 🐳 [Docker Deployment](docs/docker.md) |
+| **Verify or upgrade the Node.js runtime** | 🟢 [Node.js Version Reference](docs/node-version.md) |
+| **Enable, disable, or inspect running plugins** | 🔌 [Plugin System Overview](docs/plugins.md) |
+| **Build a public or private plugin** | 🛠️ [Create a Plugin](docs/create-plugin.md) & [Plugin API Reference](docs/plugin-api.md) |
+| **Understand the premium core plugin features** | 💎 [Official Core Plugin](docs/core-plugin.md) |
+| **Understand Core limitations and built-in security** | 🔒 [Core Technical Reference](docs/core-plugin-reference.md) |
+| **Use and configure the official web dashboard** | 🌐 [Core Dashboard](docs/dashboard.md) |
+| **Fix common launch, installation or update issues** | 🩺 [Troubleshooting Guide](docs/troubleshooting.md) |
+| **Understand licensing and allowed personal use** | 📄 [License](LICENSE) | [Commercial Use](COMMERCIAL.md) | [Trademark Policy](TRADEMARK.md) |
 
-*Can't find what you need? Start with [docs/README.md](https://www.google.com/search?q=docs/README.md) for the full documentation structural index.*
+*Can't find what you need? Start with [docs/README.md](docs/README.md) for the full documentation structural index.*
 
 ---
 

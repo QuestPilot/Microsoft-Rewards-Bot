@@ -22,15 +22,24 @@ The update flow is:
 1. read the latest commit SHA from the configured update branch;
 2. read `package.json` at that SHA;
 3. compare the remote version with the local `package.json`;
-4. apply the exact commit with Git or the exact commit archive;
-5. remove obsolete files from managed project paths;
-6. preserve and migrate user files;
-7. verify that the local `package.json` now matches the remote version;
-8. run `npm ci` or `npm install`.
+4. acquire `.updates/update.lock` before mutating files, so concurrent starts do not apply two updates at the same time;
+5. apply the exact commit with Git or the exact commit archive;
+6. remove obsolete files from managed project paths;
+7. preserve and migrate user files;
+8. verify that the local `package.json` now matches the remote version;
+9. run `npm ci` or `npm install`.
 
 The updater does not report `Updated` unless the version on disk matches the remote version after the apply step.
 
 The updater no longer depends on `updates/stable.json`, archive checksums, or manifest signatures for the public channel.
+
+If the installed files look damaged but the local version already matches the remote version, use repair mode:
+
+```bash
+npm run update:repair
+```
+
+Repair mode re-applies the current official branch commit through the same Git/archive updater path. It still preserves user-owned files and refuses to downgrade.
 
 ## Preserved User Files
 
@@ -53,6 +62,7 @@ After an update, missing keys from `config.example.json` and `accounts.example.j
 ```bash
 npm start
 npm run update:check
+npm run update:repair
 npm run update:doctor
 ```
 
@@ -60,6 +70,9 @@ Useful environment variables:
 
 - `MSRB_AUTO_UPDATE=0`: disable update checks and updates.
 - `MSRB_UPDATE_CHECK_ONLY=1`: check and log only; do not apply updates.
+- `MSRB_UPDATE_FORCE=1`: re-apply the current remote version when local and remote versions are equal.
+- `MSRB_UPDATE_LOCK_WAIT_MS=120000`: maximum time to wait for another updater process before continuing with the local version.
+- `MSRB_UPDATE_LOCK_STALE_MS=1800000`: age after which an updater lock can be treated as stale.
 - `MSRB_UPDATE_STRATEGY=auto`: choose Git when possible, otherwise archive.
 - `MSRB_UPDATE_STRATEGY=git`: require Git update mode and fail if this is not a compatible Git working tree.
 - `MSRB_UPDATE_STRATEGY=archive`: force archive download mode.
