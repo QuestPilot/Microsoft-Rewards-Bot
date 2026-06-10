@@ -5,10 +5,16 @@ const path = require('path')
 const test = require('node:test')
 
 const startScript = require('../scripts/start')
+const packageJson = require('../package.json')
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-start-'))
 }
+
+test('build no longer runs the legacy session migration', () => {
+    assert.equal(packageJson.scripts.prebuild, undefined)
+    assert.equal(fs.existsSync(path.join(__dirname, '..', 'scripts', 'migrate-legacy-sessions.js')), false)
+})
 
 test('background launch skips updater unless explicitly enabled', () => {
     assert.equal(startScript.shouldRunUpdater(['node', 'scripts/start.js'], {}), true)

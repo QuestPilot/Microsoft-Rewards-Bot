@@ -4,6 +4,7 @@ release/
 .dev/
 node_modules/
 src/accounts.json
+src/accounts.enc.json
 src/config.json
 /.vscode
 /diagnostics

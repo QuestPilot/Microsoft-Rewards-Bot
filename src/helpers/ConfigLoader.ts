@@ -8,6 +8,10 @@ import type { Config } from '../types/Config'
 import { writeJsonAtomic } from './AtomicFile'
 import { validateAccounts, validateConfig } from './SchemaValidator'
 
+const { createAccountStorage } = require('../../scripts/account-storage') as {
+    createAccountStorage(options: { root: string }): { readAccounts(): Account[]; encryptedPath: string }
+}
+
 let configCache: Config
 
 function errorMessage(error: unknown): string {
@@ -34,21 +38,8 @@ function getSessionDir(sessionPath: string, email: string): string {
     return path.resolve(process.cwd(), sessionPath, email)
 }
 
-function getLegacySessionDir(sessionPath: string, email: string): string {
-    return path.join(__dirname, '../automation/', sessionPath, email)
-}
-
 function resolveSessionFile(sessionPath: string, email: string, fileName: string): string {
-    const primary = path.join(getSessionDir(sessionPath, email), fileName)
-    if (fs.existsSync(primary)) return primary
-
-    const legacy = path.join(getLegacySessionDir(sessionPath, email), fileName)
-    if (fs.existsSync(legacy)) {
-        console.warn(`[CONFIG] Using legacy session data from ${path.relative(process.cwd(), legacy)}`)
-        return legacy
-    }
-
-    return primary
+    return path.join(getSessionDir(sessionPath, email), fileName)
 }
 
 function resolveFirstExistingFile(candidates: string[], label: string): string {
@@ -71,6 +62,16 @@ function resolveFirstExistingFile(candidates: string[], label: string): string {
 
 export function loadAccounts(): Account[] {
     try {
+        if (!process.argv.includes('-dev')) {
+            const projectRoot = path.resolve(__dirname, '../..')
+            const storage = createAccountStorage({ root: projectRoot })
+            if (fs.existsSync(storage.encryptedPath) || fs.existsSync(path.join(projectRoot, 'src', 'accounts.json'))) {
+                const accountsData = storage.readAccounts()
+                validateAccounts(accountsData)
+                return accountsData
+            }
+        }
+
         const accountCandidates = process.argv.includes('-dev')
             ? ['accounts.dev.json', 'accounts.json', 'accounts.example.json']
             : ['accounts.json', 'accounts.example.json']

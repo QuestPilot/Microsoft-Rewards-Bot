@@ -95,8 +95,7 @@ export const ConfigSchema = z.object({
         doDailyStreak: z.boolean(),
         doDashboardInfo: z.boolean(),
         doClaimPoints: z.boolean(),
-        doApplyCoupons: z.boolean().default(true),
-        enforceCoreStreakProtectionGate: z.boolean().default(true)
+        doApplyCoupons: z.boolean().default(true)
     }),
     searchOnBingLocalQueries: z.boolean(),
     globalTimeout: NumberOrString,
@@ -118,6 +117,21 @@ export const ConfigSchema = z.object({
     backgroundAgent: BackgroundAgentSchema.optional(),
     terminal: TerminalSchema.optional(),
     scheduler: SchedulerSchema.optional(),
+    core: z.object({
+        doubleSearchPoints: z.boolean().optional(),
+        appReward: z.boolean().optional(),
+        readToEarn: z.boolean().optional(),
+        dailyCheckIn: z.boolean().optional(),
+        dailyStreak: z.boolean().optional(),
+        redeemGoal: z.boolean().optional(),
+        claimPoints: z.boolean().optional(),
+        applyCoupons: z.boolean().optional(),
+        temporaryPunchcards: z.boolean().optional(),
+        collectDashboardInfo: z.boolean().optional(),
+        streakProtection: z.boolean().optional(),
+        dailySetUnlimited: z.boolean().optional(),
+        dashboardSync: z.boolean().optional()
+    }).optional(),
     safetyAdvisory: SafetyAdvisorySchema.optional()
 })
 

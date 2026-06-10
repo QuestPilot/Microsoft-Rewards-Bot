@@ -800,9 +800,13 @@ export class MicrosoftRewardsBot {
                     }
                 }
 
-                if (this.config.workers.enforceCoreStreakProtectionGate) {
-                    const desiredEnabled = this.pluginManager.hasOfficialCoreEntitlement()
-                    await this.activities.syncStreakProtection(this.mainMobilePage, desiredEnabled)
+                // Streak protection is managed exclusively by Core. The open-source
+                // edition never toggles the user's streak protection switch — when Core
+                // is entitled it enables/maintains protection through its own task (which
+                // also honours the Core `streakProtection` config flag). Without Core the
+                // switch is left untouched.
+                if (this.pluginManager.hasOfficialCoreEntitlement()) {
+                    await this.activities.syncStreakProtection(this.mainMobilePage, true)
                 }
 
                 const searchPoints = await this.browser.func.getSearchPoints()

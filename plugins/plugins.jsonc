@@ -26,7 +26,7 @@
 
     "core": {
         "enabled": true,
-        "priority": 100,
+        "priority": 100
         // The released Core plugin validates licenses against the official
         // Turso license database. Nothing is required here for normal users.
         // Override these values only for a custom backend/database.

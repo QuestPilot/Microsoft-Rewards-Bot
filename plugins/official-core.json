@@ -1,14 +1,30 @@
 {
-  "plugin": "core",
-  "version": "1.0.5",
-  "targets": {
-    "win32-x64-node-24.15.0": {
-      "indexSha256": "760ce24e6e444865986daf4552bb25476dea0a6ce18907352b759f5f9464e964",
-      "bytecodeTarget": {
-        "node": "24.15.0",
-        "platform": "win32",
-        "arch": "x64"
-      }
-    }
-  }
+    "plugin":  "core",
+    "version":  "1.0.5",
+    "targets":  {
+                    "win32-x64-node-24.15.0":  {
+                                                   "indexSha256":  "db5d94b6074bc5167c6bdcb2d8d89ea0e0a32fcb38132b10e5a93ddc55c76e58",
+                                                   "bytecodeTarget":  {
+                                                                          "node":  "24.15.0",
+                                                                          "platform":  "win32",
+                                                                          "arch":  "x64"
+                                                                      }
+                                               },
+                    "linux-x64-node-24.15.0":  {
+                                                   "indexSha256":  "f07cbfb4d44beea5c4d0f4d00d85e9a0b6acd712eb493cc7bf63039a7511a473",
+                                                   "bytecodeTarget":  {
+                                                                          "node":  "24.15.0",
+                                                                          "platform":  "linux",
+                                                                          "arch":  "x64"
+                                                                      }
+                                               },
+                    "linux-arm64-node-24.15.0":  {
+                                                     "indexSha256":  "fc8bacc953d0af3396279f65fe6f62c8a9284f43bef80d06d4972cc0797d731e",
+                                                     "bytecodeTarget":  {
+                                                                            "node":  "24.15.0",
+                                                                            "platform":  "linux",
+                                                                            "arch":  "arm64"
+                                                                        }
+                                                 }
+                }
 }

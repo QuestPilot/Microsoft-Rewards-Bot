@@ -17,8 +17,7 @@
         "doDailyStreak": true,
         "doDashboardInfo": true,
         "doClaimPoints": true,
-        "doApplyCoupons": true,
-        "enforceCoreStreakProtectionGate": true
+        "doApplyCoupons": true
     },
     "searchOnBingLocalQueries": true,
     "globalTimeout": "30sec",
@@ -74,9 +73,24 @@
             "includeCorePitch": true
         }
     },
+    "core": {
+        "doubleSearchPoints": true,
+        "appReward": true,
+        "readToEarn": true,
+        "dailyCheckIn": true,
+        "dailyStreak": true,
+        "redeemGoal": true,
+        "claimPoints": true,
+        "applyCoupons": true,
+        "temporaryPunchcards": false,
+        "collectDashboardInfo": true,
+        "streakProtection": true,
+        "dailySetUnlimited": false,
+        "dashboardSync": true
+    },
     "backgroundAgent": {
-        "enabled": true,
-        "allowDashboardAutostart": true,
+        "enabled": false,
+        "allowDashboardAutostart": false,
         "openConsole": true
     },
     "terminal": {

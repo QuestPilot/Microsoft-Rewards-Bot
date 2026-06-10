@@ -1,62 +1,59 @@
-# Microsoft Rewards Bot Documentation
+# Documentation
 
-Public documentation for Microsoft Rewards Bot.
+Welcome! This is the full guide to Microsoft Rewards Bot, split by what you want to do. The main [README](../README.md) is the front door — this folder is the detail.
 
-The README is the quick entry point. This folder is the full guide, split by task so you can jump directly to installation, plugins, Core, updates, or troubleshooting.
+New here? Run `npm start`, let **Rewards Desk** open, and read the two pages below. Everything else is here when you need it.
 
-## Start Here
+## Start here
 
-| If you want to... | Go here |
+| If you want to… | Go to |
 | --- | --- |
-| Install the bot manually or understand what happens on launch | [Install and auto-updates](./updates.md) |
-| Run the bot in Docker | [Docker](./docker.md) |
-| Fix a Node.js version mismatch | [Node.js version](./node-version.md) |
-| Enable Core or a free optional plugin | [Plugin system overview](./plugins.md) |
-| Learn what Core adds before buying it | [Official Core plugin](./core-plugin.md) |
-| Open or understand the official dashboard | [Core Dashboard](./dashboard.md) |
-| Understand Core release integrity rules | [Core release integrity](./core-release-security.md) |
-| Build your own public plugin | [Create a plugin](./create-plugin.md) |
-| Look up exact plugin interfaces | [Plugin API reference](./plugin-api.md) |
-| Package or publish a plugin | [Plugin publishing](./plugin-marketplace.md) |
-| Understand licensing and allowed use | [Licensing and allowed use](./licensing.md) |
-| Diagnose launch, update, Core, or dashboard problems | [Troubleshooting](./troubleshooting.md) |
+| Understand the app and its control panel | [Rewards Desk](./rewards-desk.md) |
+| Install the bot or learn what `npm start` does | [Install and auto-updates](./updates.md) |
+| Run the bot in a container | [Docker](./docker.md) |
+| Turn features on and off, or add a plugin | [Plugin system overview](./plugins.md) |
+| See what the premium Core plugin adds | [Official Core plugin](./core-plugin.md) |
+| Fix a launch, update, or Core problem | [Troubleshooting](./troubleshooting.md) |
 
-## Documentation Paths
+---
 
-### Users
+## For everyone
 
+- [Rewards Desk](./rewards-desk.md) — the local control panel that opens on `npm start`
 - [Install and auto-updates](./updates.md)
 - [Docker](./docker.md)
-- [Licensing and allowed use](./licensing.md)
 - [Node.js version](./node-version.md)
 - [Built-in scheduler](./scheduler.md)
+- [Licensing and allowed use](./licensing.md)
 - [Troubleshooting](./troubleshooting.md)
 
-### Plugins
+## Core (premium)
+
+- [Official Core plugin](./core-plugin.md) — what Core adds and how to activate it
+- [Core technical reference](./core-plugin-reference.md)
+- [Core Dashboard](./dashboard.md)
+
+## Build a plugin (developers)
 
 - [Plugin system overview](./plugins.md)
 - [Create a plugin](./create-plugin.md)
 - [Plugin API reference](./plugin-api.md)
-- [Plugin publishing](./plugin-marketplace.md)
+- [Publishing a plugin](./plugin-marketplace.md)
 
-### Official Core
-
-- [Official Core plugin](./core-plugin.md)
-- [Core technical reference](./core-plugin-reference.md)
-- [Core release integrity](./core-release-security.md)
-- [Core Dashboard](./dashboard.md)
-- [Dashboard testing](./dashboard-testing.md)
-
-### Maintainers
+## Maintainers
 
 - [Auto-update release checklist](./auto-update-release.md)
 - [Core release integrity](./core-release-security.md)
+- [Dashboard testing](./dashboard-testing.md)
 - [Safety advisory](./safety-advisory.md)
 - [Selectors reference](./selectors-reference.md)
 
-## Recommended Reading Order
+---
 
-1. [Install and auto-updates](./updates.md)
-2. [Plugin system overview](./plugins.md)
-3. [Official Core plugin](./core-plugin.md)
-4. [Troubleshooting](./troubleshooting.md)
+## Suggested reading order
+
+1. [Rewards Desk](./rewards-desk.md)
+2. [Install and auto-updates](./updates.md)
+3. [Plugin system overview](./plugins.md)
+4. [Official Core plugin](./core-plugin.md)
+5. [Troubleshooting](./troubleshooting.md)

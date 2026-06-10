@@ -24,11 +24,11 @@
 **Microsoft Rewards Bot** delivers a fully automated, hands-free rewards workflow alongside a sophisticated modular plugin system. This application is designed to streamline accounts routine management while showcasing a scalable and dynamic architecture.
 
 ### 🌟 Key Features
-- 🤖 **Core Automation**: Advanced headless search and account farming logic.
-- 🔌 **Public Plugin API**: Extensibility at its finest, letting you create custom integrations and individual modules.
-- 📦 **Plugin Manager**: Manage features seamlessly via standard commands like `npm run plugins`.
-- 🔄 **Smart Auto-Updates**: Stays fresh, fully optimized, and up-to-date on every single `npm start`.
-- 💎 **Premium Core Plugin**: Proprietary logic easily enabled and configured via `plugins/plugins.jsonc`.
+- 🤖 **Hands-free automation** — daily sets, searches, promotions and more, fully automated.
+- 🖥️ **Rewards Desk** — a local control panel opens on `npm start`: run the bot, manage accounts, edit settings, toggle plugins, read the docs, and activate Core.
+- 🔌 **Public Plugin API** — build your own tasks and integrations, then share them with the community.
+- 🔄 **Smart auto-updates** — stays current automatically on every `npm start`.
+- 💎 **Optional Core plugin** — premium automation (coupon claiming, streak protection, double search points, remote dashboard…), enabled with a license.
 
 > [!NOTE]  
 > This repository is source-available exclusively for personal non-commercial use and official contributions. It is not licensed for commercial redistribution, unofficial public competing releases, impersonation, or reproducing the proprietary Core plugin.

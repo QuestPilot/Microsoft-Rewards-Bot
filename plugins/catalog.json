@@ -12,7 +12,7 @@
                         "sha256":  "",
                         "targets":  {
                                         "win32-x64-node-24.15.0":  {
-                                                                       "indexSha256":  "6b1d6bc69cb159d70fcd5c00c0192df98263e2c8445e412f7ddd2c763823e1ff",
+                                                                       "indexSha256":  "db5d94b6074bc5167c6bdcb2d8d89ea0e0a32fcb38132b10e5a93ddc55c76e58",
                                                                        "bytecodeTarget":  {
                                                                                               "node":  "24.15.0",
                                                                                               "platform":  "win32",
@@ -20,7 +20,7 @@
                                                                                           }
                                                                    },
                                         "linux-x64-node-24.15.0":  {
-                                                                       "indexSha256":  "0fc2b913d2b356c004a508d4cce142051b54e7f0c8f3d591d924fa529d53366d",
+                                                                       "indexSha256":  "f07cbfb4d44beea5c4d0f4d00d85e9a0b6acd712eb493cc7bf63039a7511a473",
                                                                        "bytecodeTarget":  {
                                                                                               "node":  "24.15.0",
                                                                                               "platform":  "linux",
@@ -28,7 +28,7 @@
                                                                                           }
                                                                    },
                                         "linux-arm64-node-24.15.0":  {
-                                                                         "indexSha256":  "a3a42ed786163e2544ad66aa3d8f67fead691cd501de2afc1ddeceaa980f0809",
+                                                                         "indexSha256":  "fc8bacc953d0af3396279f65fe6f62c8a9284f43bef80d06d4972cc0797d731e",
                                                                          "bytecodeTarget":  {
                                                                                                 "node":  "24.15.0",
                                                                                                 "platform":  "linux",

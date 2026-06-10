@@ -120,6 +120,38 @@ test('config migrator adds missing keys without replacing user values', () => {
     assert.equal(accounts[0].saveFingerprint.mobile, false)
 })
 
+test('config migration moves corePremium flags without overwriting modern values', () => {
+    const root = tempRoot()
+    const src = path.join(root, 'src')
+    fs.mkdirSync(src, { recursive: true })
+    fs.writeFileSync(
+        path.join(src, 'config.json'),
+        JSON.stringify({
+            core: { streakProtection: false },
+            corePremium: {
+                streakProtection: true,
+                temporaryPunchcards: true,
+                dailySetUnlimited: true
+            }
+        })
+    )
+    fs.writeFileSync(path.join(src, 'config.example.json'), JSON.stringify({ core: {} }))
+
+    migrateUserFiles(root, { log() {} })
+    const config = JSON.parse(fs.readFileSync(path.join(src, 'config.json'), 'utf8'))
+    assert.deepEqual(config.core, {
+        streakProtection: false,
+        temporaryPunchcards: true,
+        dailySetUnlimited: true
+    })
+    assert.equal(Object.hasOwn(config, 'corePremium'), false)
+})
+
+test('session loading source no longer contains the automation legacy fallback', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src', 'helpers', 'ConfigLoader.ts'), 'utf8')
+    assert.doesNotMatch(source, /getLegacySessionDir|automation\/.*sessionPath/)
+})
+
 test('updater reports current when main branch version is not newer', async () => {
     const root = tempRoot()
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '2.0.0' }))
@@ -398,6 +430,7 @@ test('applying release preserves user files and removes obsolete managed files',
 
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
     fs.writeFileSync(path.join(root, 'src', 'config.json'), '{"user":true}')
+    fs.writeFileSync(path.join(root, 'src', 'accounts.enc.json'), '{"encrypted":"user-data"}')
     fs.writeFileSync(path.join(root, 'src', 'old.ts'), 'old')
     fs.writeFileSync(path.join(root, 'plugins', 'plugins.jsonc'), '{"core":{"enabled":true}}')
     fs.mkdirSync(path.join(root, 'sessions'), { recursive: true })
@@ -412,6 +445,7 @@ test('applying release preserves user files and removes obsolete managed files',
     updater.applyFromSourceRoot(source, backup)
 
     assert.equal(fs.readFileSync(path.join(root, 'src', 'config.json'), 'utf8'), '{"user":true}')
+    assert.equal(fs.readFileSync(path.join(root, 'src', 'accounts.enc.json'), 'utf8'), '{"encrypted":"user-data"}')
     assert.equal(fs.readFileSync(path.join(root, 'plugins', 'plugins.jsonc'), 'utf8'), '{"core":{"enabled":true}}')
     assert.equal(fs.readFileSync(path.join(root, 'sessions', 'keep.txt'), 'utf8'), 'session')
     assert.equal(fs.existsSync(path.join(root, 'src', 'old.ts')), false)

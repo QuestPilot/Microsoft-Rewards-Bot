@@ -30,6 +30,7 @@ const DEFAULT_EXCLUDES = [
     'sessions',
     'src/config.json',
     'src/accounts.json',
+    'src/accounts.enc.json',
     'plugins/plugins.jsonc',
     'plugins/*/node_modules',
     'plugins/*/.cache'
@@ -42,6 +43,7 @@ const DEFAULT_BACKUP_PATHS = [
     'sessions',
     'src/config.json',
     'src/accounts.json',
+    'src/accounts.enc.json',
     'plugins/plugins.jsonc'
 ]
 

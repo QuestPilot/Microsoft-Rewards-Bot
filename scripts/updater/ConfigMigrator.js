@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { createAccountStorage } = require('../account-storage')
 
 function isPlainObject(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -43,12 +44,28 @@ const DEPRECATED_CONFIG_PATHS = [
     'dashboard'
 ]
 
+const LEGACY_CORE_KEYS = ['streakProtection', 'temporaryPunchcards', 'dailySetUnlimited']
+
+function migrateLegacyCorePremium(config) {
+    if (!isPlainObject(config) || !isPlainObject(config.corePremium)) return false
+    if (!isPlainObject(config.core)) config.core = {}
+    for (const key of LEGACY_CORE_KEYS) {
+        if (config.core[key] === undefined && config.corePremium[key] !== undefined) {
+            config.core[key] = config.corePremium[key]
+        }
+    }
+    delete config.corePremium
+    return true
+}
+
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
 }
 
 function writeJson(filePath, data) {
-    fs.writeFileSync(filePath, `${JSON.stringify(data, null, 4)}\n`, 'utf8')
+    const tempPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${process.pid}-${Date.now()}.tmp`)
+    fs.writeFileSync(tempPath, `${JSON.stringify(data, null, 4)}\n`, { encoding: 'utf8', mode: 0o600 })
+    fs.renameSync(tempPath, filePath)
 }
 
 function migrateConfig(root, logger = console) {
@@ -60,10 +77,11 @@ function migrateConfig(root, logger = console) {
     }
 
     const userConfig = readJson(userPath)
+    const migratedLegacyCore = migrateLegacyCorePremium(userConfig)
     const defaultConfig = readJson(examplePath)
     const migrated = mergeMissing(userConfig, defaultConfig)
     const removed = DEPRECATED_CONFIG_PATHS.filter(configPath => removePath(migrated, configPath))
-    const changed = JSON.stringify(migrated) !== JSON.stringify(userConfig)
+    const changed = migratedLegacyCore || JSON.stringify(migrated) !== JSON.stringify(userConfig)
 
     if (changed) {
         writeJson(userPath, migrated)
@@ -92,13 +110,15 @@ function migrateAccount(account, defaultAccount) {
 
 function migrateAccounts(root, logger = console) {
     const userPath = path.join(root, 'src', 'accounts.json')
+    const encryptedPath = path.join(root, 'src', 'accounts.enc.json')
     const examplePath = path.join(root, 'src', 'accounts.example.json')
 
-    if (!fs.existsSync(userPath) || !fs.existsSync(examplePath)) {
+    if ((!fs.existsSync(userPath) && !fs.existsSync(encryptedPath)) || !fs.existsSync(examplePath)) {
         return { changed: false, reason: 'missing accounts or example' }
     }
 
-    const accounts = readJson(userPath)
+    const storage = createAccountStorage({ root })
+    const accounts = storage.readAccounts()
     const examples = readJson(examplePath)
     if (!Array.isArray(accounts) || !Array.isArray(examples) || !examples[0]) {
         return { changed: false, reason: 'invalid account shape' }
@@ -108,8 +128,12 @@ function migrateAccounts(root, logger = console) {
     const changed = JSON.stringify(migrated) !== JSON.stringify(accounts)
 
     if (changed) {
-        writeJson(userPath, migrated)
-        logger.log('[UPDATER] Migrated src/accounts.json with new default keys')
+        storage.writeAccounts(migrated)
+        logger.log(
+            fs.existsSync(encryptedPath)
+                ? '[UPDATER] Migrated encrypted accounts with new default keys'
+                : '[UPDATER] Migrated src/accounts.json with new default keys'
+        )
     }
 
     return { changed }
@@ -125,6 +149,7 @@ function migrateUserFiles(root, logger = console) {
 
 module.exports = {
     mergeMissing,
+    migrateLegacyCorePremium,
     migrateAccounts,
     migrateConfig,
     migrateUserFiles

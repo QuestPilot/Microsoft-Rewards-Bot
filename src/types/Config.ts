@@ -17,6 +17,7 @@ export interface Config {
     terminal?: ConfigTerminal
     plugins?: ConfigPlugins
     scheduler?: ConfigScheduler
+    core?: ConfigCore
     safetyAdvisory?: ConfigSafetyAdvisory
 }
 
@@ -36,6 +37,32 @@ export interface ConfigScheduler {
     timezone: string
     startTime: string
     randomDelay: ConfigDelay
+}
+
+/**
+ * Per-feature gating for the proprietary Core plugin. Each flag enables or
+ * disables one premium action — the compiled Core plugin reads these exactly
+ * like the open-source bot reads `workers.*`. A feature only ever runs (and is
+ * only ever counted) when a valid Core license is active AND its flag is not
+ * `false`. Without a license / with Core inactive these flags are inert because
+ * the premium tasks are never registered. Defaults are `true` (opt-out), except
+ * `dailySetUnlimited` which defaults to `false`.
+ *
+ */
+export interface ConfigCore {
+    doubleSearchPoints?: boolean
+    appReward?: boolean
+    readToEarn?: boolean
+    dailyCheckIn?: boolean
+    dailyStreak?: boolean
+    redeemGoal?: boolean
+    claimPoints?: boolean
+    applyCoupons?: boolean
+    temporaryPunchcards?: boolean
+    collectDashboardInfo?: boolean
+    streakProtection?: boolean
+    dailySetUnlimited?: boolean
+    dashboardSync?: boolean
 }
 
 export interface ConfigSafetyAdvisory {
@@ -85,7 +112,6 @@ export interface ConfigWorkers {
     doDashboardInfo: boolean
     doClaimPoints: boolean
     doApplyCoupons: boolean
-    enforceCoreStreakProtectionGate: boolean
 }
 
 // Webhooks

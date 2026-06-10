@@ -54,17 +54,13 @@ Use the latest `main` branch. Older 4.0.1 builds could stop after `Already up to
 
 ## Sessions Are Lost After Build
 
-Sessions are stored in the root `sessions/` folder. If an older build saved them under `dist/automation/sessions`, `src/automation/sessions`, `dist/browser/sessions`, or `src/browser/sessions`, `npm run build` migrates missing files into the root session folder before clearing `dist`.
+Sessions are stored in the root `sessions/` folder and are not modified by `npm run build`.
 
 ## Core Plugin Does Not Load
 
-Check `plugins/plugins.jsonc` and run:
+Check that `core` is `enabled` in `plugins/plugins.jsonc` (or toggle it from the **Plugins** page in Rewards Desk).
 
-```bash
-npm run plugins
-```
-
-The Plugin Desk shows whether the Core checksum matches `plugins/official-core.json`.
+The bot logs whether the Core bytecode checksum matches `plugins/official-core.json` at startup — look for a Core entitlement line in the console. If the checksum doesn't match, premium entitlement is not granted and Core stays inactive.
 
 For Docker, confirm that the final image contains:
 
