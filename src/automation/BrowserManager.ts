@@ -26,6 +26,8 @@ type BrowserCandidate = BrowserChannel | undefined
 
 class BrowserManager {
     private readonly bot: MicrosoftRewardsBot
+    private detectedBrowserChannel?: Promise<BrowserCandidate>
+    private static readonly DETECTION_CLOSE_TIMEOUT_MS = 5_000
     private static readonly BROWSER_ARGS = [
         '--no-sandbox',
         '--mute-audio',
@@ -66,20 +68,59 @@ class BrowserManager {
      * Edge can block account.live.com on some Windows installations.
      */
     private async detectBrowserChannel(): Promise<BrowserCandidate> {
+        if (this.detectedBrowserChannel) {
+            return this.detectedBrowserChannel
+        }
+
+        this.detectedBrowserChannel = this.detectBrowserChannelOnce().catch(error => {
+            this.detectedBrowserChannel = undefined
+            throw error
+        })
+
+        return this.detectedBrowserChannel
+    }
+
+    private async detectBrowserChannelOnce(): Promise<BrowserCandidate> {
         for (const channel of [undefined, 'chrome', 'msedge'] as const) {
+            let testBrowser: rebrowser.Browser | undefined
             try {
-                const testBrowser = await rebrowser.chromium.launch({
+                testBrowser = await rebrowser.chromium.launch({
                     headless: true,
                     ...(channel && { channel })
                 })
-                await testBrowser.close()
                 return channel
             } catch {
                 // Channel not available, try next
+            } finally {
+                if (testBrowser?.isConnected()) {
+                    await this.closeDetectionBrowser(testBrowser).catch(() => {})
+                }
             }
         }
 
         throw new Error('No supported Chromium browser found. Run `npx patchright install chromium` and try again.')
+    }
+
+    private async closeDetectionBrowser(browser: rebrowser.Browser): Promise<void> {
+        let timeout: NodeJS.Timeout | undefined
+        try {
+            await Promise.race([
+                browser.close(),
+                new Promise<void>((_, reject) => {
+                    timeout = setTimeout(
+                        () =>
+                            reject(
+                                new Error(
+                                    `Browser detection close timed out after ${BrowserManager.DETECTION_CLOSE_TIMEOUT_MS}ms`
+                                )
+                            ),
+                        BrowserManager.DETECTION_CLOSE_TIMEOUT_MS
+                    )
+                })
+            ])
+        } finally {
+            if (timeout) clearTimeout(timeout)
+        }
     }
 
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
