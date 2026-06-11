@@ -34,6 +34,8 @@ test('Core release check enforces exact version policy and required targets', ()
     assert.match(source, /win32-x64-node-24\.15\.0/)
     assert.match(source, /linux-x64-node-24\.15\.0/)
     assert.match(source, /linux-arm64-node-24\.15\.0/)
+    assert.match(source, /darwin-x64-node-24\.15\.0/)
+    assert.match(source, /compatibleArtifactSource/)
     assert.match(source, /does not match Core package version/)
 })
 

@@ -42,7 +42,15 @@ The interface can accept a Core license prompt or an empty response, but develop
 
 Docker, CI, and forced-headless launches stay in terminal mode automatically. Use `MSRB_NO_APP_WINDOW=1` if a desktop machine should also skip the app window.
 
-The app window first tries the bundled Chromium runtime used by the bot, then Chrome/Chromium, then Edge as a last desktop fallback. It uses the Rewards Bot logo as the page icon, but a browser-based app window can still show the browser's taskbar identity on some systems. A fully custom taskbar icon requires a packaged native shell.
+The Desk window can fall back to an installed Chrome, Chromium, or Edge browser. Automation runs are stricter: they always use Patchright's bundled Chromium so behavior is consistent across Windows, Linux, and macOS.
+
+If an automation run reports that Patchright Chromium is missing, run:
+
+```console
+npx patchright install chromium
+```
+
+The bot no longer silently runs automation in the user's installed Chrome or Edge. Tracked automation browser processes are closed during normal completion, interruption signals, and fatal-error shutdown paths.
 
 Rewards Desk opens its local window before loading the OS account vault and compiled Core licensing client. Those services finish in background processes so a slow DPAPI/Keychain/Secret Service response or Core bytecode startup does not freeze the Settings interface.
 

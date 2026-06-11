@@ -53,6 +53,27 @@
             "includeEmails": false,
             "writeMarkdown": true
         }
+    },
+
+    // Tracks recent failures, zero-point runs, and account duration locally.
+    "run-health": {
+        "enabled": false,
+        "priority": 30,
+        "config": {
+            "historyLimit": 50,
+            "warnOnZeroPoints": true,
+            "outputDir": "diagnostics/run-health"
+        }
+    },
+
+    // Checks whether saved browser sessions are missing, empty, or stale.
+    "session-health": {
+        "enabled": false,
+        "priority": 20,
+        "config": {
+            "sessionPath": "sessions",
+            "staleDays": 30
+        }
     }
 
     // ───────────────────────────────────────────────────────────────

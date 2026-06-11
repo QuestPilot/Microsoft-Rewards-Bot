@@ -80,12 +80,13 @@ Enable the relevant workers in `src/config.json`:
 "webhook": {
   "runSummary": {
     "enabled": true,
-    "includeCorePitch": true
+    "discordUrl": "https://discord.com/api/webhooks/...",
+    "includeCoreComparison": true
   }
 }
 ```
 
-The final summary uses the existing `webhook.discord` and `webhook.ntfy` destinations. When Core is active, it reports claimed points, handled coupons, coupon names, expiry text when available, and estimated coupon-discount points. When Core is inactive, it keeps the message honest and explains what Core could have handled.
+The final Discord summary uses its own `webhook.runSummary.discordUrl`; the normal `webhook.discord` destination remains dedicated to filtered console logs. The summary is sent as a structured embed with per-account results, total balance changes, runtime, coupon names when available, and an optional Core impact comparison. The existing ntfy destination can still receive the text recap.
 
 ## Background Agent
 
@@ -109,8 +110,9 @@ On Windows, the dashboard can open a visible console for the running agent. On L
 
 Core can install auto-start from the dashboard:
 
-- Windows: user Task Scheduler task at logon.
+- Windows: current-user Startup folder entry.
 - Linux: `systemd --user` service.
+- macOS: current-user LaunchAgent.
 - Docker: no local mutation; use the container restart policy.
 
 If another bot instance is already running, a new interactive `npm start` reports it and can close the old instance before continuing. Background launches simply exit and leave the running agent untouched.

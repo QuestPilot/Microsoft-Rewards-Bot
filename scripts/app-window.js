@@ -77,6 +77,7 @@ let accountWorker = null
 let accountWorkerReady = null
 let accountWorkerSequence = 0
 const accountWorkerPending = new Map()
+let accountCache = null
 
 function runCoreLicenseWorker(payload) {
     return runJsonWorker('core-license-worker.js', payload)
@@ -470,6 +471,14 @@ const PLUGIN_META = {
     'run-summary': {
         official: false,
         description: 'Writes per-account run summaries to diagnostics/run-summary after each run.'
+    },
+    'run-health': {
+        official: false,
+        description: 'Tracks recent failures, zero-point runs, and account duration without storing credentials.'
+    },
+    'session-health': {
+        official: false,
+        description: 'Checks the official sessions directory for missing, empty, or stale browser sessions.'
     }
 }
 
@@ -668,6 +677,7 @@ function initializeDeskInBackground() {
         void startAccountStorageWorker().then(result => {
             if (result.storage?.warning) pushLog('warn', result.storage.warning)
             state.accounts = Array.isArray(result.accounts) ? result.accounts : []
+            accountCache = Array.isArray(result.rawAccounts) ? result.rawAccounts : null
         }).catch(error => {
             pushLog('warn', `Account encryption could not be enabled: ${error.message}`)
         }).finally(() => {
@@ -736,7 +746,7 @@ function html() {
       animation:appIn .4s ease-out;
       user-select:none;-webkit-user-select:none;
     }
-    input,textarea,select{user-select:text;-webkit-user-select:text}
+    input,textarea,select,.console-box{user-select:text;-webkit-user-select:text}
     @keyframes appIn{from{opacity:0}to{opacity:1}}
     @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.75)}}
@@ -1000,6 +1010,7 @@ function html() {
       font-family:"Cascadia Code",Consolas,"Courier New",monospace;font-size:13px;
       line-height:1.75;color:#cfe3f2;white-space:pre-wrap;word-break:break-word;
       scroll-behavior:smooth;
+      cursor:text;
     }
     .console-box::-webkit-scrollbar{width:11px}
     .console-box::-webkit-scrollbar-thumb{background:rgba(110,146,184,.32);border-radius:8px;border:2px solid #020610}
@@ -1715,7 +1726,7 @@ function html() {
         <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Free, open-source features. Click <b>Configure</b> to set the destination and details.</div>
         <div class="toggle-grid-1">
           <div class="cfg-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">Discord webhook</div><div class="toggle-sub">Post logs &amp; run results to a Discord channel</div></div>
+            <div class="toggle-wrap-left"><div class="toggle-label">Discord log webhook</div><div class="toggle-sub">Stream filtered console logs to a Discord channel</div></div>
             <button class="btn-cfg" data-cfg="discord">Configure</button>
             <label class="toggle"><input type="checkbox" id="tog-wh-discord"><span class="toggle-slider"></span></label>
           </div>
@@ -1725,7 +1736,7 @@ function html() {
             <label class="toggle"><input type="checkbox" id="tog-wh-ntfy"><span class="toggle-slider"></span></label>
           </div>
           <div class="cfg-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">Run summary</div><div class="toggle-sub">Send a recap after each run to your webhook(s)</div></div>
+            <div class="toggle-wrap-left"><div class="toggle-label">Discord run summary</div><div class="toggle-sub">Send one structured recap to a separate Discord webhook</div></div>
             <button class="btn-cfg" data-cfg="runSummary">Configure</button>
             <label class="toggle"><input type="checkbox" id="tog-wh-runSummary"><span class="toggle-slider"></span></label>
           </div>
@@ -2291,7 +2302,10 @@ function html() {
     var PLUGIN_DOC_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/main/docs/create-plugin.md';
     var DOCS_GITHUB_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/main/docs';
 
-    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    document.addEventListener('contextmenu', function(e) {
+      if (e.target && e.target.closest && e.target.closest('#console-box')) return;
+      e.preventDefault();
+    });
     document.addEventListener('dragstart', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
       var blocked = e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) ||
@@ -2308,8 +2322,10 @@ function html() {
       _toastTimer = setTimeout(function(){toast.classList.remove('show');}, 3200);
     }
     function releaseBootOverlay() {
+      if (_bootOverlayReleased) return;
       _bootOverlayReleased = true;
       var boot = G('app-boot');
+      if (!boot) return;
       boot.classList.add('ready');
       boot.style.opacity = '0';
       boot.style.visibility = 'hidden';
@@ -2345,7 +2361,7 @@ function html() {
     // ── Config popup forms (essentials on top, advanced expander) ──
     var CFG_FORMS = {
       discord: {
-        title: 'Discord webhook', sub: 'Post bot logs and run results to a Discord channel.',
+        title: 'Discord log webhook', sub: 'Stream selected console logs to this Discord channel.',
         essential: [
           { label:'Webhook URL', path:'webhook.discord.url', type:'text', placeholder:'https://discord.com/api/webhooks/...' }
         ],
@@ -2370,9 +2386,10 @@ function html() {
         ]
       },
       runSummary: {
-        title: 'Run summary', sub: 'Send a recap to your enabled webhook(s) after each run.',
+        title: 'Discord run summary', sub: 'Send one structured account recap to a separate Discord channel.',
         essential: [
-          { label:'Include Core upgrade pitch', path:'webhook.runSummary.includeCorePitch', type:'checkbox' }
+          { label:'Summary webhook URL', path:'webhook.runSummary.discordUrl', type:'text', placeholder:'https://discord.com/api/webhooks/...' },
+          { label:'Include Core impact comparison', path:'webhook.runSummary.includeCoreComparison', type:'checkbox' }
         ],
         advanced: []
       }
@@ -2623,8 +2640,10 @@ function html() {
     // ── Accounts editor ───────────────────────
     var _raw = [];
     var _accountsLoading = false;
+    var _accountsLoaded = false;
     async function loadAccEditor() {
       if (_accountsLoading) return;
+      if (_accountsLoaded) { renderAccEditor(); return; }
       _accountsLoading = true;
       G('acc-editor-list').innerHTML = '<div class="loading-block"><span class="inline-spinner"></span><span>Decrypting accounts…</span></div>';
       try {
@@ -2632,6 +2651,7 @@ function html() {
         var data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not load accounts');
         _raw = data;
+        _accountsLoaded = true;
         renderAccEditor();
       } catch(e) {
         G('acc-editor-list').innerHTML = '<div class="acc-empty"><p>' + esc(e.message) + '</p></div>';
@@ -2674,6 +2694,7 @@ function html() {
           var result = await response.json().catch(function(){return {};});
           throw new Error(result.error || 'Could not save accounts');
         }
+        _accountsLoaded = true;
       } catch(e) {
         showToast(e.message, true);
       }
@@ -3203,10 +3224,11 @@ function html() {
         el.classList.toggle('ok', !!entry[1]);
         el.querySelector('span').textContent = entry[1] ? 'Installed' : 'Not installed';
       });
-      var installed = !!data.menu;
+      var installed = data.complete === true;
+      var anyInstalled = !!data.desktop || !!data.menu;
       G('install-btn').style.display = installed ? 'none' : '';
-      G('desktop-uninstall').disabled = !installed;
-      G('desktop-uninstall').textContent = installed ? 'Uninstall shortcuts' : 'Not installed';
+      G('desktop-uninstall').disabled = !anyInstalled;
+      G('desktop-uninstall').textContent = anyInstalled ? 'Uninstall shortcuts' : 'Not installed';
       return installed;
     }
 
@@ -3466,6 +3488,7 @@ function html() {
     initLicOverlay();
     refreshAccountStorage().catch(function(){});
     syncDesktopInstallStatus().catch(function(){});
+    setInterval(function(){ syncDesktopInstallStatus().catch(function(){}); }, 30000);
     setInterval(refresh, 900);
     refresh();
   </script>
@@ -3659,8 +3682,15 @@ const server = http.createServer((req, res) => {
         return
     }
     if (req.method === 'GET' && req.url === '/api/accounts-raw') {
+        if (Array.isArray(accountCache)) {
+            jsonResponse(res, 200, accountCache)
+            return
+        }
         accountStorageRequest('read')
-            .then(result => jsonResponse(res, 200, result.accounts || []))
+            .then(result => {
+                accountCache = Array.isArray(result.accounts) ? result.accounts : []
+                jsonResponse(res, 200, accountCache)
+            })
             .catch(error => jsonResponse(res, 500, { error: error.message }))
         return
     }
@@ -3671,6 +3701,7 @@ const server = http.createServer((req, res) => {
             try {
                 const result = await accountStorageRequest('write', { accounts })
                 state.accounts = Array.isArray(result.masked) ? result.masked : []
+                accountCache = Array.isArray(result.accounts) ? result.accounts : accounts
                 res.writeHead(204)
                 res.end()
             } catch (error) {
@@ -3786,6 +3817,7 @@ const server = http.createServer((req, res) => {
                 }
                 const result = await accountStorageRequest(data.action, data)
                 if (Array.isArray(result.masked)) state.accounts = result.masked
+                if (Array.isArray(result.accounts)) accountCache = result.accounts
                 jsonResponse(res, 200, result)
             } catch (error) {
                 jsonResponse(res, 400, { error: error.message })

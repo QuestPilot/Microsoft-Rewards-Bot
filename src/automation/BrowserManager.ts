@@ -24,10 +24,10 @@ interface BrowserCreationResult {
 }
 
 type BrowserChannel = 'chrome' | 'msedge'
-type BrowserCandidate = BrowserChannel | undefined
 
 class BrowserManager {
     private readonly bot: MicrosoftRewardsBot
+    private readonly activeBrowsers = new Set<rebrowser.Browser>()
     private static readonly BROWSER_ARGS = [
         '--no-sandbox',
         '--mute-audio',
@@ -64,26 +64,15 @@ class BrowserManager {
         this.bot = bot
     }
 
-    /**
-     * Attempts to find the best Chromium-based browser.
-     * Preference: Patchright bundled Chromium > Google Chrome > Microsoft Edge.
-     * Edge can block account.live.com on some Windows installations.
-     */
-    private async detectBrowserChannel(): Promise<BrowserCandidate> {
-        for (const channel of [undefined, 'chrome', 'msedge'] as const) {
-            try {
-                const testBrowser = await rebrowser.chromium.launch({
-                    headless: true,
-                    ...(channel && { channel })
-                })
-                await testBrowser.close()
-                return channel
-            } catch {
-                // Channel not available, try next
-            }
+    private async assertBundledChromiumAvailable(): Promise<void> {
+        try {
+            const testBrowser = await rebrowser.chromium.launch({ headless: true })
+            await testBrowser.close()
+        } catch {
+            throw new Error(
+                'Patchright Chromium is not installed. Run `npx patchright install chromium` and try again.'
+            )
         }
-
-        throw new Error('No supported Chromium browser found. Run `npx patchright install chromium` and try again.')
     }
 
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
@@ -107,19 +96,19 @@ class BrowserManager {
                   }
                 : undefined
 
-            channel = await this.detectBrowserChannel()
+            await this.assertBundledChromiumAvailable()
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BROWSER',
-                `Using browser channel: ${channel ?? 'chromium (bundled)'}`
+                'Using browser channel: chromium (Patchright bundled)'
             )
 
             browser = await rebrowser.chromium.launch({
                 headless: this.bot.config.headless,
-                ...(channel && { channel }),
                 ...(proxyConfig && { proxy: proxyConfig }),
                 args: [...BrowserManager.BROWSER_ARGS]
             })
+            this.activeBrowsers.add(browser)
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
             this.bot.logger.error(this.bot.isMobile, 'BROWSER', `Launch failed: ${errorMessage}`)
@@ -144,6 +133,10 @@ class BrowserManager {
                     viewport: DESKTOP_BROWSER_VIEWPORT,
                     screen: DESKTOP_BROWSER_VIEWPORT
                 }
+            })
+            context.once('close', () => {
+                this.activeBrowsers.delete(browser)
+                void browser.close().catch(() => {})
             })
 
             await context.addInitScript(() => {
@@ -211,9 +204,16 @@ class BrowserManager {
 
             return { context: context as unknown as BrowserContext, fingerprint }
         } catch (error) {
+            this.activeBrowsers.delete(browser)
             await browser.close().catch(() => {})
             throw error
         }
+    }
+
+    async closeAll(): Promise<void> {
+        const browsers = [...this.activeBrowsers]
+        this.activeBrowsers.clear()
+        await Promise.allSettled(browsers.map(browser => browser.close()))
     }
 
     private formatProxyServer(proxy: AccountProxy): string {

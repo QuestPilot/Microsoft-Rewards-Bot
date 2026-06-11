@@ -36,6 +36,15 @@
                                                                                          "platform":  "linux",
                                                                                          "arch":  "arm64"
                                                                                      }
+                                                              },
+                                 "darwin-x64-node-24.15.0":  {
+                                                                "indexSha256":  "7fda17d5407661fe3c8022a06cfd7b46639281447753cfdeab2315f5388ed3eb",
+                                                                "bytecodeTarget":  {
+                                                                                       "node":  "24.15.0",
+                                                                                       "platform":  "darwin",
+                                                                                       "arch":  "x64"
+                                                                                   },
+                                                                "compatibleArtifactSource":  "linux-x64-node-24.15.0"
                                                               }
                              }
              },

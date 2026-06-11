@@ -44,6 +44,12 @@ Taskbar and Dock pinning is not offered because the Desk currently uses a browse
 
 The local `.core/` directory is an ignored runtime workspace shared by the open-source Desk launchers and the optional Core agent. It contains generated launch scripts and build scratch data, not account data or a Core entitlement.
 
+Rewards Desk checks the actual shortcut files at startup and every 30 seconds while open. The install action stays hidden only while every expected shortcut exists. If a Desktop or application-menu shortcut is removed manually, the install action appears again so the missing shortcut can be restored.
+
+The dashboard account list and the Accounts editor share the same protected-storage worker. The OS vault is opened once per Desk process, decrypted account data is cached only in memory, and that cache is replaced after account or encryption changes.
+
+Text selection and the context menu remain disabled across the desktop-style interface, except inside the Console page where logs can be selected and copied.
+
 Use **Settings → Advanced → Account protection** to disable encryption, rotate the local key, or create a portable password-protected backup. Portable backups can be imported on another computer and are then re-encrypted with that computer's OS vault. If Linux Secret Service is unavailable, the Desk keeps `src/accounts.json` in plaintext and displays a warning instead of risking inaccessible credentials.
 
 ## Developer / terminal mode

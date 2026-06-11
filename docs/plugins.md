@@ -32,6 +32,8 @@ The source-available public release can ship optional free plugins beside Core. 
 | Plugin | Default | Purpose |
 | --- | --- | --- |
 | `run-summary` | Disabled | Writes local account result summaries to `diagnostics/run-summary/` after each account finishes. |
+| `run-health` | Disabled | Tracks repeated failures, zero-point completions, and account duration using masked local history. |
+| `session-health` | Disabled | Reports missing, empty, or stale directories under the official `sessions/` path without reading cookies. |
 
 Enable one in `plugins/plugins.jsonc` or from the **Plugins** page in Rewards Desk.
 
@@ -50,7 +52,7 @@ Enable one in `plugins/plugins.jsonc` or from the **Plugins** page in Rewards De
 }
 ```
 
-The plugin writes local diagnostics only. It does not send account data to a remote service.
+These plugins write or inspect local diagnostics only. They do not send account data to a remote service.
 
 ## Managing Plugins
 

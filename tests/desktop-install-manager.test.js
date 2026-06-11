@@ -45,6 +45,7 @@ test('Windows installer creates icon shortcuts and a visible startup launcher', 
 
     assert.equal(result.desktop, true)
     assert.equal(result.menu, true)
+    assert.equal(result.complete, true)
     assert.equal(calls.filter(([command]) => command === 'powershell.exe').length, 2)
     const launcher = fs.readFileSync(path.join(root, '.core', 'start-desk.cmd'), 'utf8')
     assert.match(launcher, /Rewards Desk is preparing/)
@@ -61,6 +62,7 @@ test('Linux installer creates application-menu and desktop entries with the proj
 
     assert.equal(result.desktop, true)
     assert.equal(result.menu, true)
+    assert.equal(result.complete, true)
     assert.match(menu, /Terminal=true/)
     assert.match(menu, /assets[\\/]logo\.png/)
     const removed = manager.uninstall()
@@ -73,8 +75,20 @@ test('macOS installer creates an application bundle for Finder and Dock pinning'
     const result = manager.install()
 
     assert.equal(result.menu, true)
+    assert.equal(result.complete, true)
     assert.equal(fs.existsSync(path.join(home, 'Applications', 'Rewards Desk.app', 'Contents', 'Info.plist')), true)
     assert.equal(fs.existsSync(path.join(home, 'Applications', 'Rewards Desk.app', 'Contents', 'Resources', 'AppIcon.png')), true)
     const removed = manager.uninstall()
     assert.equal(removed.menu, false)
+})
+
+test('installer status becomes incomplete when a shortcut is removed manually', () => {
+    const { home, manager } = fixture('win32')
+    manager.install()
+    fs.rmSync(path.join(home, 'Desktop', 'Rewards Desk.lnk'))
+
+    const result = manager.status()
+    assert.equal(result.desktop, false)
+    assert.equal(result.menu, true)
+    assert.equal(result.complete, false)
 })

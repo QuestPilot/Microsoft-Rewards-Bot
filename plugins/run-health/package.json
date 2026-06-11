@@ -1,0 +1,12 @@
+{
+  "name": "msrb-plugin-run-health",
+  "version": "1.0.0",
+  "description": "Local health diagnostics for recent Microsoft Rewards account runs.",
+  "license": "MIT",
+  "private": true,
+  "msrb": {
+    "plugin": "run-health",
+    "botVersionRange": ">=4.0.0",
+    "capabilities": ["diagnostics"]
+  }
+}

@@ -124,7 +124,10 @@ export interface ConfigWebhook {
 
 export interface WebhookRunSummaryConfig {
     enabled: boolean
-    includeCorePitch: boolean
+    discordUrl: string
+    includeCoreComparison?: boolean
+    /** Legacy name accepted during config migration. */
+    includeCorePitch?: boolean
 }
 
 export interface LogFilter {

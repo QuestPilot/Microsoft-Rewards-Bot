@@ -11,6 +11,15 @@ export interface DiscordConfig {
     url: string
 }
 
+export interface DiscordEmbed {
+    title?: string
+    description?: string
+    color?: number
+    fields?: Array<{ name: string; value: string; inline?: boolean }>
+    footer?: { text: string }
+    timestamp?: string
+}
+
 const discordQueue = new PQueue({
     interval: 1000,
     intervalCap: 2,
@@ -24,7 +33,7 @@ function truncate(text: string) {
 export async function sendDiscord(discordUrl: string, content: string, level: LogLevel): Promise<void> {
     if (!discordUrl) return
 
-    const request: AxiosRequestConfig = {
+    await enqueueDiscordRequest({
         method: 'POST',
         url: discordUrl,
         headers: { 'Content-Type': 'application/json' },
@@ -35,8 +44,26 @@ export async function sendDiscord(discordUrl: string, content: string, level: Lo
             allowed_mentions: { parse: [] }
         },
         timeout: 10000
-    }
+    })
+}
 
+export async function sendDiscordEmbed(discordUrl: string, embed: DiscordEmbed): Promise<void> {
+    if (!discordUrl) return
+    await enqueueDiscordRequest({
+        method: 'POST',
+        url: discordUrl,
+        headers: { 'Content-Type': 'application/json' },
+        data: {
+            embeds: [embed],
+            username: BOT_USERNAME,
+            avatar_url: BOT_AVATAR_URL,
+            allowed_mentions: { parse: [] }
+        },
+        timeout: 10000
+    })
+}
+
+async function enqueueDiscordRequest(request: AxiosRequestConfig): Promise<void> {
     await discordQueue.add(async () => {
         try {
             await axios(request)

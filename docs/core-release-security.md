@@ -69,4 +69,5 @@ When Core changed, also verify:
 - the private maintainer pipeline produced the official target artifacts;
 - `plugins/official-core.json` matches every shipped Core target checksum;
 - `plugins/catalog.json` matches the same target checksum metadata;
+- the Intel macOS compatibility target is identical to its declared Linux x64 source artifact;
 - no Core source, sourcemap, `.env`, or private secret exists in the public repository.

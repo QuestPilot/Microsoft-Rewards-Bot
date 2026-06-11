@@ -41,7 +41,7 @@ import {
     writeAccountSafetyWarningState
 } from './helpers/AccountSafetyWarning'
 import HttpClient from './helpers/HttpClient'
-import { flushDiscordQueue, sendDiscord } from './notifications/DiscordWebhook'
+import { flushDiscordQueue, sendDiscord, sendDiscordEmbed } from './notifications/DiscordWebhook'
 import { flushNtfyQueue, sendNtfy } from './notifications/NtfyWebhook'
 import type { Account } from './types/Account'
 import type { AppDashboardData } from './types/AppDashboardData'
@@ -138,6 +138,10 @@ export class MicrosoftRewardsBot {
     private activeWorkers: number
     private exitedWorkers: number[]
     private browserFactory: BrowserManager = new BrowserManager(this)
+
+    async closeAllBrowsers(): Promise<void> {
+        await this.browserFactory.closeAll()
+    }
     private accounts: Account[]
     private workers: TaskBase
     private login = new AuthManager(this)
@@ -565,15 +569,18 @@ export class MicrosoftRewardsBot {
         const summaryConfig = this.config.webhook.runSummary
         if (!summaryConfig?.enabled || cluster.isWorker) return
 
-        const message = this.buildRunSummaryMessage(
-            accountStats,
-            runStartTime,
-            summaryConfig.includeCorePitch !== false
-        )
+        const includeCoreComparison =
+            summaryConfig.includeCoreComparison ?? summaryConfig.includeCorePitch ?? true
+        const message = this.buildRunSummaryMessage(accountStats, runStartTime, includeCoreComparison)
 
         const sends: Promise<void>[] = []
-        if (this.config.webhook.discord?.enabled && this.config.webhook.discord.url) {
-            sends.push(sendDiscord(this.config.webhook.discord.url, message, 'info'))
+        if (summaryConfig.discordUrl) {
+            sends.push(
+                sendDiscordEmbed(
+                    summaryConfig.discordUrl,
+                    this.buildRunSummaryEmbed(accountStats, runStartTime, includeCoreComparison)
+                )
+            )
         }
         if (this.config.webhook.ntfy?.enabled && this.config.webhook.ntfy.url) {
             sends.push(sendNtfy(this.config.webhook.ntfy, message, 'info'))
@@ -582,7 +589,85 @@ export class MicrosoftRewardsBot {
         await Promise.allSettled(sends)
     }
 
-    private buildRunSummaryMessage(accountStats: AccountStats[], runStartTime: number, includeCorePitch: boolean): string {
+    private buildRunSummaryEmbed(
+        accountStats: AccountStats[],
+        runStartTime: number,
+        includeCoreComparison: boolean
+    ) {
+        const totalCollectedPoints = accountStats.reduce((sum, stats) => sum + stats.collectedPoints, 0)
+        const successfulAccounts = accountStats.filter(stats => stats.success).length
+        const failedAccounts = accountStats.length - successfulAccounts
+        const totalInitialPoints = accountStats.reduce((sum, stats) => sum + stats.initialPoints, 0)
+        const totalFinalPoints = accountStats.reduce((sum, stats) => sum + stats.finalPoints, 0)
+        const runtimeMinutes = ((Date.now() - runStartTime) / 1000 / 60).toFixed(1)
+        const coreStats = this.aggregateCoreStats(accountStats)
+        const hasCore = this.pluginManager.hasOfficialCoreEntitlement()
+        const accountFields = accountStats.slice(0, 20).map(stats => {
+            const accountCore = stats.coreStats
+            const coreLine =
+                accountCore && (accountCore.claimPoints || accountCore.couponsApplied)
+                    ? `\nCore: +${accountCore.claimPoints} claimed | ${accountCore.couponsApplied} coupon(s)`
+                    : ''
+            return {
+                name: `${stats.success ? 'Completed' : 'Failed'} - ${stats.email}`.slice(0, 256),
+                value: stats.success
+                    ? `**+${stats.collectedPoints} points**\n${stats.initialPoints} -> ${stats.finalPoints} | ${(stats.duration / 60).toFixed(1)} min${coreLine}`
+                    : `**Run failed**\n${String(stats.error || 'Unknown error').slice(0, 500)}`,
+                inline: true
+            }
+        })
+
+        const fields = [
+            {
+                name: 'Run totals',
+                value: `**${successfulAccounts}/${accountStats.length} accounts completed**\n+${totalCollectedPoints} points | ${totalInitialPoints} -> ${totalFinalPoints}\nRuntime: ${runtimeMinutes} min`,
+                inline: false
+            },
+            ...accountFields
+        ]
+
+        if (includeCoreComparison) {
+            fields.push({
+                name: hasCore ? 'Core impact' : 'Core comparison',
+                value: hasCore
+                    ? `+${coreStats.claimPoints} dashboard points claimed\n${coreStats.couponsApplied}/${coreStats.couponsAvailable} coupons handled\n${coreStats.couponPointsDiscount} estimated coupon-discount points`
+                    : 'Core was inactive. Ready-to-claim dashboard points, coupon handling, app rewards, streak details, goals, punchcards, and remote control were not included.',
+                inline: false
+            })
+            if (hasCore && coreStats.coupons.length) {
+                fields.push({
+                    name: 'Coupons handled',
+                    value: this.formatCouponSummary(coreStats.coupons).slice(0, 1024),
+                    inline: false
+                })
+            }
+        }
+
+        if (accountStats.length > 20) {
+            fields.push({
+                name: 'Additional accounts',
+                value: `${accountStats.length - 20} more account(s) are included in the totals above.`,
+                inline: false
+            })
+        }
+
+        return {
+            title: failedAccounts ? 'Rewards run completed with warnings' : 'Rewards run complete',
+            description: failedAccounts
+                ? `${failedAccounts} account(s) require attention.`
+                : 'All configured accounts finished successfully.',
+            color: failedAccounts ? 0xf7c85c : 0x2fd27d,
+            fields,
+            footer: { text: 'Microsoft Rewards Bot - local run summary' },
+            timestamp: new Date().toISOString()
+        }
+    }
+
+    private buildRunSummaryMessage(
+        accountStats: AccountStats[],
+        runStartTime: number,
+        includeCoreComparison: boolean
+    ): string {
         const totalAccounts = accountStats.length
         const successfulAccounts = accountStats.filter(s => s.success).length
         const failedAccounts = totalAccounts - successfulAccounts
@@ -601,7 +686,7 @@ export class MicrosoftRewardsBot {
             `Runtime: ${totalDurationMinutes}min`
         ]
 
-        if (includeCorePitch) {
+        if (includeCoreComparison) {
             if (hasCore) {
                 lines.push(
                     `Core impact: +${coreStats.claimPoints} claimed points | ${coreStats.couponsApplied}/${coreStats.couponsAvailable} coupon(s) handled | ${coreStats.couponPointsDiscount} estimated coupon-discount points`
@@ -918,6 +1003,7 @@ async function main(): Promise<void> {
     })
     process.on('SIGINT', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGINT received, flushing and exiting...')
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
@@ -925,6 +1011,7 @@ async function main(): Promise<void> {
     })
     process.on('SIGTERM', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGTERM received, flushing and exiting...')
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
@@ -932,12 +1019,14 @@ async function main(): Promise<void> {
     })
     process.on('uncaughtException', async error => {
         rewardsBot.logger.error('main', 'UNCAUGHT-EXCEPTION', error)
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
         process.exit(1)
     })
     process.on('unhandledRejection', async reason => {
         rewardsBot.logger.error('main', 'UNHANDLED-REJECTION', reason as Error)
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
         process.exit(1)
@@ -960,12 +1049,14 @@ async function main(): Promise<void> {
             : await runSingle(rewardsBot)
 
         await rewardsBot.agentRuntime.stop()
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(exitCode)
     } catch (error) {
         rewardsBot.dashboardRunState = 'error'
         rewardsBot.logger.error('main', 'MAIN-ERROR', error as Error)
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
     }

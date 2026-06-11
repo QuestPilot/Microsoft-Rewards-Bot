@@ -70,7 +70,9 @@ const WebhookSchema = z.object({
     runSummary: z
         .object({
             enabled: z.boolean().default(false),
-            includeCorePitch: z.boolean().default(true)
+            discordUrl: z.string().default(''),
+            includeCoreComparison: z.boolean().optional(),
+            includeCorePitch: z.boolean().optional()
         })
         .optional()
 })

@@ -59,7 +59,13 @@ function execute(action, payload = {}) {
 try {
     const storageState = storage.initializeEncryption()
     const accounts = storage.readAccounts()
-    send({ type: 'ready', success: true, storage: storageState, accounts: maskedAccounts(accounts) })
+    send({
+        type: 'ready',
+        success: true,
+        storage: storageState,
+        accounts: maskedAccounts(accounts),
+        rawAccounts: accounts
+    })
 } catch (error) {
     send({
         type: 'ready',

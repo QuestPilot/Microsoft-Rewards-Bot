@@ -30,6 +30,8 @@ npm start
 
 The official Core plugin is runtime-targeted. Running it on another Node.js version or another runtime target can fail at runtime or behave unpredictably.
 
+Core currently ships for Windows x64, Linux x64, Linux ARM64, and Intel macOS x64 on Node.js `24.15.0`. The Intel macOS target is a verified compatibility alias of the Linux x64 V8 bytecode artifact, not a native macOS build. Apple Silicon requires running the x64 Node.js runtime through Rosetta until a native `darwin-arm64` artifact is produced and tested.
+
 For this reason, the official release refuses every Node.js version except 24.15.0 before loading the bot.
 
 ## Common Fix on Windows

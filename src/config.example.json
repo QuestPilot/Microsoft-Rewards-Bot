@@ -70,7 +70,8 @@
         },
         "runSummary": {
             "enabled": false,
-            "includeCorePitch": true
+            "discordUrl": "",
+            "includeCoreComparison": true
         }
     },
     "core": {

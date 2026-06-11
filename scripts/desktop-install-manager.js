@@ -93,31 +93,40 @@ function createDesktopInstallManager(options = {}) {
     function status() {
         if (platform === 'win32') {
             const paths = windowsPaths()
+            const desktop = fs.existsSync(paths.desktop)
+            const menu = fs.existsSync(paths.startMenu)
             return {
                 supported: true,
                 platform,
-                desktop: fs.existsSync(paths.desktop),
-                menu: fs.existsSync(paths.startMenu)
+                desktop,
+                menu,
+                complete: desktop && menu
             }
         }
         if (platform === 'darwin') {
+            const installed = fs.existsSync(macAppPath())
             return {
                 supported: true,
                 platform,
-                desktop: fs.existsSync(macAppPath()),
-                menu: fs.existsSync(macAppPath())
+                desktop: installed,
+                menu: installed,
+                complete: installed
             }
         }
         if (platform === 'linux') {
             const paths = linuxPaths()
+            const desktopAvailable = fs.existsSync(path.dirname(paths.desktop))
+            const desktop = fs.existsSync(paths.desktop)
+            const menu = fs.existsSync(paths.menu)
             return {
                 supported: true,
                 platform,
-                desktop: fs.existsSync(paths.desktop),
-                menu: fs.existsSync(paths.menu)
+                desktop,
+                menu,
+                complete: menu && (!desktopAvailable || desktop)
             }
         }
-        return { supported: false, platform, desktop: false, menu: false }
+        return { supported: false, platform, desktop: false, menu: false, complete: false }
     }
 
     function install() {

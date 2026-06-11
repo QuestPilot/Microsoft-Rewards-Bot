@@ -21,8 +21,11 @@ const FORBIDDEN_BYTECODE_MARKERS = [
 const REQUIRED_TARGETS = new Set([
     'win32-x64-node-24.15.0',
     'linux-x64-node-24.15.0',
-    'linux-arm64-node-24.15.0'
+    'linux-arm64-node-24.15.0',
+    'darwin-x64-node-24.15.0'
 ])
+const DARWIN_COMPAT_TARGET = 'darwin-x64-node-24.15.0'
+const DARWIN_COMPAT_SOURCE = 'linux-x64-node-24.15.0'
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -86,7 +89,7 @@ function assertTargetSet(label, targets) {
 }
 
 function assertTargetMetadata(targetId, target, sourceLabel) {
-    const match = targetId.match(/^(win32|linux)-(x64|arm64)-node-(\d+\.\d+\.\d+)$/)
+    const match = targetId.match(/^(win32|linux|darwin)-(x64|arm64)-node-(\d+\.\d+\.\d+)$/)
     if (!match) {
         fail(`${sourceLabel} target id ${targetId} is not in platform-arch-node-version format`)
         return
@@ -181,6 +184,20 @@ function main() {
             if (!target.bytecodeTarget?.node || !target.bytecodeTarget?.platform || !target.bytecodeTarget?.arch) {
                 fail(`plugins/official-core.json ${targetId} bytecodeTarget metadata is incomplete`)
             }
+        }
+        const darwinTarget = targets[DARWIN_COMPAT_TARGET]
+        const linuxSource = targets[DARWIN_COMPAT_SOURCE]
+        if (darwinTarget?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
+            fail(`plugins/official-core.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
+        }
+        if (packageTargets[DARWIN_COMPAT_TARGET]?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
+            fail(`plugins/core/package.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
+        }
+        if (catalogTargets[DARWIN_COMPAT_TARGET]?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
+            fail(`plugins/catalog.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
+        }
+        if (darwinTarget?.indexSha256 !== linuxSource?.indexSha256) {
+            fail(`macOS compatibility target must remain byte-for-byte identical to ${DARWIN_COMPAT_SOURCE}`)
         }
         const targetList = Object.keys(targets).join(', ')
         console.log(`[CORE-RELEASE-CHECK] Core bytecode targets: ${targetList}`)
