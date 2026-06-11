@@ -46,6 +46,8 @@ The app window first tries the bundled Chromium runtime used by the bot, then Ch
 
 Rewards Desk opens its local window before loading the OS account vault and compiled Core licensing client. Those services finish in background processes so a slow DPAPI/Keychain/Secret Service response or Core bytecode startup does not freeze the Settings interface.
 
+On Windows, Rewards Desk and the Core agent now use the current user's Startup folder and do not require administrator rights. When migrating an older protected Task Scheduler entry, Windows may show one UAC prompt solely to remove that legacy task.
+
 ## Development Version Gets Replaced
 
 Use `npm run dev` or pass `-dev`. Auto-update is skipped in development mode.

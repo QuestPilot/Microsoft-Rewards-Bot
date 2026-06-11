@@ -32,15 +32,17 @@ The **Disable encryption** action remains visible in Settings → Advanced. It r
 
 ## Install desktop shortcuts
 
-Click **Install Rewards Desk** near the bottom of the sidebar to create or repair native launchers:
+Click **Install Rewards Desk** near the bottom of the sidebar to create native launchers:
 
 - Windows: Desktop and Start menu shortcuts with the Rewards Desk icon.
 - Linux: Desktop and application-menu `.desktop` entries.
 - macOS: a `Rewards Desk.app` launcher in the current user's Applications folder.
 
-The launcher keeps a terminal visible while update checks and the local TypeScript build run. The terminal closes automatically after Rewards Desk starts, or stays open when startup fails so the error can be read.
+The launcher keeps a terminal visible while update checks and the local TypeScript build run. The terminal closes automatically after Rewards Desk starts, or stays open when startup fails so the error can be read. Once installed, the sidebar button disappears; shortcuts can be removed from **Settings → Advanced**.
 
-Taskbar and Dock pinning remains a user action. Windows intentionally restricts automatic taskbar pinning for ordinary unpackaged applications; Rewards Desk opens the installed shortcut's location so it can be pinned normally.
+Taskbar and Dock pinning is not offered because the Desk currently uses a browser application window. Pinning that window can identify Edge or Chrome instead of the Rewards Desk launcher. A stable standalone taskbar identity requires a future packaged native shell.
+
+The local `.core/` directory is an ignored runtime workspace shared by the open-source Desk launchers and the optional Core agent. It contains generated launch scripts and build scratch data, not account data or a Core entitlement.
 
 Use **Settings → Advanced → Account protection** to disable encryption, rotate the local key, or create a portable password-protected backup. Portable backups can be imported on another computer and are then re-encrypted with that computer's OS vault. If Linux Secret Service is unavailable, the Desk keeps `src/accounts.json` in plaintext and displays a warning instead of risking inaccessible credentials.
 

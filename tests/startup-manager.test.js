@@ -40,7 +40,7 @@ function fixture(platform) {
     }
 }
 
-test('Windows exposes exactly separate Desk and Core agent startup tasks', () => {
+test('Windows uses per-user Startup entries without administrator rights', () => {
     const { root, calls, manager } = fixture('win32')
     manager.setDeskEnabled(true)
     manager.setAgentEnabled(true)
@@ -48,10 +48,40 @@ test('Windows exposes exactly separate Desk and Core agent startup tasks', () =>
 
     assert.equal(status.desk.installed, true)
     assert.equal(status.agent.installed, true)
-    assert.ok(calls.some(([, args]) => args.includes('Microsoft Rewards Bot Rewards Desk')))
-    assert.ok(calls.some(([, args]) => args.includes('Microsoft Rewards Bot Core Agent')))
+    assert.equal(status.desk.method, 'startup-folder')
+    assert.equal(status.agent.method, 'startup-folder')
+    assert.equal(calls.some(([command, args]) => command === 'schtasks.exe' && args[0] === '/Create'), false)
     assert.match(fs.readFileSync(path.join(root, '.core', 'start-desk.cmd'), 'utf8'), /scripts\\start\.js"/)
     assert.match(fs.readFileSync(path.join(root, '.core', 'start-background.cmd'), 'utf8'), /--background/)
+})
+
+test('Windows requests elevation only to remove an inaccessible legacy task', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-startup-elevated-'))
+    const home = path.join(root, 'home')
+    const calls = []
+    fs.mkdirSync(path.join(root, 'scripts'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'scripts', 'start.js'), '')
+    const manager = createStartupManager({
+        root,
+        home,
+        platform: 'win32',
+        env: { APPDATA: path.join(home, 'AppData', 'Roaming') },
+        execFileSync(command, args) {
+            calls.push([command, args])
+            if (command === 'schtasks.exe' && args[0] === '/Query') return ''
+            if (command === 'schtasks.exe' && args[0] === '/Delete') {
+                const error = new Error('Access is denied')
+                error.stderr = 'Access is denied'
+                throw error
+            }
+            if (command === 'powershell.exe') return ''
+            return ''
+        }
+    })
+
+    manager.setDeskEnabled(true)
+    assert.ok(calls.some(([command, args]) => command === 'powershell.exe' && args.includes('-Command')))
+    assert.equal(calls.some(([command, args]) => command === 'schtasks.exe' && args[0] === '/Create'), false)
 })
 
 test('macOS uses LaunchAgents for both startup modes', () => {

@@ -73,9 +73,94 @@ let stopRequested = false
 let shuttingDown = false
 let pendingLicenseKey = ''
 let closeAgentLogSubscription = null
+let accountWorker = null
+let accountWorkerReady = null
+let accountWorkerSequence = 0
+const accountWorkerPending = new Map()
 
 function runCoreLicenseWorker(payload) {
     return runJsonWorker('core-license-worker.js', payload)
+}
+
+function startAccountStorageWorker() {
+    if (accountWorkerReady) return accountWorkerReady
+    accountWorkerReady = new Promise((resolve, reject) => {
+        accountWorker = childProcess.spawn(process.execPath, [path.join(__dirname, 'account-storage-worker.js')], {
+            cwd: ROOT,
+            env: process.env,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            windowsHide: true
+        })
+        let stdout = ''
+        let stderr = ''
+        const timeout = setTimeout(() => reject(new Error('Account storage initialization timed out')), 45_000)
+
+        accountWorker.stdout.setEncoding('utf8')
+        accountWorker.stderr.setEncoding('utf8')
+        accountWorker.stderr.on('data', chunk => {
+            if (stderr.length < 4096) stderr += chunk.slice(0, 4096 - stderr.length)
+        })
+        accountWorker.stdout.on('data', chunk => {
+            stdout += chunk
+            let newline
+            while ((newline = stdout.indexOf('\n')) !== -1) {
+                const line = stdout.slice(0, newline)
+                stdout = stdout.slice(newline + 1)
+                if (!line.trim()) continue
+                try {
+                    const message = JSON.parse(line)
+                    if (message.type === 'ready') {
+                        clearTimeout(timeout)
+                        if (message.success) resolve(message)
+                        else reject(new Error(message.message || 'Account storage initialization failed'))
+                        continue
+                    }
+                    const pending = accountWorkerPending.get(message.id)
+                    if (!pending) continue
+                    accountWorkerPending.delete(message.id)
+                    clearTimeout(pending.timeout)
+                    if (message.success) pending.resolve(message.result)
+                    else pending.reject(new Error(message.message || 'Account storage operation failed'))
+                } catch (error) {
+                    pushLog('warn', `Invalid account storage response: ${error.message}`)
+                }
+            }
+        })
+        accountWorker.on('error', error => {
+            clearTimeout(timeout)
+            reject(error)
+        })
+        accountWorker.on('close', code => {
+            clearTimeout(timeout)
+            accountWorker = null
+            accountWorkerReady = null
+            const error = new Error(stderr || `Account storage worker exited with code ${code}`)
+            for (const pending of accountWorkerPending.values()) {
+                clearTimeout(pending.timeout)
+                pending.reject(error)
+            }
+            accountWorkerPending.clear()
+        })
+    }).catch(error => {
+        accountWorkerReady = null
+        if (accountWorker) accountWorker.kill()
+        throw error
+    })
+    return accountWorkerReady
+}
+
+async function accountStorageRequest(action, payload = {}) {
+    await startAccountStorageWorker()
+    if (!accountWorker?.stdin?.writable) throw new Error('Account storage service is unavailable')
+    const id = ++accountWorkerSequence
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            accountWorkerPending.delete(id)
+            reject(new Error(`Account storage ${action} timed out`))
+        }, 45_000)
+        accountWorkerPending.set(id, { resolve, reject, timeout })
+        accountWorker.stdin.write(`${JSON.stringify({ id, action, payload })}\n`)
+    })
 }
 
 function runJsonWorker(scriptName, payload) {
@@ -121,21 +206,6 @@ function runJsonWorker(scriptName, payload) {
         })
         worker.stdin.end(JSON.stringify(payload || {}))
     })
-}
-
-function readAccounts() {
-    try {
-        const accounts = accountStorage.readAccounts()
-        if (!Array.isArray(accounts)) return []
-        return accounts.map((account, index) => ({
-            id: index + 1,
-            email: maskEmail(account.email || `Account ${index + 1}`),
-            enabled: account.enabled !== false,
-            status: account.enabled === false ? 'Disabled' : 'Ready'
-        }))
-    } catch {
-        return []
-    }
 }
 
 function maskEmail(email) {
@@ -363,17 +433,6 @@ function sendInput(value) {
     if (!botProcess?.stdin?.writable) return false
     botProcess.stdin.write(`${value || ''}\n`)
     return true
-}
-
-function readAccountsRaw() {
-    try {
-        return accountStorage.readAccounts()
-    } catch { return [] }
-}
-
-function writeAccountsRaw(accounts) {
-    accountStorage.writeAccounts(accounts)
-    state.accounts = readAccounts()
 }
 
 const CONFIG_SRC  = path.join(ROOT, 'src',  'config.json')
@@ -606,8 +665,7 @@ function finishDeskBoot() {
 function initializeDeskInBackground() {
     void loadDeskLicenseState()
     setTimeout(() => {
-        void runJsonWorker('account-storage-worker.js', {}).then(result => {
-            if (!result.success) throw new Error(result.message || 'Account storage initialization failed')
+        void startAccountStorageWorker().then(result => {
             if (result.storage?.warning) pushLog('warn', result.storage.warning)
             state.accounts = Array.isArray(result.accounts) ? result.accounts : []
         }).catch(error => {
@@ -687,6 +745,36 @@ function html() {
     @keyframes glowPulse{0%,100%{box-shadow:0 0 0 0 rgba(30,155,255,0)}50%{box-shadow:0 0 24px 4px rgba(30,155,255,.18)}}
     @keyframes viewIn{from{opacity:0;transform:translateY(8px) scale(.995)}to{opacity:1;transform:none}}
     @keyframes coreAura{0%,100%{filter:drop-shadow(0 0 0 rgba(247,200,92,0))}50%{filter:drop-shadow(0 0 12px rgba(247,200,92,.25))}}
+    .app-boot{
+      position:fixed;inset:0;z-index:500;display:grid;place-items:center;
+      background:radial-gradient(circle at 50% 42%,rgba(30,155,255,.12),transparent 34%),var(--bg);
+      transition:opacity .28s ease,visibility .28s ease;
+    }
+    .app-boot.ready{opacity:0;visibility:hidden;pointer-events:none}
+    .app-boot-card{display:flex;flex-direction:column;align-items:center;gap:13px;text-align:center}
+    .app-boot-logo{width:58px;height:58px;border-radius:16px;box-shadow:0 0 30px rgba(30,155,255,.28)}
+    .app-boot-spinner,.inline-spinner{
+      width:20px;height:20px;border:2px solid rgba(46,232,255,.18);
+      border-top-color:var(--cyan);border-radius:50%;animation:spin .75s linear infinite;
+    }
+    .app-boot-title{font-size:16px;font-weight:750}
+    .app-boot-detail{font-size:12px;color:var(--muted)}
+    .loading-block{display:flex;align-items:center;justify-content:center;gap:10px;min-height:105px;color:var(--muted);font-size:12px}
+    .action-busy{position:relative;pointer-events:none;opacity:.72}
+    .action-busy:after{
+      content:"";width:12px;height:12px;margin-left:8px;display:inline-block;vertical-align:-2px;
+      border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;
+    }
+    .startup-card.is-busy{opacity:.72;pointer-events:none}
+    .toast{
+      position:fixed;right:22px;bottom:22px;z-index:450;max-width:360px;
+      padding:11px 14px;border-radius:11px;border:1px solid rgba(47,210,125,.26);
+      background:rgba(7,20,28,.96);color:#caffdf;font-size:12.5px;
+      box-shadow:0 18px 50px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);
+      pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+    }
+    .toast.show{opacity:1;transform:none}
+    .toast.error{border-color:rgba(255,107,138,.35);color:#ffd2dc}
     button,input{font:inherit}
     ::-webkit-scrollbar{width:4px;height:4px}
     ::-webkit-scrollbar-track{background:transparent}
@@ -1186,7 +1274,7 @@ function html() {
     .btn-lic-secondary:hover{color:var(--text);border-color:rgba(110,146,184,.4);background:rgba(255,255,255,.04)}
     .btn-lic-danger{border-color:rgba(255,107,138,.3);color:#ff9eb2;background:rgba(255,107,138,.06)}
     .btn-lic-danger:hover{border-color:rgba(255,107,138,.55);color:#ffd4dd;background:rgba(255,107,138,.12)}
-    .install-status-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:18px 0}
+    .install-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0 18px}
     .install-status-item{padding:12px 8px;border:1px solid var(--border);border-radius:10px;text-align:center;background:rgba(255,255,255,.025)}
     .install-status-item b{display:block;font-size:12px;margin-bottom:4px}
     .install-status-item span{font-size:10.5px;color:var(--muted)}
@@ -1432,6 +1520,15 @@ function html() {
   </style>
 </head>
 <body>
+  <div class="app-boot" id="app-boot">
+    <div class="app-boot-card">
+      <img src="/app-icon.png" class="app-boot-logo" alt="">
+      <div class="app-boot-spinner"></div>
+      <div class="app-boot-title">Preparing Rewards Desk</div>
+      <div class="app-boot-detail" id="app-boot-detail">Loading accounts and Core status…</div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
   <aside class="sidebar">
     <div class="brand">
       <img src="/app-icon.png" alt="">
@@ -1763,6 +1860,13 @@ function html() {
             <div class="toggle-sub">Close Rewards Desk and relaunch the bot in PowerShell with live developer logs.</div>
           </div>
           <button class="btn btn-secondary" id="btn-terminal-mode" style="flex-shrink:0">Open terminal &amp; run →</button>
+        </div>
+        <div class="advanced-block term-row">
+          <div class="toggle-wrap-left">
+            <div class="toggle-label">Desktop shortcuts</div>
+            <div class="toggle-sub">Remove the Desktop and application-menu shortcuts. Autostart settings are not changed.</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="desktop-uninstall" style="flex-shrink:0">Uninstall shortcuts</button>
         </div>
       </div>
     </div>
@@ -2129,16 +2233,13 @@ function html() {
         </div>
       </div>
       <div class="lic-body">
-        <h2>Open Desk like an application</h2>
-        <p>Creates native shortcuts with the Rewards Desk icon. The startup terminal remains visible while updates and the local build run, then closes after Desk opens.</p>
+        <h2>Install shortcuts</h2>
         <div class="install-status-grid">
           <div class="install-status-item" id="install-status-desktop"><b>Desktop</b><span>Checking…</span></div>
           <div class="install-status-item" id="install-status-menu"><b>App menu</b><span>Checking…</span></div>
-          <div class="install-status-item" id="install-status-taskbar"><b>Taskbar / Dock</b><span>User pin</span></div>
         </div>
         <div class="lic-actions">
-          <button class="btn-lic-primary" id="install-create">Create or repair shortcuts</button>
-          <button class="btn-lic-secondary" id="install-reveal">Show shortcut to pin</button>
+          <button class="btn-lic-primary" id="install-create">Install</button>
           <button class="btn-lic-secondary" id="install-close">Close</button>
         </div>
         <div class="lic-error" id="install-error"></div>
@@ -2185,6 +2286,8 @@ function html() {
     var _licClientReady = false;
     var _coreData = { tier: 'free' };
     var _storageConfirmation = '';
+    var _toastTimer = null;
+    var _bootOverlayReleased = false;
     var PLUGIN_DOC_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/main/docs/create-plugin.md';
     var DOCS_GITHUB_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/main/docs';
 
@@ -2195,6 +2298,40 @@ function html() {
         (e.ctrlKey && e.key.toUpperCase() === 'U');
       if (blocked) { e.preventDefault(); e.stopPropagation(); }
     }, true);
+
+    function showToast(message, isError) {
+      var toast = G('toast');
+      toast.textContent = message;
+      toast.classList.toggle('error', !!isError);
+      toast.classList.add('show');
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(function(){toast.classList.remove('show');}, 3200);
+    }
+    function releaseBootOverlay() {
+      _bootOverlayReleased = true;
+      var boot = G('app-boot');
+      boot.classList.add('ready');
+      boot.style.opacity = '0';
+      boot.style.visibility = 'hidden';
+      boot.style.pointerEvents = 'none';
+      setTimeout(function(){if (boot.parentNode) boot.parentNode.removeChild(boot);}, 320);
+    }
+    setTimeout(function(){
+      releaseBootOverlay();
+    }, 900);
+
+    function setButtonBusy(button, busy, label) {
+      if (!button) return;
+      if (busy) {
+        button.dataset.idleText = button.textContent;
+        if (label) button.textContent = label;
+      } else if (button.dataset.idleText) {
+        button.textContent = button.dataset.idleText;
+        delete button.dataset.idleText;
+      }
+      button.disabled = !!busy;
+      button.classList.toggle('action-busy', !!busy);
+    }
 
     // ── Core feature gating (config.json core.*) ──
     var CORE_KEYS = ['claimPoints','applyCoupons','doubleSearchPoints','appReward','readToEarn',
@@ -2370,7 +2507,10 @@ function html() {
     }
 
     // ── Dashboard accounts (masked list) ──────
-    function renderAccounts(accounts, active) {
+    function renderAccounts(accounts, active, loading) {
+      if (loading) {
+        return '<div class="loading-block"><span class="inline-spinner"></span><span>Loading protected accounts…</span></div>';
+      }
       if (!accounts || !accounts.length) {
         return '<div class="acc-empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg><p>No accounts yet</p><button class="btn btn-secondary btn-sm" onclick="setView(&apos;accounts&apos;)">Add accounts</button></div>';
       }
@@ -2394,6 +2534,14 @@ function html() {
       var s = data.status || 'Ready';
       var running = data.isRunning;
       var m = data.metrics || {};
+      var boot = data.boot || {};
+      var bootReady = !!boot.accountsReady && !!boot.licenseReady;
+      if (bootReady && !_bootOverlayReleased) releaseBootOverlay();
+      if (!bootReady && !_bootOverlayReleased) {
+        G('app-boot-detail').textContent = !boot.accountsReady
+          ? 'Loading protected accounts…'
+          : 'Checking Core status…';
+      }
 
       G('st-text').textContent = s;
       G('st-detail').textContent = data.detail || '';
@@ -2429,7 +2577,7 @@ function html() {
 
       G('btn-run').disabled = running;
       G('btn-stop').disabled = !running;
-      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount);
+      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady);
 
       if (data.consoleLogs && data.consoleLogs.length) {
         var lines = data.consoleLogs.map(function(l) {
@@ -2474,10 +2622,22 @@ function html() {
 
     // ── Accounts editor ───────────────────────
     var _raw = [];
+    var _accountsLoading = false;
     async function loadAccEditor() {
-      try { _raw = await fetch('/api/accounts-raw').then(function(r){return r.json();}); }
-      catch(e) { _raw = []; }
-      renderAccEditor();
+      if (_accountsLoading) return;
+      _accountsLoading = true;
+      G('acc-editor-list').innerHTML = '<div class="loading-block"><span class="inline-spinner"></span><span>Decrypting accounts…</span></div>';
+      try {
+        var response = await fetch('/api/accounts-raw');
+        var data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load accounts');
+        _raw = data;
+        renderAccEditor();
+      } catch(e) {
+        G('acc-editor-list').innerHTML = '<div class="acc-empty"><p>' + esc(e.message) + '</p></div>';
+      } finally {
+        _accountsLoading = false;
+      }
     }
     function renderAccEditor() {
       var list = G('acc-editor-list');
@@ -2508,8 +2668,15 @@ function html() {
       }).join('');
     }
     async function saveRaw() {
-      try { await fetch('/api/accounts-save', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(_raw)}); }
-      catch(e) {}
+      try {
+        var response = await fetch('/api/accounts-save', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(_raw)});
+        if (!response.ok) {
+          var result = await response.json().catch(function(){return {};});
+          throw new Error(result.error || 'Could not save accounts');
+        }
+      } catch(e) {
+        showToast(e.message, true);
+      }
     }
 
     async function refreshAccountStorage() {
@@ -2539,8 +2706,9 @@ function html() {
     }
 
     G('storage-toggle').addEventListener('click', async function() {
+      var button = this;
       try {
-        var encrypted = this.dataset.encrypted === '1';
+        var encrypted = button.dataset.encrypted === '1';
         var payload = {};
         if (encrypted) {
           var typed = prompt(
@@ -2550,29 +2718,47 @@ function html() {
           if (typed === null) return;
           payload.confirmation = typed;
         }
+        setButtonBusy(button, true, encrypted ? 'Disabling' : 'Enabling');
         await storageAction(encrypted ? 'disable' : 'enable', payload);
-      } catch(e) { alert(e.message); }
+        showToast(encrypted ? 'Account encryption disabled.' : 'Account encryption enabled.');
+      } catch(e) { showToast(e.message, true); }
+      finally {
+        setButtonBusy(button, false);
+        refreshAccountStorage().catch(function(){});
+      }
     });
     G('storage-rotate').addEventListener('click', async function() {
-      try { if (confirm('Rotate the local encryption key now?')) await storageAction('rotate'); }
-      catch(e) { alert(e.message); }
+      if (!confirm('Rotate the local encryption key now?')) return;
+      var button = this;
+      try {
+        setButtonBusy(button, true, 'Rotating');
+        await storageAction('rotate');
+        showToast('Local encryption key rotated.');
+      } catch(e) { showToast(e.message, true); }
+      finally { setButtonBusy(button, false); }
     });
     G('storage-export').addEventListener('click', async function() {
       var password = prompt('Backup password (minimum 12 characters):'); if (!password) return;
       var destination = prompt('Backup destination path (leave empty for your home folder):', '');
+      var button = this;
       try {
+        setButtonBusy(button, true, 'Exporting');
         var result = await storageAction('export', {password:password, destination:destination||''});
-        alert('Encrypted backup created at:\\n' + result.path);
-      } catch(e) { alert(e.message); }
+        showToast('Encrypted backup created at ' + result.path);
+      } catch(e) { showToast(e.message, true); }
+      finally { setButtonBusy(button, false); }
     });
     G('storage-import').addEventListener('click', async function() {
       var source = prompt('Path to the encrypted backup:'); if (!source) return;
       var password = prompt('Backup password:'); if (!password) return;
+      var button = this;
       try {
+        setButtonBusy(button, true, 'Importing');
         var result = await storageAction('import', {password:password, source:source});
         await loadAccEditor();
-        alert(result.count + ' account(s) imported.');
-      } catch(e) { alert(e.message); }
+        showToast(result.count + ' account(s) imported.');
+      } catch(e) { showToast(e.message, true); }
+      finally { setButtonBusy(button, false); }
     });
     function toggleAcc(i) { _raw[i].enabled = !(_raw[i].enabled !== false); saveRaw(); renderAccEditor(); }
     function deleteAcc(i) {
@@ -2811,15 +2997,25 @@ function html() {
       var el = G(id); if (!el) return;
       el.addEventListener('change', async function() {
         var enabled = this.checked;
-        var response = await fetch('/api/startup', {
-          method:'POST',
-          headers:{'content-type':'application/json'},
-          body:JSON.stringify({mode:mode, enable:enabled})
-        }).catch(function(){return null;});
-        if (!response || !response.ok) {
+        var card = this.closest('.startup-card');
+        this.disabled = true;
+        if (card) card.classList.add('is-busy');
+        try {
+          var response = await fetch('/api/startup', {
+            method:'POST',
+            headers:{'content-type':'application/json'},
+            body:JSON.stringify({mode:mode, enable:enabled})
+          });
+          var result = await response.json().catch(function(){return {};});
+          if (!response.ok) throw new Error(result.error || 'Could not update startup settings.');
+          showToast(enabled ? 'Startup enabled.' : 'Startup disabled.');
+          await loadSettings();
+        } catch(e) {
           this.checked = !enabled;
-          var result = response ? await response.json().catch(function(){return {};}) : {};
-          alert(result.error || 'Could not update startup settings.');
+          showToast(e.message, true);
+        } finally {
+          this.disabled = false;
+          if (card) card.classList.remove('is-busy');
         }
       });
     }
@@ -3007,15 +3203,24 @@ function html() {
         el.classList.toggle('ok', !!entry[1]);
         el.querySelector('span').textContent = entry[1] ? 'Installed' : 'Not installed';
       });
-      G('install-status-taskbar').querySelector('span').textContent =
-        data.taskbar === 'manual' ? 'Pin manually' : 'Unsupported';
-      G('install-reveal').style.display = data.taskbar === 'manual' ? '' : 'none';
+      var installed = !!data.menu;
+      G('install-btn').style.display = installed ? 'none' : '';
+      G('desktop-uninstall').disabled = !installed;
+      G('desktop-uninstall').textContent = installed ? 'Uninstall shortcuts' : 'Not installed';
+      return installed;
+    }
+
+    async function syncDesktopInstallStatus() {
+      var response = await fetch('/api/desktop-install');
+      var result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not read installation status');
+      return paintInstallStatus(result);
     }
 
     async function openInstallOverlay() {
       G('install-overlay').classList.add('open');
       G('install-error').textContent = '';
-      try { paintInstallStatus(await fetch('/api/desktop-install').then(function(r){return r.json();})); }
+      try { await syncDesktopInstallStatus(); }
       catch(e) { G('install-error').textContent = e.message; }
     }
 
@@ -3026,6 +3231,7 @@ function html() {
       var result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Desktop installation failed');
       paintInstallStatus(result);
+      return result;
     }
 
     function _licSpawnConfetti() {
@@ -3228,13 +3434,29 @@ function html() {
     G('install-close').addEventListener('click', function(){G('install-overlay').classList.remove('open');});
     G('install-overlay').addEventListener('click', function(e){if(e.target===this)this.classList.remove('open');});
     G('install-create').addEventListener('click', async function() {
-      var original = this.textContent; this.disabled = true; this.textContent = 'Creating shortcuts…';
-      try { await desktopInstallAction('install'); }
+      var button = this;
+      setButtonBusy(button, true, 'Installing');
+      try {
+        await desktopInstallAction('install');
+        showToast('Rewards Desk shortcuts installed.');
+        G('install-overlay').classList.remove('open');
+      }
       catch(e) { G('install-error').textContent = e.message; }
-      finally { this.disabled = false; this.textContent = original; }
+      finally { setButtonBusy(button, false); }
     });
-    G('install-reveal').addEventListener('click', function() {
-      desktopInstallAction('reveal').catch(function(e){G('install-error').textContent=e.message;});
+    G('desktop-uninstall').addEventListener('click', async function() {
+      if (!confirm('Remove the Rewards Desk shortcuts?')) return;
+      var button = this;
+      setButtonBusy(button, true, 'Removing');
+      try {
+        await desktopInstallAction('uninstall');
+        showToast('Rewards Desk shortcuts removed.');
+      } catch(e) {
+        showToast(e.message, true);
+      } finally {
+        setButtonBusy(button, false);
+        syncDesktopInstallStatus().catch(function(){});
+      }
     });
 
     fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
@@ -3243,6 +3465,7 @@ function html() {
     setInterval(updateNextRun, 30000);
     initLicOverlay();
     refreshAccountStorage().catch(function(){});
+    syncDesktopInstallStatus().catch(function(){});
     setInterval(refresh, 900);
     refresh();
   </script>
@@ -3436,16 +3659,23 @@ const server = http.createServer((req, res) => {
         return
     }
     if (req.method === 'GET' && req.url === '/api/accounts-raw') {
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(readAccountsRaw()))
+        accountStorageRequest('read')
+            .then(result => jsonResponse(res, 200, result.accounts || []))
+            .catch(error => jsonResponse(res, 500, { error: error.message }))
         return
     }
     if (req.method === 'POST' && req.url === '/api/accounts-save') {
-        readApiBody(req, res, body => {
+        readApiBody(req, res, async body => {
             const accounts = parseJson(body, null)
             if (!Array.isArray(accounts)) { res.writeHead(400); res.end('Invalid'); return }
-            try { writeAccountsRaw(accounts); res.writeHead(204); res.end() }
-            catch (e) { res.writeHead(500); res.end(String(e.message)) }
+            try {
+                const result = await accountStorageRequest('write', { accounts })
+                state.accounts = Array.isArray(result.masked) ? result.masked : []
+                res.writeHead(204)
+                res.end()
+            } catch (error) {
+                jsonResponse(res, 500, { error: error.message })
+            }
         })
         return
     }
@@ -3529,9 +3759,8 @@ const server = http.createServer((req, res) => {
                     jsonResponse(res, 200, desktopInstallManager.install())
                     return
                 }
-                if (data.action === 'reveal') {
-                    desktopInstallManager.revealPinTarget()
-                    jsonResponse(res, 200, desktopInstallManager.status())
+                if (data.action === 'uninstall') {
+                    jsonResponse(res, 200, desktopInstallManager.uninstall())
                     return
                 }
                 jsonResponse(res, 400, { error: 'Unknown desktop installation action' })
@@ -3542,37 +3771,21 @@ const server = http.createServer((req, res) => {
         return
     }
     if (req.method === 'GET' && req.url === '/api/account-storage') {
-        jsonResponse(res, 200, {
-            ...accountStorage.status(),
-            disableConfirmation: os.userInfo().username
-        })
+        accountStorageRequest('status')
+            .then(result => jsonResponse(res, 200, { ...result, disableConfirmation: os.userInfo().username }))
+            .catch(error => jsonResponse(res, 500, { error: error.message }))
         return
     }
     if (req.method === 'POST' && req.url === '/api/account-storage') {
-        readApiBody(req, res, body => {
+        readApiBody(req, res, async body => {
             try {
                 const data = parseJson(body, {})
-                let result
-                if (data.action === 'enable') result = accountStorage.enableEncryption()
-                else if (data.action === 'disable') {
-                    if (String(data.confirmation || '') !== os.userInfo().username) {
-                        throw new Error('Local-user confirmation did not match')
-                    }
-                    result = accountStorage.disableEncryption()
-                }
-                else if (data.action === 'rotate') result = accountStorage.rotateKey()
-                else if (data.action === 'export') {
-                    const destination = data.destination
-                        ? path.resolve(String(data.destination))
-                        : path.join(os.homedir(), `MSRB-accounts-${new Date().toISOString().slice(0, 10)}.msrb-accounts`)
-                    result = { path: accountStorage.exportBackup(destination, String(data.password || '')) }
-                } else if (data.action === 'import') {
-                    result = { count: accountStorage.importBackup(String(data.source || ''), String(data.password || '')) }
-                    state.accounts = readAccounts()
-                } else {
+                if (!['enable', 'disable', 'rotate', 'export', 'import'].includes(data.action)) {
                     jsonResponse(res, 400, { error: 'Unknown storage action' })
                     return
                 }
+                const result = await accountStorageRequest(data.action, data)
+                if (Array.isArray(result.masked)) state.accounts = result.masked
                 jsonResponse(res, 200, result)
             } catch (error) {
                 jsonResponse(res, 400, { error: error.message })

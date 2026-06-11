@@ -2,6 +2,7 @@ const childProcess = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const { createRuntimeLaunchers } = require('./runtime-launchers')
 
 const DESK_TASK = 'Microsoft Rewards Bot Rewards Desk'
 const AGENT_TASK = 'Microsoft Rewards Bot Core Agent'
@@ -15,15 +16,14 @@ function createStartupManager(options = {}) {
     const home = options.home || os.homedir()
     const env = options.env || process.env
     const execFileSync = options.execFileSync || childProcess.execFileSync
-    const runtimeDir = path.join(root, '.core')
-    const startScript = path.join(root, 'scripts', 'start.js')
+    const launchers = createRuntimeLaunchers({ root, platform })
 
-    function run(command, args) {
+    function run(command, args, extraEnv = {}) {
         try {
             const stdout = execFileSync(command, args, {
                 cwd: root,
                 encoding: 'utf8',
-                env,
+                env: { ...env, ...extraEnv },
                 stdio: ['ignore', 'pipe', 'pipe'],
                 windowsHide: true
             })
@@ -46,53 +46,41 @@ function createStartupManager(options = {}) {
     }
 
     function launcher(mode) {
-        fs.mkdirSync(runtimeDir, { recursive: true })
-        if (platform === 'win32') {
-            const filePath = path.join(runtimeDir, mode === 'desk' ? 'start-desk.cmd' : 'start-background.cmd')
-            const args = mode === 'desk' ? '' : ' --background'
-            const log = path.join(root, 'logs', mode === 'desk' ? 'rewards-desk.log' : 'background-agent.log')
-            atomicWrite(
-                filePath,
-                ['@echo off', `cd /d "${root}"`, `"${process.execPath}" "${startScript}"${args} >> "${log}" 2>&1`, ''].join('\r\n')
-            )
-            return filePath
-        }
-
-        const filePath = path.join(runtimeDir, mode === 'desk' ? 'start-desk.sh' : 'start-background.sh')
-        const args = mode === 'desk' ? '' : ' --background'
-        atomicWrite(
-            filePath,
-            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nexec ${shellQuote(process.execPath)} ${shellQuote(startScript)}${args}\n`,
-            0o700
-        )
-        return filePath
+        return mode === 'desk' ? launchers.ensureDeskLauncher() : launchers.ensureAgentLauncher()
     }
 
     function windowsTaskState(name) {
         return run('schtasks.exe', ['/Query', '/TN', name]).ok
     }
 
-    function installWindowsTask(name, launcherPath) {
-        fs.mkdirSync(path.join(root, 'logs'), { recursive: true })
-        const result = run('schtasks.exe', [
-            '/Create',
-            '/SC',
-            'ONLOGON',
-            '/TN',
-            name,
-            '/TR',
-            `cmd.exe /c ""${launcherPath}""`,
-            '/RL',
-            'LIMITED',
-            '/F'
-        ])
-        if (!result.ok) throw new Error(result.stderr || result.stdout || `Could not install ${name}`)
+    function windowsStartupPath(mode) {
+        const appData = env.APPDATA || path.join(home, 'AppData', 'Roaming')
+        const name = mode === 'desk' ? 'Rewards Desk.cmd' : 'Rewards Core Agent.cmd'
+        return path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', name)
     }
 
-    function removeWindowsTask(name) {
+    function installWindowsStartup(mode) {
+        const launcherPath = launcher(mode)
+        const content =
+            mode === 'desk'
+                ? `@echo off\r\ncall "${launcherPath}"\r\n`
+                : `@echo off\r\nstart "" /min cmd.exe /c ""${launcherPath}""\r\n`
+        atomicWrite(windowsStartupPath(mode), content)
+    }
+
+    function removeWindowsTask(name, strict = true) {
         if (!windowsTaskState(name)) return
         const result = run('schtasks.exe', ['/Delete', '/TN', name, '/F'])
-        if (!result.ok) throw new Error(result.stderr || result.stdout || `Could not remove ${name}`)
+        if (result.ok) return
+        const elevated = run('powershell.exe', [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            '$p=Start-Process -FilePath "schtasks.exe" -ArgumentList @("/Delete","/TN",$env:MSRB_TASK_NAME,"/F") -Verb RunAs -Wait -PassThru;exit $p.ExitCode'
+        ], { MSRB_TASK_NAME: name })
+        if (!elevated.ok && strict) {
+            throw new Error(elevated.stderr || elevated.stdout || `Could not remove legacy task ${name}`)
+        }
     }
 
     function removeLegacyDeskRegistryEntry() {
@@ -175,9 +163,18 @@ function createStartupManager(options = {}) {
 
     function status() {
         if (platform === 'win32') {
+            const deskStartup = fs.existsSync(windowsStartupPath('desk'))
+            const agentStartup = fs.existsSync(windowsStartupPath('agent'))
             return {
-                desk: { installed: windowsTaskState(DESK_TASK) || legacyDeskRegistryInstalled(), method: 'task-scheduler' },
-                agent: { installed: windowsTaskState(AGENT_TASK), method: 'task-scheduler', supported: true }
+                desk: {
+                    installed: deskStartup || windowsTaskState(DESK_TASK) || legacyDeskRegistryInstalled(),
+                    method: deskStartup ? 'startup-folder' : 'legacy-task-scheduler'
+                },
+                agent: {
+                    installed: agentStartup || windowsTaskState(AGENT_TASK),
+                    method: agentStartup ? 'startup-folder' : 'legacy-task-scheduler',
+                    supported: true
+                }
             }
         }
         if (platform === 'darwin') {
@@ -202,8 +199,13 @@ function createStartupManager(options = {}) {
     function setDeskEnabled(enable) {
         if (platform === 'win32') {
             removeLegacyDeskRegistryEntry()
-            if (enable) installWindowsTask(DESK_TASK, launcher('desk'))
-            else removeWindowsTask(DESK_TASK)
+            if (enable) {
+                installWindowsStartup('desk')
+                removeWindowsTask(DESK_TASK, false)
+            } else {
+                fs.rmSync(windowsStartupPath('desk'), { force: true })
+                removeWindowsTask(DESK_TASK)
+            }
         } else if (platform === 'darwin') {
             if (enable) installLaunchAgent(DESK_LAUNCH_AGENT, 'desk')
             else removeLaunchAgent(DESK_LAUNCH_AGENT)
@@ -218,8 +220,13 @@ function createStartupManager(options = {}) {
 
     function setAgentEnabled(enable) {
         if (platform === 'win32') {
-            if (enable) installWindowsTask(AGENT_TASK, launcher('agent'))
-            else removeWindowsTask(AGENT_TASK)
+            if (enable) {
+                installWindowsStartup('agent')
+                removeWindowsTask(AGENT_TASK, false)
+            } else {
+                fs.rmSync(windowsStartupPath('agent'), { force: true })
+                removeWindowsTask(AGENT_TASK)
+            }
         } else if (platform === 'darwin') {
             if (enable) installLaunchAgent(CORE_LAUNCH_AGENT, 'agent')
             else removeLaunchAgent(CORE_LAUNCH_AGENT)
@@ -233,10 +240,6 @@ function createStartupManager(options = {}) {
     }
 
     return { setAgentEnabled, setDeskEnabled, status }
-}
-
-function shellQuote(value) {
-    return `'${String(value).replace(/'/g, "'\\''")}'`
 }
 
 function systemdQuote(value) {

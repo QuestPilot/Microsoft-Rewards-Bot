@@ -2,6 +2,7 @@ const childProcess = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const { createRuntimeLaunchers } = require('./runtime-launchers')
 
 function createDesktopInstallManager(options = {}) {
     const root = path.resolve(options.root || process.cwd())
@@ -9,10 +10,9 @@ function createDesktopInstallManager(options = {}) {
     const home = options.home || os.homedir()
     const env = options.env || process.env
     const execFileSync = options.execFileSync || childProcess.execFileSync
-    const runtimeDir = path.join(root, '.core')
+    const launchers = createRuntimeLaunchers({ root, platform })
     const iconPng = path.join(root, 'assets', 'logo.png')
     const iconIco = path.join(root, 'assets', 'logo.ico')
-    const startScript = path.join(root, 'scripts', 'start.js')
 
     function atomicWrite(filePath, content, mode = 0o600) {
         fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -36,31 +36,6 @@ function createDesktopInstallManager(options = {}) {
         const desktop = path.join(home, 'Desktop', 'Rewards Desk.lnk')
         const startMenu = path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Rewards Desk.lnk')
         return { desktop, startMenu }
-    }
-
-    function windowsLauncher() {
-        const filePath = path.join(runtimeDir, 'launch-rewards-desk.cmd')
-        atomicWrite(
-            filePath,
-            [
-                '@echo off',
-                'title Rewards Desk - Starting',
-                'color 0B',
-                `cd /d "${root}"`,
-                'echo.',
-                'echo   Rewards Desk is preparing...',
-                'echo   Updates and local files are being checked. This window will close automatically.',
-                'echo.',
-                `"${process.execPath}" "${startScript}"`,
-                'if errorlevel 1 (',
-                '  echo.',
-                '  echo Rewards Desk could not start. Review the error above.',
-                '  pause',
-                ')',
-                ''
-            ].join('\r\n')
-        )
-        return filePath
     }
 
     function createWindowsShortcut(shortcutPath, launcherPath) {
@@ -89,16 +64,6 @@ function createDesktopInstallManager(options = {}) {
         }
     }
 
-    function unixLauncher() {
-        const filePath = path.join(runtimeDir, 'launch-rewards-desk.sh')
-        atomicWrite(
-            filePath,
-            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nprintf '\\n  Rewards Desk is preparing...\\n  This terminal closes after the interface opens.\\n\\n'\n${shellQuote(process.execPath)} ${shellQuote(startScript)}\nstatus=$?\nif [ "$status" -ne 0 ]; then printf '\\nStartup failed. Press Enter to close.\\n'; read answer; fi\nexit "$status"\n`,
-            0o700
-        )
-        return filePath
-    }
-
     function linuxDesktopEntry(launcherPath) {
         return `[Desktop Entry]\nType=Application\nVersion=1.0\nName=Rewards Desk\nComment=Microsoft Rewards Bot local control panel\nExec=/bin/sh ${desktopQuote(launcherPath)}\nIcon=${iconPng}\nTerminal=true\nCategories=Utility;\nStartupNotify=true\n`
     }
@@ -117,7 +82,7 @@ function createDesktopInstallManager(options = {}) {
         )
         atomicWrite(
             executable,
-            `#!/bin/sh\nopen -a Terminal ${shellQuote(unixLauncher())}\n`,
+            `#!/bin/sh\nopen -a Terminal ${shellQuote(launchers.ensureDeskLauncher())}\n`,
             0o700
         )
         fs.mkdirSync(resources, { recursive: true })
@@ -132,8 +97,7 @@ function createDesktopInstallManager(options = {}) {
                 supported: true,
                 platform,
                 desktop: fs.existsSync(paths.desktop),
-                menu: fs.existsSync(paths.startMenu),
-                taskbar: 'manual'
+                menu: fs.existsSync(paths.startMenu)
             }
         }
         if (platform === 'darwin') {
@@ -141,8 +105,7 @@ function createDesktopInstallManager(options = {}) {
                 supported: true,
                 platform,
                 desktop: fs.existsSync(macAppPath()),
-                menu: fs.existsSync(macAppPath()),
-                taskbar: 'manual'
+                menu: fs.existsSync(macAppPath())
             }
         }
         if (platform === 'linux') {
@@ -151,17 +114,16 @@ function createDesktopInstallManager(options = {}) {
                 supported: true,
                 platform,
                 desktop: fs.existsSync(paths.desktop),
-                menu: fs.existsSync(paths.menu),
-                taskbar: 'manual'
+                menu: fs.existsSync(paths.menu)
             }
         }
-        return { supported: false, platform, desktop: false, menu: false, taskbar: 'unsupported' }
+        return { supported: false, platform, desktop: false, menu: false }
     }
 
     function install() {
         if (platform === 'win32') {
             const paths = windowsPaths()
-            const launcherPath = windowsLauncher()
+            const launcherPath = launchers.ensureDeskLauncher()
             createWindowsShortcut(paths.desktop, launcherPath)
             createWindowsShortcut(paths.startMenu, launcherPath)
             return status()
@@ -172,7 +134,7 @@ function createDesktopInstallManager(options = {}) {
         }
         if (platform === 'linux') {
             const paths = linuxPaths()
-            const entry = linuxDesktopEntry(unixLauncher())
+            const entry = linuxDesktopEntry(launchers.ensureDeskLauncher())
             atomicWrite(paths.menu, entry, 0o755)
             if (fs.existsSync(path.dirname(paths.desktop))) atomicWrite(paths.desktop, entry, 0o755)
             return status()
@@ -180,22 +142,27 @@ function createDesktopInstallManager(options = {}) {
         throw new Error('Desktop installation is not supported on this platform')
     }
 
-    function revealPinTarget() {
+    function uninstall() {
         if (platform === 'win32') {
-            const shortcut = windowsPaths().startMenu
-            childProcess.spawn('explorer.exe', [`/select,${shortcut}`], { detached: true, stdio: 'ignore' }).unref()
-            return
+            const paths = windowsPaths()
+            fs.rmSync(paths.desktop, { force: true })
+            fs.rmSync(paths.startMenu, { force: true })
+            return status()
         }
         if (platform === 'darwin') {
-            childProcess.spawn('open', ['-R', macAppPath()], { detached: true, stdio: 'ignore' }).unref()
-            return
+            fs.rmSync(macAppPath(), { recursive: true, force: true })
+            return status()
         }
         if (platform === 'linux') {
-            childProcess.spawn('xdg-open', [path.dirname(linuxPaths().menu)], { detached: true, stdio: 'ignore' }).unref()
+            const paths = linuxPaths()
+            fs.rmSync(paths.desktop, { force: true })
+            fs.rmSync(paths.menu, { force: true })
+            return status()
         }
+        throw new Error('Desktop installation is not supported on this platform')
     }
 
-    return { install, revealPinTarget, status }
+    return { install, status, uninstall }
 }
 
 function shellQuote(value) {
