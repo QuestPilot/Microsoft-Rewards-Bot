@@ -28,7 +28,21 @@ If you have a Core license, click **Activate Core** (sidebar, or the prompt on f
 
 On desktop systems, Rewards Desk automatically encrypts account credentials with AES-256-GCM. The encryption key is protected by Windows DPAPI, macOS Keychain, or Linux Secret Service. Account edits are written atomically and re-encrypted with a fresh nonce.
 
-Use **Settings → Account storage** to disable encryption, rotate the local key, or create a portable password-protected backup. Portable backups can be imported on another computer and are then re-encrypted with that computer's OS vault. If Linux Secret Service is unavailable, the Desk keeps `src/accounts.json` in plaintext and displays a warning instead of risking inaccessible credentials.
+The **Disable encryption** action remains visible in Settings → Advanced. It requires confirmation with the current local OS username, writes a verified plaintext `accounts.json`, and only then removes the encrypted file.
+
+## Install desktop shortcuts
+
+Click **Install Rewards Desk** near the bottom of the sidebar to create or repair native launchers:
+
+- Windows: Desktop and Start menu shortcuts with the Rewards Desk icon.
+- Linux: Desktop and application-menu `.desktop` entries.
+- macOS: a `Rewards Desk.app` launcher in the current user's Applications folder.
+
+The launcher keeps a terminal visible while update checks and the local TypeScript build run. The terminal closes automatically after Rewards Desk starts, or stays open when startup fails so the error can be read.
+
+Taskbar and Dock pinning remains a user action. Windows intentionally restricts automatic taskbar pinning for ordinary unpackaged applications; Rewards Desk opens the installed shortcut's location so it can be pinned normally.
+
+Use **Settings → Advanced → Account protection** to disable encryption, rotate the local key, or create a portable password-protected backup. Portable backups can be imported on another computer and are then re-encrypted with that computer's OS vault. If Linux Secret Service is unavailable, the Desk keeps `src/accounts.json` in plaintext and displays a warning instead of risking inaccessible credentials.
 
 ## Developer / terminal mode
 

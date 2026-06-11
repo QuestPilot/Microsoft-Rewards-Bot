@@ -204,6 +204,7 @@ function createAccountStorage(options = {}) {
     const accountsPath = options.accountsPath || path.join(root, 'src', 'accounts.json')
     const encryptedPath = options.encryptedPath || path.join(root, 'src', 'accounts.enc.json')
     const vault = options.vault || createSystemVault({ ...options, root })
+    let cachedKey = null
 
     function vaultStatus() {
         try {
@@ -214,16 +215,19 @@ function createAccountStorage(options = {}) {
     }
 
     function getKey(create) {
+        if (cachedKey) return Buffer.from(cachedKey)
         if (!vault.available()) throw new Error(`${vault.name} is unavailable`)
         const existing = vault.load()
         if (existing) {
             if (existing.length !== KEY_BYTES) throw new Error('The stored accounts key has an invalid length')
-            return existing
+            cachedKey = Buffer.from(existing)
+            return Buffer.from(cachedKey)
         }
         if (!create) throw new Error('The accounts encryption key is missing from the OS vault')
         const key = crypto.randomBytes(KEY_BYTES)
         vault.save(key)
-        return key
+        cachedKey = Buffer.from(key)
+        return Buffer.from(cachedKey)
     }
 
     function readEncrypted(key = getKey(false)) {
@@ -264,6 +268,7 @@ function createAccountStorage(options = {}) {
         atomicWrite(accountsPath, `${JSON.stringify(accounts, null, 4)}\n`)
         parseAccounts(fs.readFileSync(accountsPath, 'utf8'), 'Accounts file')
         fs.rmSync(encryptedPath, { force: true })
+        cachedKey = null
         return status()
     }
 
@@ -287,9 +292,11 @@ function createAccountStorage(options = {}) {
         decryptPayload(JSON.parse(fs.readFileSync(tempPath, 'utf8')), newKey)
         try {
             vault.save(newKey)
+            cachedKey = Buffer.from(newKey)
             fs.renameSync(tempPath, encryptedPath)
         } catch (error) {
             try { vault.save(oldKey) } catch {}
+            cachedKey = Buffer.from(oldKey)
             fs.rmSync(tempPath, { force: true })
             throw error
         }

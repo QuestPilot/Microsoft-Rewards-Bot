@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
@@ -102,4 +103,24 @@ test('stores and restores a key with Windows DPAPI', { skip: process.platform !=
 
     const protectedBytes = fs.readFileSync(path.join(appData, '.msrb', 'accounts-key.dpapi'))
     assert.equal(protectedBytes.includes(key), false)
+})
+
+test('reuses the OS-vault key within one Desk process', () => {
+    const { root } = fixture()
+    let loads = 0
+    const key = crypto.randomBytes(32)
+    const vault = {
+        name: 'Test vault',
+        available: () => true,
+        load: () => {
+            loads++
+            return key
+        },
+        save: () => {}
+    }
+    const storage = createAccountStorage({ root, vault })
+    storage.enableEncryption()
+    storage.readAccounts()
+    storage.readAccounts()
+    assert.equal(loads, 1)
 })

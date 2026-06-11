@@ -14,7 +14,7 @@
                  "releaseShape":  "single-entry-bytecode",
                  "targets":  {
                                  "win32-x64-node-24.15.0":  {
-                                                                "indexSha256":  "ea083317148712c382d5ba24ef5cf345bb7bc9b475a0d61c81e49f25f9680bf3",
+                                                                "indexSha256":  "16219479beb13bd66399cdb0260a4374604f94326aff65c37e30d6d4587bf28e",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "win32",
@@ -22,7 +22,7 @@
                                                                                    }
                                                             },
                                  "linux-x64-node-24.15.0":  {
-                                                                "indexSha256":  "42767167c24014de7034f909335904c7671a32b17af5f17e63f052b8560357c6",
+                                                                "indexSha256":  "4c59efcf5d2ee73cfbb7611cebf4608720e65608c46edb3238c6dde9c2eaf440",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "linux",
@@ -30,7 +30,7 @@
                                                                                    }
                                                             },
                                  "linux-arm64-node-24.15.0":  {
-                                                                  "indexSha256":  "4c129bf9496c0739ef3d34119e7e00da9379c3598bfb658d066f95322eed954e",
+                                                                  "indexSha256":  "82549421edbd731d4475aee3e4b095911a77c51bb9d40802b45f5c3df9d8b4d1",
                                                                   "bytecodeTarget":  {
                                                                                          "node":  "24.15.0",
                                                                                          "platform":  "linux",

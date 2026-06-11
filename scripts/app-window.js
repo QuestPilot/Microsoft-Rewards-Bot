@@ -5,6 +5,7 @@ const http = require('http')
 const os = require('os')
 const path = require('path')
 const { createAccountStorage } = require('./account-storage')
+const { createDesktopInstallManager } = require('./desktop-install-manager')
 const { createStartupManager } = require('./startup-manager')
 
 const ROOT = path.resolve(__dirname, '..')
@@ -17,6 +18,7 @@ const APP_WINDOW_HEIGHT = 900
 const API_TOKEN = crypto.randomBytes(32).toString('base64url')
 const MAX_API_BODY_BYTES = 64 * 1024
 const accountStorage = createAccountStorage({ root: ROOT })
+const desktopInstallManager = createDesktopInstallManager({ root: ROOT })
 const startupManager = createStartupManager({ root: ROOT })
 let agentApi = null
 try {
@@ -28,27 +30,15 @@ function readVersion() {
 }
 const APP_VERSION = readVersion()
 
-let deskLicClient = null
-;(() => {
-    const corePath = path.join(ROOT, 'plugins', 'core', 'index.js')
-    if (!fs.existsSync(corePath)) return
-    try {
-        const coreExports = require(corePath)
-        if (typeof coreExports.DeskLicensingClient === 'function') {
-            deskLicClient = new coreExports.DeskLicensingClient()
-        }
-    } catch {}
-})()
-
 const state = {
-    status: 'Ready',
-    detail: 'Click "Run daily set now" to start',
+    status: 'Preparing',
+    detail: 'Rewards Desk is loading local services',
     startedAt: new Date().toISOString(),
     finishedAt: null,
     exitCode: null,
     isRunning: false,
     agentConnected: false,
-    accounts: readAccounts(),
+    accounts: [],
     activeAccount: null,
     logs: [],
     consoleLogs: [],
@@ -57,7 +47,12 @@ const state = {
         tier: 'free',
         planType: '',
         expiresAt: null,
-        clientReady: deskLicClient !== null
+        clientReady: false,
+        loading: true
+    },
+    boot: {
+        accountsReady: false,
+        licenseReady: false
     },
     licensePrompt: {
         visible: false,
@@ -78,6 +73,55 @@ let stopRequested = false
 let shuttingDown = false
 let pendingLicenseKey = ''
 let closeAgentLogSubscription = null
+
+function runCoreLicenseWorker(payload) {
+    return runJsonWorker('core-license-worker.js', payload)
+}
+
+function runJsonWorker(scriptName, payload) {
+    return new Promise((resolve, reject) => {
+        const worker = childProcess.spawn(process.execPath, [path.join(__dirname, scriptName)], {
+            cwd: ROOT,
+            env: process.env,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            windowsHide: true
+        })
+        let stdout = ''
+        let stderr = ''
+        let settled = false
+        const finish = (callback, value) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timeout)
+            callback(value)
+        }
+        const timeout = setTimeout(() => {
+            worker.kill()
+            finish(reject, new Error(`${scriptName} timed out after 45 seconds`))
+        }, 45_000)
+        worker.stdout.setEncoding('utf8')
+        worker.stderr.setEncoding('utf8')
+        worker.stdout.on('data', chunk => {
+            if (stdout.length < MAX_API_BODY_BYTES) {
+                stdout += chunk.slice(0, MAX_API_BODY_BYTES - stdout.length)
+            }
+        })
+        worker.stderr.on('data', chunk => {
+            if (stderr.length < 4096) stderr += chunk.slice(0, 4096 - stderr.length)
+        })
+        worker.on('error', error => finish(reject, error))
+        worker.on('close', code => {
+            try {
+                const result = JSON.parse(stdout || '{}')
+                if (code && !result.message) throw new Error(stderr || `Core licensing worker exited with code ${code}`)
+                finish(resolve, result)
+            } catch (error) {
+                finish(reject, error)
+            }
+        })
+        worker.stdin.end(JSON.stringify(payload || {}))
+    })
+}
 
 function readAccounts() {
     try {
@@ -321,13 +365,6 @@ function sendInput(value) {
     return true
 }
 
-function hasCoreLicenseCache() {
-    const candidates = []
-    if (process.platform === 'win32' && process.env.APPDATA) candidates.push(path.join(process.env.APPDATA, '.msrb', 'license.dat'))
-    candidates.push(path.join(os.homedir(), '.msrb', 'license.dat'))
-    return candidates.some(candidate => fs.existsSync(candidate))
-}
-
 function readAccountsRaw() {
     try {
         return accountStorage.readAccounts()
@@ -534,26 +571,52 @@ function readDocFile(name) {
     }
 }
 
-function loadDeskLicenseState() {
-    if (!deskLicClient) return
+async function loadDeskLicenseState() {
     try {
-        const cache = deskLicClient.getCachedLicense()
-        if (cache && (!cache.expiresAt || new Date(cache.expiresAt) > new Date())) {
+        const result = await runCoreLicenseWorker({ action: 'status' })
+        state.deskLicense.clientReady = result.clientReady === true
+        if (result.tier === 'premium') {
             state.deskLicense.tier = 'premium'
-            state.deskLicense.planType = cache.planType || ''
-            state.deskLicense.expiresAt = cache.expiresAt || null
+            state.deskLicense.planType = result.planType || ''
+            state.deskLicense.expiresAt = result.expiresAt || null
             state.hasLicenseCache = true
         } else {
             state.deskLicense.tier = 'free'
+            state.hasLicenseCache = false
         }
-    } catch {}
+    } catch (error) {
+        pushLog('warn', `Core license status could not be loaded: ${error.message}`)
+    } finally {
+        state.deskLicense.loading = false
+        state.boot.licenseReady = true
+        finishDeskBoot()
+    }
 }
 
 function prepareInitialRun() {
-    state.hasLicenseCache = hasCoreLicenseCache()
-    loadDeskLicenseState()
     state.status = 'Ready'
     state.detail = 'Click "Run daily set now" to start'
+}
+
+function finishDeskBoot() {
+    if (!state.boot.accountsReady || !state.boot.licenseReady) return
+    prepareInitialRun()
+}
+
+function initializeDeskInBackground() {
+    void loadDeskLicenseState()
+    setTimeout(() => {
+        void runJsonWorker('account-storage-worker.js', {}).then(result => {
+            if (!result.success) throw new Error(result.message || 'Account storage initialization failed')
+            if (result.storage?.warning) pushLog('warn', result.storage.warning)
+            state.accounts = Array.isArray(result.accounts) ? result.accounts : []
+        }).catch(error => {
+            pushLog('warn', `Account encryption could not be enabled: ${error.message}`)
+        }).finally(() => {
+            state.boot.accountsReady = true
+            finishDeskBoot()
+        })
+    }, 150)
 }
 
 function openAccountsFile() {
@@ -667,6 +730,14 @@ function html() {
     }
     .discord-btn:hover{background:rgba(88,101,242,.28);color:#fff;border-color:rgba(88,101,242,.5)}
     .discord-btn svg{width:15px;height:15px;flex-shrink:0}
+    .install-btn{
+      display:flex;align-items:center;justify-content:center;gap:8px;
+      padding:9px 12px;border-radius:10px;border:1px solid rgba(47,210,125,.28);
+      background:rgba(47,210,125,.1);color:#8ce9b7;font-size:12.5px;
+      font-weight:650;cursor:pointer;transition:all .16s ease;
+    }
+    .install-btn:hover{background:rgba(47,210,125,.2);color:#d8ffea;border-color:rgba(47,210,125,.5)}
+    .install-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2}
     .ver{font-size:11px;color:var(--muted);text-align:center;opacity:.7}
 
     /* ── Main ── */
@@ -1113,6 +1184,13 @@ function html() {
       transition:all .15s;
     }
     .btn-lic-secondary:hover{color:var(--text);border-color:rgba(110,146,184,.4);background:rgba(255,255,255,.04)}
+    .btn-lic-danger{border-color:rgba(255,107,138,.3);color:#ff9eb2;background:rgba(255,107,138,.06)}
+    .btn-lic-danger:hover{border-color:rgba(255,107,138,.55);color:#ffd4dd;background:rgba(255,107,138,.12)}
+    .install-status-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:18px 0}
+    .install-status-item{padding:12px 8px;border:1px solid var(--border);border-radius:10px;text-align:center;background:rgba(255,255,255,.025)}
+    .install-status-item b{display:block;font-size:12px;margin-bottom:4px}
+    .install-status-item span{font-size:10.5px;color:var(--muted)}
+    .install-status-item.ok{border-color:rgba(47,210,125,.28);background:rgba(47,210,125,.06)}
     .lic-key-input{
       width:100%;background:rgba(2,7,16,.7);
       border:1.5px solid var(--border);border-radius:11px;
@@ -1410,6 +1488,10 @@ function html() {
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037 13.8 13.8 0 0 0-.61 1.253 18.3 18.3 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.253.077.077 0 0 0-.079-.037A19.7 19.7 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.08.08 0 0 0 .031.055 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.8 19.8 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
         Join Discord
       </button>
+      <button class="install-btn" id="install-btn">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Install Rewards Desk
+      </button>
       <div class="ver">v${APP_VERSION}</div>
     </div>
   </aside>
@@ -1662,13 +1744,15 @@ function html() {
               <div class="storage-state" id="account-storage-status">Checking protected storage…</div>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="storage-export">Export protected backup</button>
+          <div class="advanced-actions">
+            <button class="btn btn-secondary btn-sm" id="storage-export">Export protected backup</button>
+            <button class="btn btn-secondary btn-sm" id="storage-toggle">Disable encryption</button>
+          </div>
         </div>
         <details class="storage-tools">
           <summary>Security and recovery options</summary>
           <div class="advanced-caption">These actions are rarely needed. Disabling protection requires an explicit local-user confirmation and writes credentials to plaintext JSON.</div>
           <div class="advanced-actions">
-            <button class="btn btn-secondary btn-sm" id="storage-toggle">Disable protection</button>
             <button class="btn btn-secondary btn-sm" id="storage-rotate">Rotate local key</button>
             <button class="btn btn-secondary btn-sm" id="storage-import">Import protected backup</button>
           </div>
@@ -1691,6 +1775,7 @@ function html() {
           <div class="core-active-badge">Core active</div>
           <h1 class="core-active-title">Core is <span>working for you</span></h1>
           <p class="core-active-sub">Your license is valid and the premium engine is running. Here's a realistic estimate of the points Core adds on top of the free open-source bot — based on typical Microsoft Rewards values across your enabled features and accounts.</p>
+          <button class="btn btn-secondary btn-sm" id="core-manage-license" style="margin-top:14px">Manage this license</button>
         </div>
         <div class="core-est-card">
           <div class="core-est-label">Estimated extra points / month</div>
@@ -2013,6 +2098,50 @@ function html() {
             <button class="btn-lic-primary" id="lic-btn-success-close" style="margin-top:10px;width:auto;padding:12px 32px">Let's go →</button>
           </div>
         </div>
+        <!-- Active license management -->
+        <div id="lic-view-manage" style="display:none">
+          <div class="lic-success-wrap">
+            <div class="lic-success-ring">
+              <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h2>Core is active</h2>
+            <div class="lic-success-plan" id="lic-manage-plan">Premium</div>
+            <div class="lic-success-expires" id="lic-manage-expires"></div>
+            <p style="margin:4px 0 8px">This computer is linked to your Core license and can use premium features and remote access.</p>
+            <button class="btn-lic-secondary btn-lic-danger" id="lic-btn-deactivate">Deactivate Core on this computer</button>
+            <button class="btn-lic-secondary" id="lic-btn-manage-close">Close</button>
+            <div class="lic-error" id="lic-deactivate-error"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop installation -->
+  <div class="lic-overlay" id="install-overlay">
+    <div class="lic-card">
+      <div class="lic-banner-wrap">
+        <img src="/banner-core.png" class="lic-banner-img" alt="">
+        <div class="lic-banner-tint"></div>
+        <div class="lic-banner-badges">
+          <img src="/app-icon.png" class="lic-banner-logo" alt="">
+          <div><div class="lic-banner-title">Install Rewards Desk</div><div class="lic-banner-ver">Quick access from your computer</div></div>
+        </div>
+      </div>
+      <div class="lic-body">
+        <h2>Open Desk like an application</h2>
+        <p>Creates native shortcuts with the Rewards Desk icon. The startup terminal remains visible while updates and the local build run, then closes after Desk opens.</p>
+        <div class="install-status-grid">
+          <div class="install-status-item" id="install-status-desktop"><b>Desktop</b><span>Checking…</span></div>
+          <div class="install-status-item" id="install-status-menu"><b>App menu</b><span>Checking…</span></div>
+          <div class="install-status-item" id="install-status-taskbar"><b>Taskbar / Dock</b><span>User pin</span></div>
+        </div>
+        <div class="lic-actions">
+          <button class="btn-lic-primary" id="install-create">Create or repair shortcuts</button>
+          <button class="btn-lic-secondary" id="install-reveal">Show shortcut to pin</button>
+          <button class="btn-lic-secondary" id="install-close">Close</button>
+        </div>
+        <div class="lic-error" id="install-error"></div>
       </div>
     </div>
   </div>
@@ -2750,6 +2879,10 @@ function html() {
       _coreData = data || { tier: 'free' };
       _licClientReady = !!data.clientReady;
       _licActivated = data.tier === 'premium';
+      if (data.loading) {
+        setTimeout(initLicOverlay, 500);
+        return;
+      }
       document.body.classList.toggle('core-enhanced', _licActivated);
       _updateLicSidebarBtn(data);
       renderCoreView();
@@ -2778,12 +2911,19 @@ function html() {
       G('lic-overlay').classList.add('open');
       _licSetView(v || 'welcome');
       if (v === 'key' || v === 'welcome') { G('lic-key').value = ''; _licSetError(''); }
+      if (v === 'manage') {
+        G('lic-manage-plan').textContent = _coreData.planType || 'Premium';
+        G('lic-manage-expires').textContent = _coreData.expiresAt
+          ? 'Expires ' + new Date(_coreData.expiresAt).toLocaleDateString()
+          : 'Lifetime license';
+        G('lic-deactivate-error').textContent = '';
+      }
     }
 
     function licCloseOverlay() { G('lic-overlay').classList.remove('open'); }
 
     function _licSetView(v) {
-      ['welcome','key','success'].forEach(function(n) {
+      ['welcome','key','success','manage'].forEach(function(n) {
         G('lic-view-' + n).style.display = (n === v) ? '' : 'none';
       });
       if (v === 'key') setTimeout(function() { G('lic-key').focus(); }, 60);
@@ -2834,6 +2974,58 @@ function html() {
       } else {
         _licSetError(result.message || 'Activation failed.');
       }
+    }
+
+    async function _licDoDeactivate() {
+      if (!confirm('Deactivate Core on this computer?\\n\\nThis removes the machine activation, disables remote startup, and deletes the local license cache. Your license itself is not cancelled.')) return;
+      var btn = G('lic-btn-deactivate');
+      var original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Deactivating…';
+      G('lic-deactivate-error').textContent = '';
+      try {
+        var response = await fetch('/api/license/deactivate', {method:'POST'});
+        var result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Deactivation failed');
+        _licActivated = false;
+        _coreData = {tier:'free',clientReady:true};
+        document.body.classList.remove('core-enhanced');
+        _updateLicSidebarBtn(_coreData);
+        renderCoreView();
+        licCloseOverlay();
+      } catch(e) {
+        G('lic-deactivate-error').textContent = e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    }
+
+    function paintInstallStatus(data) {
+      [['desktop',data.desktop],['menu',data.menu]].forEach(function(entry) {
+        var el = G('install-status-' + entry[0]);
+        el.classList.toggle('ok', !!entry[1]);
+        el.querySelector('span').textContent = entry[1] ? 'Installed' : 'Not installed';
+      });
+      G('install-status-taskbar').querySelector('span').textContent =
+        data.taskbar === 'manual' ? 'Pin manually' : 'Unsupported';
+      G('install-reveal').style.display = data.taskbar === 'manual' ? '' : 'none';
+    }
+
+    async function openInstallOverlay() {
+      G('install-overlay').classList.add('open');
+      G('install-error').textContent = '';
+      try { paintInstallStatus(await fetch('/api/desktop-install').then(function(r){return r.json();})); }
+      catch(e) { G('install-error').textContent = e.message; }
+    }
+
+    async function desktopInstallAction(action) {
+      var response = await fetch('/api/desktop-install', {
+        method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({action:action})
+      });
+      var result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Desktop installation failed');
+      paintInstallStatus(result);
     }
 
     function _licSpawnConfetti() {
@@ -3019,7 +3211,7 @@ function html() {
     }
 
     G('btn-lic').addEventListener('click', function() {
-      licOpenOverlay(_licActivated ? 'key' : 'welcome');
+      licOpenOverlay(_licActivated ? 'manage' : 'welcome');
     });
     G('lic-btn-show-key').addEventListener('click', function() { _licSetView('key'); });
     G('lic-btn-back').addEventListener('click', function() { _licSetView('welcome'); });
@@ -3028,7 +3220,22 @@ function html() {
     G('lic-btn-activate').addEventListener('click', _licDoActivate);
     G('lic-key').addEventListener('keydown', function(e) { if (e.key==='Enter') _licDoActivate(); });
     G('lic-btn-success-close').addEventListener('click', licCloseOverlay);
+    G('lic-btn-deactivate').addEventListener('click', _licDoDeactivate);
+    G('lic-btn-manage-close').addEventListener('click', licCloseOverlay);
+    G('core-manage-license').addEventListener('click', function(){licOpenOverlay('manage');});
     G('lic-overlay').addEventListener('click', function(e) { if (e.target===this) licCloseOverlay(); });
+    G('install-btn').addEventListener('click', openInstallOverlay);
+    G('install-close').addEventListener('click', function(){G('install-overlay').classList.remove('open');});
+    G('install-overlay').addEventListener('click', function(e){if(e.target===this)this.classList.remove('open');});
+    G('install-create').addEventListener('click', async function() {
+      var original = this.textContent; this.disabled = true; this.textContent = 'Creating shortcuts…';
+      try { await desktopInstallAction('install'); }
+      catch(e) { G('install-error').textContent = e.message; }
+      finally { this.disabled = false; this.textContent = original; }
+    });
+    G('install-reveal').addEventListener('click', function() {
+      desktopInstallAction('reveal').catch(function(e){G('install-error').textContent=e.message;});
+    });
 
     fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
       _schedCache = (s && s.scheduler) || null; updateNextRun();
@@ -3146,26 +3353,48 @@ const server = http.createServer((req, res) => {
         return
     }
     if (req.method === 'POST' && req.url === '/api/license/activate') {
-        if (!deskLicClient) {
-            res.writeHead(503, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({ success: false, message: 'Core plugin not available.' }))
-            return
-        }
         readApiBody(req, res, async body => {
             try {
                 const parsed = parseJson(body, {})
-                const result = await deskLicClient.activate(parsed.key || '')
+                const result = await runCoreLicenseWorker({ action: 'activate', key: parsed.key || '' })
                 if (result.success) {
                     state.deskLicense.tier = 'premium'
                     state.deskLicense.planType = result.planType
                     state.deskLicense.expiresAt = result.expiresAt
+                    state.deskLicense.clientReady = true
+                    state.deskLicense.loading = false
                     state.hasLicenseCache = true
                 }
-                res.writeHead(200, { 'content-type': 'application/json' })
-                res.end(JSON.stringify(result))
-            } catch {
-                res.writeHead(500, { 'content-type': 'application/json' })
-                res.end(JSON.stringify({ success: false, message: 'Internal error.' }))
+                jsonResponse(res, 200, result)
+            } catch (error) {
+                jsonResponse(res, 500, { success: false, message: error.message || 'Internal error.' })
+            }
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/license/deactivate') {
+        readApiBody(req, res, async () => {
+            try {
+                const result = await runCoreLicenseWorker({ action: 'deactivate' })
+                if (result.success) {
+                    state.deskLicense.tier = 'free'
+                    state.deskLicense.planType = ''
+                    state.deskLicense.expiresAt = null
+                    state.hasLicenseCache = false
+                    try {
+                        startupManager.setAgentEnabled(false)
+                        writeConfigPatch({
+                            backgroundAgent: { enabled: false, allowDashboardAutostart: false, openConsole: false },
+                            core: { dashboardSync: false }
+                        })
+                    } catch (cleanupError) {
+                        pushLog('warn', `Core was deactivated, but startup cleanup needs attention: ${cleanupError.message}`)
+                        result.message += ' Automatic startup cleanup could not be completed.'
+                    }
+                }
+                jsonResponse(res, result.success ? 200 : 503, result)
+            } catch (error) {
+                jsonResponse(res, 500, { success: false, message: error.message || 'Internal error.' })
             }
         })
         return
@@ -3288,6 +3517,30 @@ const server = http.createServer((req, res) => {
         res.end()
         return
     }
+    if (req.method === 'GET' && req.url === '/api/desktop-install') {
+        jsonResponse(res, 200, desktopInstallManager.status())
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/desktop-install') {
+        readApiBody(req, res, body => {
+            try {
+                const data = parseJson(body, {})
+                if (data.action === 'install') {
+                    jsonResponse(res, 200, desktopInstallManager.install())
+                    return
+                }
+                if (data.action === 'reveal') {
+                    desktopInstallManager.revealPinTarget()
+                    jsonResponse(res, 200, desktopInstallManager.status())
+                    return
+                }
+                jsonResponse(res, 400, { error: 'Unknown desktop installation action' })
+            } catch (error) {
+                jsonResponse(res, 500, { error: error.message })
+            }
+        })
+        return
+    }
     if (req.method === 'GET' && req.url === '/api/account-storage') {
         jsonResponse(res, 200, {
             ...accountStorage.status(),
@@ -3371,20 +3624,13 @@ const server = http.createServer((req, res) => {
     res.end('Not found')
 })
 
-server.listen(PORT, '127.0.0.1', async () => {
+server.listen(PORT, '127.0.0.1', () => {
     const address = server.address()
     const url = `http://127.0.0.1:${address.port}`
-    try {
-        const storageState = accountStorage.initializeEncryption()
-        if (storageState.warning) pushLog('warn', storageState.warning)
-        state.accounts = readAccounts()
-    } catch (error) {
-        pushLog('warn', `Account encryption could not be enabled: ${error.message}`)
-    }
-    prepareInitialRun()
-    await refreshAgentState()
-    setInterval(() => void refreshAgentState(), 900)
     if (process.env.MSRB_APP_NO_OPEN !== '1') openAppWindow(url)
+    initializeDeskInBackground()
+    void refreshAgentState()
+    setInterval(() => void refreshAgentState(), 900)
 })
 
 function openAppWindow(url) {

@@ -44,6 +44,8 @@ Docker, CI, and forced-headless launches stay in terminal mode automatically. Us
 
 The app window first tries the bundled Chromium runtime used by the bot, then Chrome/Chromium, then Edge as a last desktop fallback. It uses the Rewards Bot logo as the page icon, but a browser-based app window can still show the browser's taskbar identity on some systems. A fully custom taskbar icon requires a packaged native shell.
 
+Rewards Desk opens its local window before loading the OS account vault and compiled Core licensing client. Those services finish in background processes so a slow DPAPI/Keychain/Secret Service response or Core bytecode startup does not freeze the Settings interface.
+
 ## Development Version Gets Replaced
 
 Use `npm run dev` or pass `-dev`. Auto-update is skipped in development mode.

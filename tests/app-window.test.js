@@ -57,3 +57,18 @@ test('Rewards Desk presents two coherent startup modes and desktop-like interact
     assert.match(source, /requestAgentRun/)
     assert.match(source, /subscribeToAgentLogs/)
 })
+
+test('Rewards Desk opens before slow Core and OS-vault initialization', () => {
+    assert.match(source, /runCoreLicenseWorker/)
+    assert.match(source, /account-storage-worker\.js/)
+    assert.match(source, /if \(process\.env\.MSRB_APP_NO_OPEN !== '1'\) openAppWindow\(url\)[\s\S]*initializeDeskInBackground\(\)/)
+    assert.doesNotMatch(source, /require\(corePath\)/)
+})
+
+test('Rewards Desk exposes visible protection, Core deactivation, and desktop installation controls', () => {
+    assert.match(source, /id="storage-toggle">Disable encryption/)
+    assert.match(source, /id="lic-view-manage"/)
+    assert.match(source, /\/api\/license\/deactivate/)
+    assert.match(source, /id="install-btn"/)
+    assert.match(source, /\/api\/desktop-install/)
+})
