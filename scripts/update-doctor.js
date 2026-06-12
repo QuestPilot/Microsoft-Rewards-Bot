@@ -97,7 +97,7 @@ function formatBool(value) {
 function actionForUpdateResult(result) {
     if (!result) return 'Update check did not run.'
     if (result.status === 'current') return 'No action required.'
-    if (result.status === 'updated') return 'Restart the bot after dependency sync completes.'
+    if (result.status === 'updated') return 'The launcher restarts automatically after dependency sync.'
     if (result.status === 'update-available' && result.docker) return 'Docker users must pull or rebuild the image, then restart the container.'
     if (result.status === 'update-available') return 'Run npm start without -dev so the updater can apply the release.'
     if (result.status === 'failed') return 'Check network access to GitHub, then retry npm run update:doctor.'
@@ -156,7 +156,7 @@ async function main() {
     console.log(`[UPDATE-DOCTOR] bot version: ${packageJson.version}`)
     console.log(`[UPDATE-DOCTOR] node runtime: ${process.version} (required ${packageJson.engines?.node || 'unspecified'})`)
     console.log(`[UPDATE-DOCTOR] docker runtime: ${formatBool(isDocker)}`)
-    console.log(`[UPDATE-DOCTOR] update source: signed latest release from ${updater.repo}`)
+    console.log(`[UPDATE-DOCTOR] update source: ${updater.repo}#${updater.branch}`)
     console.log(`[UPDATE-DOCTOR] plugin config: ${pluginConfig.exists ? 'plugins/plugins.jsonc' : 'missing'}`)
     console.log(`[UPDATE-DOCTOR] core plugin enabled: ${formatBool(pluginConfig.coreEnabled)}`)
     if (pluginConfig.error) {
@@ -181,7 +181,7 @@ async function main() {
             ? { status: 'update-available', remote, docker: isDocker }
             : { status: 'current', remote }
         if (remote) {
-            console.log(`[UPDATE-DOCTOR] signed release commit SHA: ${remote.commitSha}`)
+            console.log(`[UPDATE-DOCTOR] remote main commit SHA: ${remote.commitSha}`)
             console.log(`[UPDATE-DOCTOR] remote package version: ${remote.version}`)
         }
         console.log(`[UPDATE-DOCTOR] update status: ${updateResult.status}`)

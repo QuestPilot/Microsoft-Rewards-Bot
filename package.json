@@ -26,7 +26,6 @@
         "update:doctor": "node ./scripts/update-doctor.js",
         "update:check": "node ./scripts/update-check.js --dry-run",
         "update:repair": "node ./scripts/update-check.js --force",
-        "update:manifest": "node ./scripts/create-update-manifest.js",
         "core:sign": "node ./scripts/sign-core-manifest.js",
         "core:release-check": "node ./scripts/check-core-release-artifact.js",
         "ts-start": "ts-node ./src/index.ts",

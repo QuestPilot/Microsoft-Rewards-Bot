@@ -1,11 +1,8 @@
-name: Auto Release on package.json version bump
+name: Auto Release
 
 on:
     push:
         branches: [main]
-        paths:
-            - package.json
-            - package-lock.json
     workflow_dispatch:
 
 permissions:
@@ -27,48 +24,21 @@ jobs:
                   VERSION=$(node -p "require('./package.json').version")
                   echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-            - name: Read previous version (from previous commit)
-              id: previous
-              run: |
-                  PREV_VERSION=$(git show HEAD~1:package.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" || echo "")
-                  echo "version=$PREV_VERSION" >> "$GITHUB_OUTPUT"
-
-            - name: Check if version increased
+            - name: Check whether release exists
               id: check
               run: |
-                  CUR="${{ steps.current.outputs.version }}"
-                  PREV="${{ steps.previous.outputs.version }}"
-
-                  echo "Current: $CUR"
-                  echo "Previous: $PREV"
-
-                  # if previous doesn't exist (first commit containing package.json), skip
-                  if [ -z "$PREV" ]; then
+                  TAG="v${{ steps.current.outputs.version }}"
+                  if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+                    echo "Release tag $TAG already exists."
                     echo "should_release=false" >> "$GITHUB_OUTPUT"
-                    exit 0
+                  else
+                    echo "Release tag $TAG is missing."
+                    echo "should_release=true" >> "$GITHUB_OUTPUT"
                   fi
 
-                  # Compare semver using node's semver package if available; fallback to simple inequality
-                  node -e "
-                    const cur='${CUR}';
-                    const prev='${PREV}';
-                    let should = cur !== prev;
-                    try {
-                      const semver = require('semver');
-                      should = semver.gt(cur, prev);
-                    } catch (_) {}
-                    console.log('should_release=' + should);
-                  " >> "$GITHUB_OUTPUT"
-
-            - name: Stop if no bump
+            - name: Stop if release exists
               if: steps.check.outputs.should_release != 'true'
-              run: echo "No version increase detected."
-
-            - name: Create signed update manifest
-              if: steps.check.outputs.should_release == 'true'
-              env:
-                  MSRB_UPDATE_PRIVATE_KEY: ${{ secrets.MSRB_UPDATE_SIGNING_KEY }}
-              run: node scripts/create-update-manifest.js
+              run: echo "Release already published."
 
             - name: Create tag + GitHub Release
               if: steps.check.outputs.should_release == 'true'
@@ -77,6 +47,3 @@ jobs:
                   tag_name: v${{ steps.current.outputs.version }}
                   name: v${{ steps.current.outputs.version }}
                   generate_release_notes: true
-                  files: |
-                      .updates/release/update-manifest.json
-                      .updates/release/update-manifest.sig

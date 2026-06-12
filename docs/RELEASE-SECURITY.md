@@ -1,27 +1,16 @@
-# Release signing
+# Core release signing
 
-The bot uses two independent Ed25519 trust roots:
+The bot uses Ed25519 only to verify the proprietary Core plugin before Core
+receives privileged APIs:
 
-- `scripts/security/update-public-key.pem` verifies `update-manifest.json` from GitHub Release assets.
-- `scripts/security/core-public-key.pem` verifies `plugins/official-core.json` before Core receives privileged APIs.
+- `scripts/security/core-public-key.pem` verifies `plugins/official-core.json`.
 
 Private keys must never be committed. The local release keys are stored under
 `%USERPROFILE%\.msrb-release\` with access restricted to the current Windows user.
 
-## GitHub release setup
-
-Create the repository Actions secret `MSRB_UPDATE_SIGNING_KEY` from:
-
-```text
-%USERPROFILE%\.msrb-release\update-private-key.pem
-```
-
-The release workflow fails closed when this secret is missing. It publishes:
-
-- `update-manifest.json`
-- `update-manifest.sig`
-
-The signed manifest binds the repository, version, tag, and exact 40-character commit SHA.
+Bot auto-updates do not use a private signing key, signed manifest, or GitHub
+Actions secret. They resolve the configured `main` branch to a full commit SHA,
+then use that SHA consistently for package metadata and archive/Git application.
 
 ## Core release setup
 
@@ -35,8 +24,8 @@ The signed manifest binds the repository, version, tag, and exact 40-character c
 The generated `plugins/official-core.sig` signs the exact bytes of
 `plugins/official-core.json`. Any target hash, version, or metadata change invalidates it.
 
-## Key rotation
+## Core key rotation
 
 Key rotation requires a normal trusted release that embeds the new public key before
 artifacts are signed by the new private key. Losing a private key without such a transition
-requires users to install a trusted release manually.
+requires Core users to install a trusted Core release manually.

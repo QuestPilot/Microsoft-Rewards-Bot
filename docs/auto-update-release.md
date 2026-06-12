@@ -1,19 +1,18 @@
-# Signed Release Update Checklist
+# Auto-Update Release Checklist
 
-This guide covers the files that make `npm start` detect, authenticate, apply, and verify a public update.
+This guide covers the files that make `npm start` detect, apply, and verify a public update.
 
 ## Goal
 
-Publish a GitHub Release containing a signed manifest. Existing installs verify the
-manifest, then apply the exact signed commit through Git or the immutable commit archive,
-preserve user files, replace managed project files, and verify the installed version.
+Push a versioned release to `main`. Existing installs resolve `main` to one exact commit
+SHA, then apply that commit through Git or its commit archive, preserve user files,
+replace managed project files, and verify the installed version.
 
 ## Required Environment
 
 - Node.js `24.15.0`
 - access to rebuild the official Core plugin when Core changes
 - write access to the official release branch and GitHub Releases
-- the GitHub Actions secret `MSRB_UPDATE_SIGNING_KEY`
 
 Read [Core release integrity](./core-release-security.md) before publishing a Core artifact. It defines the public anti-leak and checksum rules.
 
@@ -31,7 +30,8 @@ npm audit --audit-level=moderate
 npm run core:release-check
 ```
 
-`update:doctor` can only validate the remote channel after the signed GitHub Release exists.
+`update:doctor` validates the current `main` branch directly. A GitHub Release is useful
+for downloads and release notes but is not required by the updater.
 
 2. Rebuild the official Core plugin with the private maintainer release pipeline when Core changed.
 
@@ -56,11 +56,10 @@ The Darwin compatibility target must declare `compatibleArtifactSource: "linux-x
 
 5. Commit the final release code and version bump to `main`.
 
-The workflow watches version changes on `main`, signs `update-manifest.json` with
-Ed25519, creates the matching `v<version>` GitHub Release, and uploads it together with
-`update-manifest.sig`. The manifest binds the repository, version, tag, and exact commit
-SHA. Git installs fetch the signed tag; archive installs download the immutable tarball for
-the same signed commit SHA.
+The workflow runs on `main`, checks whether `v<version>` already exists, and creates the
+matching GitHub Release when the tag is missing. It requires no private key or repository
+secret. The updater itself reads the head of `main`, records its full SHA, and uses that
+same SHA throughout the update.
 
 6. Validate after push.
 
@@ -73,7 +72,7 @@ npm run update:doctor
 Expected result:
 
 - local and remote versions are printed;
-- the signed release commit SHA is printed;
+- the resolved `main` commit SHA is printed;
 - successful non-Docker updates print the apply strategy;
 - successful non-Docker updates restart the launcher once and rebuild the new runtime;
 - failed local version verification reports `Update verification failed` instead of claiming success;
@@ -109,7 +108,7 @@ Managed project paths are mirrored from Git or the release archive before copy. 
 - Do not publish Core `.ts`, sourcemap, or unobfuscated Core `dist/**/*.js` files.
 - Do not rebuild Core bytecode with another Node.js version.
 - Do not claim Windows, Linux, Docker, or ARM64 support unless the matching official target artifact is present.
-- Do not publish a release without both `update-manifest.json` and `update-manifest.sig`.
-- Do not commit either private signing key.
+- Do not add an auto-update private key, signed update manifest, or update signing secret.
+- Do not confuse Core signing with Bot auto-update. Core keeps its own independent signature.
 - Do not move release automation back to a branch that is not part of the normal
   publication flow. The supported release branch is `main`.

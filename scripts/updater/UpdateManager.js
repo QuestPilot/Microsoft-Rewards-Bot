@@ -6,13 +6,8 @@ const path = require('path')
 const { URL } = require('url')
 
 const { migrateUserFiles } = require('./ConfigMigrator')
-const { readPublicKey, verifySignedBytes } = require('../security/SignedManifest')
-
 const DEFAULT_REPO = 'QuestPilot/Microsoft-Rewards-Bot'
 const DEFAULT_BRANCH = 'main'
-const UPDATE_MANIFEST_ASSET = 'update-manifest.json'
-const UPDATE_SIGNATURE_ASSET = 'update-manifest.sig'
-const UPDATE_PUBLIC_KEY_PATH = path.resolve(__dirname, '..', 'security', 'update-public-key.pem')
 const ALLOWED_UPDATE_HOSTS = new Set([
     'api.github.com',
     'github.com',
@@ -514,7 +509,7 @@ class UpdateManager {
         }
 
         const force = this.shouldForceUpdate(options, env, argv)
-        this.logger.log(`[UPDATER] Checking signed releases for ${this.repo}`)
+        this.logger.log(`[UPDATER] Checking ${this.repo}#${this.branch}`)
 
         try {
             const remote = await this.fetchRemoteRelease()
@@ -570,49 +565,25 @@ class UpdateManager {
     }
 
     async fetchRemoteRelease() {
-        const release = await requestJson(this.githubApiUrl(`/repos/${this.repo}/releases/latest`))
-        const assets = Array.isArray(release?.assets) ? release.assets : []
-        const manifestAsset = assets.find(asset => asset?.name === UPDATE_MANIFEST_ASSET)
-        const signatureAsset = assets.find(asset => asset?.name === UPDATE_SIGNATURE_ASSET)
-        if (!manifestAsset?.browser_download_url || !signatureAsset?.browser_download_url) {
-            throw new Error('Latest GitHub release is missing its signed update manifest')
+        assertSafeBranchName(this.branch)
+        const branch = encodeURIComponent(this.branch)
+        const commit = await requestJson(this.githubApiUrl(`/repos/${this.repo}/commits/${branch}`))
+        const commitSha = commit?.sha
+        if (!/^[a-f0-9]{40}$/i.test(commitSha || '')) {
+            throw new Error(`GitHub did not return a valid commit SHA for ${this.repo}#${this.branch}`)
         }
-
-        const [manifestPayload, signaturePayload] = await Promise.all([
-            requestBuffer(manifestAsset.browser_download_url, 20_000, {}, { maxBytes: 64 * 1024 }),
-            requestBuffer(signatureAsset.browser_download_url, 20_000, {}, { maxBytes: 1024 })
-        ])
-        verifySignedBytes(manifestPayload, signaturePayload.toString('utf8'), readPublicKey(UPDATE_PUBLIC_KEY_PATH))
-
-        const manifest = JSON.parse(manifestPayload.toString('utf8'))
-        if (
-            manifest.schema !== 1 ||
-            manifest.repo !== this.repo ||
-            !/^[a-f0-9]{40}$/i.test(manifest.commitSha || '') ||
-            typeof manifest.version !== 'string' ||
-            typeof manifest.tag !== 'string'
-        ) {
-            throw new Error('Signed update manifest is invalid')
-        }
-        if (release.tag_name !== manifest.tag) {
-            throw new Error(`Signed update tag ${manifest.tag} does not match GitHub release ${release.tag_name}`)
-        }
-
-        const commitSha = manifest.commitSha
         const packageUrl = this.githubApiUrl(`/repos/${this.repo}/contents/package.json?ref=${commitSha}`)
         const packageSource = await requestText(packageUrl, 20_000, { accept: 'application/vnd.github.raw' })
         const packageJson = JSON.parse(packageSource)
-        if (packageJson.version !== manifest.version) {
-            throw new Error(`Signed update version ${manifest.version} does not match package.json ${packageJson.version || 'unknown'}`)
+        if (typeof packageJson.version !== 'string') {
+            throw new Error(`Remote package.json at ${commitSha.slice(0, 12)} has no valid version`)
         }
 
         return {
-            version: manifest.version,
+            version: packageJson.version,
             commitSha,
             branch: this.branch,
             repo: this.repo,
-            tag: manifest.tag,
-            signed: true,
             packageJson,
             archiveUrl: this.githubApiUrl(`/repos/${this.repo}/tarball/${commitSha}`),
             checkedAt: new Date().toISOString()
@@ -794,20 +765,15 @@ class UpdateManager {
     }
 
     async applyGitRelease(remote) {
-        const signedTag = remote.signed ? remote.tag : null
-        assertSafeBranchName(signedTag || this.branch)
+        assertSafeBranchName(this.branch)
 
         const stamp = new Date().toISOString().replace(/[:.]/g, '-')
         const backupDir = path.join(this.updatesDir, stamp, 'backup')
         mkdirp(backupDir)
 
         const before = this.git(['rev-parse', 'HEAD']).trim()
-        const remoteRef = signedTag
-            ? `refs/msrb-update/${signedTag}`
-            : `refs/remotes/origin/${this.branch}`
-        const fetchRef = signedTag
-            ? `+refs/tags/${signedTag}:${remoteRef}`
-            : `+refs/heads/${this.branch}:${remoteRef}`
+        const remoteRef = `refs/remotes/origin/${this.branch}`
+        const fetchRef = `+refs/heads/${this.branch}:${remoteRef}`
 
         this.logger.log(`[UPDATER] Applying update with Git reset to ${remote.commitSha.slice(0, 12)}`)
         this.backupMutablePaths(backupDir)
