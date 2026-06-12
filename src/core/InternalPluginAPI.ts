@@ -49,19 +49,12 @@ export interface PremiumTaskMap {
     doReadToEarn: () => Promise<void>
     doDailyCheckIn: () => Promise<void>
     doDailyStreak: (page: Page) => Promise<DailyStreakInfo | null>
-    doRedeemGoal: (page: Page, config: CoreRedeemGoalConfig) => Promise<void>
+    doSetGoal: (page: Page) => Promise<void>
     collectDashboardInfo: (page: Page) => Promise<DashboardInfo>
     doClaimPoints: (page: Page) => Promise<ClaimPointsResult>
     doApplyCoupons: (page: Page) => Promise<ApplyCouponsResult>
     doTemporaryPunchcards: (page: Page) => Promise<TemporaryPunchcardsResult>
     syncStreakProtection: (page: Page, desiredEnabled: boolean) => Promise<StreakProtectionSyncResult>
-}
-
-export interface CoreRedeemGoalConfig {
-    enabled: boolean
-    skuUrl: string
-    skuOptionValue?: string
-    redeemMode: 'auto' | 'manual'
 }
 
 export interface ClaimEntry {

@@ -15,7 +15,6 @@ import type { BasePromotion, DashboardData, FindClippyPromotion, PurplePromotion
 import type {
     ApplyCouponsResult,
     ClaimPointsResult,
-    CoreRedeemGoalConfig,
     DailyStreakInfo,
     DashboardInfo,
     PremiumTaskMap,
@@ -109,11 +108,11 @@ export default class ActivityRunner {
         return null
     }
 
-    doRedeemGoal = async (page: Page, config: CoreRedeemGoalConfig): Promise<void> => {
-        if (this.premiumTasks.doRedeemGoal) {
-            return this.premiumTasks.doRedeemGoal(page, config)
+    doSetGoal = async (page: Page): Promise<void> => {
+        if (this.premiumTasks.doSetGoal) {
+            return this.premiumTasks.doSetGoal(page)
         }
-        this.coreHint('Redeem Goal', 'Core can manage supported redeem-goal dashboard actions.')
+        this.coreHint('Set Goal', 'Core can automatically find and set a Rewards goal when none is active.')
     }
 
     collectDashboardInfo = async (page: Page): Promise<DashboardInfo> => {

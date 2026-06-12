@@ -55,13 +55,12 @@ export interface ConfigCore {
     readToEarn?: boolean
     dailyCheckIn?: boolean
     dailyStreak?: boolean
-    redeemGoal?: boolean
+    setGoal?: boolean
     claimPoints?: boolean
     applyCoupons?: boolean
     temporaryPunchcards?: boolean
     collectDashboardInfo?: boolean
     streakProtection?: boolean
-    dailySetUnlimited?: boolean
     dashboardSync?: boolean
 }
 

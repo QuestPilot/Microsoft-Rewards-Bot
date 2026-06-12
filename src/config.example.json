@@ -80,13 +80,12 @@
         "readToEarn": true,
         "dailyCheckIn": true,
         "dailyStreak": true,
-        "redeemGoal": true,
+        "setGoal": true,
         "claimPoints": true,
         "applyCoupons": true,
         "temporaryPunchcards": false,
         "collectDashboardInfo": true,
-        "streakProtection": true,
-        "dailySetUnlimited": false,
+        "streakProtection": false,
         "dashboardSync": true
     },
     "backgroundAgent": {

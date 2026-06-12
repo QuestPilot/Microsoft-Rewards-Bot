@@ -133,7 +133,50 @@ function launchAppWindow() {
     child.unref()
 }
 
+async function deskCommand(action) {
+    const { createDesktopInstallManager } = require('./desktop-install-manager')
+    const manager = createDesktopInstallManager({ root: ROOT })
+
+    if (action === 'install') {
+        try {
+            const result = manager.install()
+            console.log('[DESK] Rewards Desk shortcuts installed.')
+            const installed = Object.entries(result).filter(([, v]) => v)
+            if (installed.length) installed.forEach(([k]) => console.log(`  ✓ ${k}`))
+        } catch (err) {
+            console.error(`[DESK] Install failed: ${err.message}`)
+            process.exit(1)
+        }
+    } else if (action === 'uninstall') {
+        try {
+            manager.uninstall()
+            console.log('[DESK] Rewards Desk shortcuts removed.')
+        } catch (err) {
+            console.error(`[DESK] Uninstall failed: ${err.message}`)
+            process.exit(1)
+        }
+    } else if (action === 'status' || !action) {
+        try {
+            const result = manager.status()
+            console.log('[DESK] Shortcut status:')
+            Object.entries(result).forEach(([k, v]) => console.log(`  ${v ? '✓' : '✗'} ${k}: ${v ? 'installed' : 'not installed'}`))
+        } catch (err) {
+            console.error(`[DESK] Status check failed: ${err.message}`)
+            process.exit(1)
+        }
+    } else {
+        console.error(`[DESK] Unknown action: ${action}`)
+        console.error('Usage: npm start desk [install|uninstall|status]')
+        process.exit(1)
+    }
+}
+
 async function main() {
+    if (process.argv[2] === 'desk') {
+        await deskCommand(process.argv[3])
+        return
+    }
+
     if (shouldRunUpdater()) {
         const updater = new UpdateManager()
         await updater.run()

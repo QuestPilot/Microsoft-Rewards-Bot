@@ -125,13 +125,12 @@ export const ConfigSchema = z.object({
         readToEarn: z.boolean().optional(),
         dailyCheckIn: z.boolean().optional(),
         dailyStreak: z.boolean().optional(),
-        redeemGoal: z.boolean().optional(),
+        setGoal: z.boolean().optional(),
         claimPoints: z.boolean().optional(),
         applyCoupons: z.boolean().optional(),
         temporaryPunchcards: z.boolean().optional(),
         collectDashboardInfo: z.boolean().optional(),
         streakProtection: z.boolean().optional(),
-        dailySetUnlimited: z.boolean().optional(),
         dashboardSync: z.boolean().optional()
     }).optional(),
     safetyAdvisory: SafetyAdvisorySchema.optional()

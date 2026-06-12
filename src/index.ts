@@ -914,7 +914,7 @@ export class MicrosoftRewardsBot {
                 if (this.config.workers.doSpecialPromotions) await this.workers.doSpecialPromotions(data)
                 if (this.config.workers.doMorePromotions) {
                     await this.workers.doMorePromotions(data, this.mainMobilePage)
-                    if (this.pluginManager.hasOfficialCoreEntitlement()) {
+                    if (this.pluginManager.hasOfficialCoreEntitlement() && this.config.core?.temporaryPunchcards !== false) {
                         await this.activities.doTemporaryPunchcards(this.mainMobilePage)
                     }
                 }
@@ -948,6 +948,13 @@ export class MicrosoftRewardsBot {
                 // switch is left untouched.
                 if (this.pluginManager.hasOfficialCoreEntitlement()) {
                     await this.activities.syncStreakProtection(this.mainMobilePage, true)
+                }
+
+                // Set Rewards goal: auto-discover the first eligible gift card and set it
+                // as the active goal when no goal is currently active. Skipped automatically
+                // for 30 days after a run that finds no eligible card. Opt-in (false by default).
+                if (this.pluginManager.hasOfficialCoreEntitlement() && this.config.core?.setGoal === true) {
+                    await this.activities.doSetGoal(this.mainMobilePage)
                 }
 
                 const searchPoints = await this.browser.func.getSearchPoints()
