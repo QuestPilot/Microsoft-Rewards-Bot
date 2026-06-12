@@ -95,6 +95,8 @@ Run `npm start`. Before building, the launcher creates a missing `src/config.jso
 
 Check that `core` is `enabled` in `plugins/plugins.jsonc` (or toggle it from the **Plugins** page in Rewards Desk).
 
+Activating a valid license from Rewards Desk now enables this flag automatically. Choosing **Continue without Core** disables it and suppresses future startup prompts until Core is activated again from the Desk.
+
 The bot logs whether the Core bytecode checksum matches `plugins/official-core.json` at startup — look for a Core entitlement line in the console. If the checksum doesn't match, premium entitlement is not granted and Core stays inactive.
 
 For Docker, confirm that the final image contains:

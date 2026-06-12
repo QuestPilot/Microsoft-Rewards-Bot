@@ -18,7 +18,6 @@ test('app window runs as a desktop-style launcher instead of the old browser pag
     assert.match(source, /chromium\.executablePath/)
     assert.match(source, /resolveBundledChromium\(\)/)
     assert.match(source, /spawn\(process\.execPath,\s*\['\.\/dist\/index\.js',\s*'--ui-child'\]/)
-    assert.match(source, /LICENSE_KEY: pendingLicenseKey/)
     assert.match(source, /POST' && req\.url === '\/api\/start'/)
     assert.match(source, /POST' && req\.url === '\/api\/stop'/)
     assert.match(source, /POST' && req\.url === '\/api\/close'/)
@@ -34,6 +33,8 @@ test('app window runs as a desktop-style launcher instead of the old browser pag
     assert.doesNotMatch(source, /License key or empty response/)
     assert.match(source, /height:\s*100vh/)
     assert.match(source, /MSRB_APP_NO_OPEN/)
+    assert.doesNotMatch(source, /id="modal"|id="lic-input"|id="lic-submit"|id="lic-skip"/)
+    assert.doesNotMatch(source, /req\.url === '\/api\/input'/)
 })
 
 test('Rewards Desk local API requires a process token and validates request boundaries', () => {
@@ -81,4 +82,15 @@ test('Rewards Desk exposes visible protection, Core deactivation, and desktop in
     assert.match(source, /data\.complete === true/)
     assert.match(source, /webhook\.runSummary\.discordUrl/)
     assert.doesNotMatch(source, /Include Core upgrade pitch/)
+})
+
+test('Rewards Desk uses one Core activation flow and synchronizes plugin state', () => {
+    assert.match(source, /if \(promptVisible && !_licensePromptVisible\) licOpenOverlay\('key'\)/)
+    assert.match(source, /if \(s\.hasLicenseCache \|\| s\.corePluginEnabled === false\)/)
+    assert.match(source, /POST' && req\.url === '\/api\/license\/skip'/)
+    assert.match(source, /setPluginEnabled\('core', false\)/)
+    assert.match(source, /setPluginEnabled\('core', true\)/)
+    assert.match(source, /if \(state\.licensePrompt\.visible\) sendInput\(parsed\.key \|\| ''\)/)
+    assert.match(source, /if \(state\.licensePrompt\.visible\) sendInput\(''\)/)
+    assert.match(source, /coreEnabled: isPluginEnabled\('core'\)/)
 })

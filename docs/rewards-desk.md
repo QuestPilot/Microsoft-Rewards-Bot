@@ -28,7 +28,9 @@ Navigation: [Documentation index](./README.md) → [Install and auto-updates](./
 
 ## Activating Core
 
-If you have a Core license, click **Activate Core** (sidebar, or the prompt on first launch), paste your `MSRB-XXXX-XXXX-XXXX-XXXX` key, and the Desk validates it online and stores it encrypted on this machine. The bot then picks it up automatically on every run — no need to re-enter it. See [Official Core plugin](./core-plugin.md) for what activation unlocks.
+If you have a Core license, click **Activate Core** (sidebar, or the prompt on first launch), paste your `MSRB-XXXX-XXXX-XXXX-XXXX` key, and the Desk validates it online and stores it encrypted on this machine. This same Core window is used everywhere in Rewards Desk; there is no separate console-style license dialog.
+
+A successful activation automatically enables the official Core plugin in `plugins/plugins.jsonc`, including when a previous **Continue without Core** choice disabled it. Choosing **Continue without Core** disables the plugin so later runs start directly in open-source mode without asking again. The bot picks an activated license up automatically on every run, with no need to re-enter it. See [Official Core plugin](./core-plugin.md) for what activation unlocks.
 
 ## Account encryption and backups
 

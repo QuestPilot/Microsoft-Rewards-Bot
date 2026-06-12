@@ -71,7 +71,6 @@ let botProcess = null
 let shutdownTimer = null
 let stopRequested = false
 let shuttingDown = false
-let pendingLicenseKey = ''
 let closeAgentLogSubscription = null
 let accountWorker = null
 let accountWorkerReady = null
@@ -303,7 +302,7 @@ function updateStateFromLine(line) {
     }
 }
 
-async function startBot(licenseKey = pendingLicenseKey) {
+async function startBot() {
     if (botProcess) return false
     if (agentApi) {
         const agentStatus = await agentApi.getAgentStatus().catch(() => ({ active: false }))
@@ -327,7 +326,6 @@ async function startBot(licenseKey = pendingLicenseKey) {
         }
     }
     stopRequested = false
-    pendingLicenseKey = String(licenseKey || '').trim()
     state.status = 'Starting'
     state.detail = 'Preparing the run'
     state.startedAt = new Date().toISOString()
@@ -335,8 +333,8 @@ async function startBot(licenseKey = pendingLicenseKey) {
     state.exitCode = null
     state.isRunning = true
     state.licensePrompt.visible = false
-    state.licensePrompt.status = pendingLicenseKey ? 'checking' : 'skipped'
-    state.licensePrompt.message = pendingLicenseKey ? 'Checking Core license...' : 'Starting without a Core license.'
+    state.licensePrompt.status = state.hasLicenseCache ? 'checking' : 'skipped'
+    state.licensePrompt.message = state.hasLicenseCache ? 'Checking Core license...' : 'Starting without a Core license.'
     state.metrics.progress = 6
     pushLog('info', 'Starting Rewards Bot run.')
 
@@ -344,7 +342,6 @@ async function startBot(licenseKey = pendingLicenseKey) {
         cwd: ROOT,
         env: {
             ...process.env,
-            ...(pendingLicenseKey ? { LICENSE_KEY: pendingLicenseKey } : {}),
             MSRB_UI_CHILD: '1',
             MSRB_TERMINAL_MODE: '0'
         },
@@ -496,6 +493,11 @@ function readPluginsConfig() {
     } catch {
         return {}
     }
+}
+
+function isPluginEnabled(name) {
+    const plugin = readPluginsConfig()[name]
+    return Boolean(plugin && typeof plugin === 'object' && plugin.enabled !== false)
 }
 
 function readPluginsList() {
@@ -2330,23 +2332,6 @@ function html() {
     </div>
   </div>
 
-  <!-- License modal -->
-  <div class="modal-bg" id="modal">
-    <div class="modal">
-      <div class="modal-icon">
-        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      </div>
-      <h2>Core license</h2>
-      <p>Enter your Core license key to enable premium features, or continue without it to use the open-source bot.</p>
-      <input class="modal-input" id="lic-input" autocomplete="off" spellcheck="false" placeholder="MSRB-XXXX-XXXX-XXXX-XXXX">
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="lic-skip">Continue without Core</button>
-        <button class="btn btn-primary" id="lic-submit">Activate</button>
-      </div>
-      <div class="modal-msg" id="lic-msg"></div>
-    </div>
-  </div>
-
   <script>
     var API_TOKEN = ${JSON.stringify(API_TOKEN)};
     var nativeFetch = window.fetch.bind(window);
@@ -2364,10 +2349,11 @@ function html() {
     var CIRC = 251.3;
     var view = 'dash';
     var accEditIdx = -1;
-    var _licStatus = 'idle';
     var _licActivated = false;
     var _licClientReady = false;
     var _coreData = { tier: 'free' };
+    var _licensePromptVisible = false;
+    var _runAfterLicenseFlow = false;
     var _storageConfirmation = '';
     var _toastTimer = null;
     var _bootOverlayReleased = false;
@@ -2694,19 +2680,26 @@ function html() {
       G('facc').textContent = data.activeAccount ? 'Account: ' + data.activeAccount : '';
 
       if (data.licensePrompt) {
-        _licStatus = data.licensePrompt.status || 'idle';
-        G('modal').classList.toggle('open', Boolean(data.licensePrompt.visible));
-        if (data.licensePrompt.message) G('lic-msg').textContent = data.licensePrompt.message;
-        if (data.licensePrompt.status === 'invalid') G('lic-input').focus();
+        var promptVisible = Boolean(data.licensePrompt.visible);
+        if (promptVisible && !_licensePromptVisible) licOpenOverlay('key');
+        if (promptVisible && data.licensePrompt.status === 'invalid') {
+          _licSetView('key');
+          _licSetError(data.licensePrompt.message || 'The license could not be validated.');
+        }
+        _licensePromptVisible = promptVisible;
       }
     }
 
     // ── Start/Stop ────────────────────────────
-    async function startWithKey(key) {
-      G('lic-msg').textContent = key ? 'Checking Core license...' : 'Starting without Core...';
-      await fetch('/api/start', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({licenseKey:key||''})});
-      G('modal').classList.remove('open');
+    async function startRun() {
+      await fetch('/api/start', {method:'POST'});
       refresh();
+    }
+
+    async function startPendingRun() {
+      if (!_runAfterLicenseFlow) return;
+      _runAfterLicenseFlow = false;
+      await startRun();
     }
 
     // ── Accounts editor ───────────────────────
@@ -2996,37 +2989,14 @@ function html() {
     // ── Listeners ─────────────────────────────
     G('btn-run').addEventListener('click', async function() {
       var s = await fetch('/api/state').then(function(r){return r.json();}).catch(function(){return {};});
-      if (s.hasLicenseCache) { startWithKey(''); }
-      else { G('modal').classList.add('open'); G('lic-input').focus(); }
+      if (s.hasLicenseCache || s.corePluginEnabled === false) {
+        startRun();
+        return;
+      }
+      _runAfterLicenseFlow = true;
+      licOpenOverlay('welcome');
     });
     G('btn-stop').addEventListener('click', function() { fetch('/api/stop',{method:'POST'}).then(refresh); });
-    G('lic-submit').addEventListener('click', function() {
-      var key = G('lic-input').value.trim();
-      if (_licStatus === 'waiting') {
-        fetch('/api/input', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({value:key})});
-        G('lic-msg').textContent = 'Checking license...';
-      } else {
-        startWithKey(key);
-      }
-    });
-    G('lic-skip').addEventListener('click', function() {
-      if (_licStatus === 'waiting') {
-        fetch('/api/input', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({value:''})});
-        G('modal').classList.remove('open');
-      } else {
-        startWithKey('');
-      }
-    });
-    G('lic-input').addEventListener('keydown', function(e) {
-      if (e.key !== 'Enter') return;
-      var key = G('lic-input').value.trim();
-      if (_licStatus === 'waiting') {
-        fetch('/api/input', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({value:key})});
-        G('lic-msg').textContent = 'Checking license...';
-      } else {
-        startWithKey(key);
-      }
-    });
     G('btn-open-acc').addEventListener('click', function() { setView('accounts'); });
     G('btn-add-acc').addEventListener('click', openAccAdd);
     G('acc-modal-save').addEventListener('click', saveAccModal);
@@ -3175,7 +3145,7 @@ function html() {
       document.body.classList.toggle('core-enhanced', _licActivated);
       _updateLicSidebarBtn(data);
       renderCoreView();
-      if (!_licActivated && _licClientReady) {
+      if (!_licActivated && _licClientReady && data.coreEnabled !== false) {
         setTimeout(function() { licOpenOverlay('welcome'); }, 750);
       }
     }
@@ -3260,8 +3230,27 @@ function html() {
         renderCoreView();
         _licSetView('success');
         _licSpawnConfetti();
+        await startPendingRun();
       } else {
         _licSetError(result.message || 'Activation failed.');
+      }
+    }
+
+    async function _licDoSkip() {
+      var buttons = [G('lic-btn-skip-welcome'), G('lic-btn-skip-key')];
+      buttons.forEach(function(button){ if (button) button.disabled = true; });
+      _licSetError('');
+      try {
+        var response = await fetch('/api/license/skip', {method:'POST'});
+        var result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Could not disable Core.');
+        _licensePromptVisible = false;
+        licCloseOverlay();
+        await startPendingRun();
+      } catch(e) {
+        _licSetError(e.message || 'Could not continue without Core.');
+      } finally {
+        buttons.forEach(function(button){ if (button) button.disabled = false; });
       }
     }
 
@@ -3614,8 +3603,8 @@ function html() {
     });
     G('lic-btn-show-key').addEventListener('click', function() { _licSetView('key'); });
     G('lic-btn-back').addEventListener('click', function() { _licSetView('welcome'); });
-    G('lic-btn-skip-welcome').addEventListener('click', licCloseOverlay);
-    G('lic-btn-skip-key').addEventListener('click', licCloseOverlay);
+    G('lic-btn-skip-welcome').addEventListener('click', _licDoSkip);
+    G('lic-btn-skip-key').addEventListener('click', _licDoSkip);
     G('lic-btn-activate').addEventListener('click', _licDoActivate);
     G('lic-key').addEventListener('keydown', function(e) { if (e.key==='Enter') _licDoActivate(); });
     G('lic-btn-success-close').addEventListener('click', licCloseOverlay);
@@ -3761,12 +3750,12 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/state') {
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(state))
+        res.end(JSON.stringify({ ...state, corePluginEnabled: isPluginEnabled('core') }))
         return
     }
     if (req.method === 'GET' && req.url === '/api/license') {
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(state.deskLicense))
+        res.end(JSON.stringify({ ...state.deskLicense, coreEnabled: isPluginEnabled('core') }))
         return
     }
     if (req.method === 'POST' && req.url === '/api/license/activate') {
@@ -3775,18 +3764,33 @@ const server = http.createServer((req, res) => {
                 const parsed = parseJson(body, {})
                 const result = await runCoreLicenseWorker({ action: 'activate', key: parsed.key || '' })
                 if (result.success) {
+                    setPluginEnabled('core', true)
                     state.deskLicense.tier = 'premium'
                     state.deskLicense.planType = result.planType
                     state.deskLicense.expiresAt = result.expiresAt
                     state.deskLicense.clientReady = true
                     state.deskLicense.loading = false
                     state.hasLicenseCache = true
+                    if (state.licensePrompt.visible) sendInput(parsed.key || '')
                 }
                 jsonResponse(res, 200, result)
             } catch (error) {
                 jsonResponse(res, 500, { success: false, message: error.message || 'Internal error.' })
             }
         })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/license/skip') {
+        try {
+            setPluginEnabled('core', false)
+            if (state.licensePrompt.visible) sendInput('')
+            state.licensePrompt.visible = false
+            state.licensePrompt.status = 'skipped'
+            state.licensePrompt.message = 'Running without Core.'
+            jsonResponse(res, 200, { success: true })
+        } catch (error) {
+            jsonResponse(res, 500, { success: false, message: error.message || 'Core could not be disabled.' })
+        }
         return
     }
     if (req.method === 'POST' && req.url === '/api/license/deactivate') {
@@ -3816,22 +3820,13 @@ const server = http.createServer((req, res) => {
         })
         return
     }
-    if (req.method === 'POST' && req.url === '/api/input') {
-        readApiBody(req, res, body => {
-            const parsed = parseJson(body, {})
-            sendInput(parsed.value || '')
-            res.writeHead(204)
-            res.end()
-        })
-        return
-    }
     if (req.method === 'POST' && req.url === '/api/start') {
-        readApiBody(req, res, async body => {
-            const parsed = parseJson(body, {})
-            const started = await startBot(parsed.licenseKey || '')
-            res.writeHead(started ? 204 : 409)
-            res.end()
-        })
+        Promise.resolve(startBot())
+            .then(started => {
+                res.writeHead(started ? 204 : 409)
+                res.end()
+            })
+            .catch(error => jsonResponse(res, 500, { error: error.message || 'The bot could not be started.' }))
         return
     }
     if (req.method === 'POST' && req.url === '/api/stop') {
