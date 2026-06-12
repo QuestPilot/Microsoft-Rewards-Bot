@@ -70,6 +70,13 @@ Updates preserve:
 
 After an update, missing keys from `config.example.json` and `accounts.example.json` are added without replacing user values.
 
+On every `npm start`, the launcher also checks the user files before building:
+
+- if `src/config.json` is missing, it is copied from `src/config.example.json`;
+- if both `src/accounts.json` and `src/accounts.enc.json` are missing,
+  `src/accounts.json` is copied from `src/accounts.example.json`;
+- existing plain or encrypted account storage is never overwritten.
+
 ## Commands
 
 ```bash

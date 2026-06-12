@@ -68,6 +68,48 @@ function writeJson(filePath, data) {
     fs.renameSync(tempPath, filePath)
 }
 
+function copyExampleIfMissing(examplePath, userPath) {
+    if (fs.existsSync(userPath)) return false
+    try {
+        fs.copyFileSync(examplePath, userPath, fs.constants.COPYFILE_EXCL)
+        return true
+    } catch (error) {
+        if (error.code === 'EEXIST') return false
+        throw error
+    }
+}
+
+function bootstrapUserFiles(root, logger = console) {
+    const srcDir = path.join(root, 'src')
+    const configPath = path.join(srcDir, 'config.json')
+    const configExamplePath = path.join(srcDir, 'config.example.json')
+    const accountsPath = path.join(srcDir, 'accounts.json')
+    const encryptedAccountsPath = path.join(srcDir, 'accounts.enc.json')
+    const accountsExamplePath = path.join(srcDir, 'accounts.example.json')
+    const created = {
+        config: false,
+        accounts: false
+    }
+
+    if (!fs.existsSync(configPath)) {
+        if (!fs.existsSync(configExamplePath)) {
+            throw new Error('Cannot create src/config.json because src/config.example.json is missing')
+        }
+        created.config = copyExampleIfMissing(configExamplePath, configPath)
+        if (created.config) logger.log('[START] Created src/config.json from config.example.json')
+    }
+
+    if (!fs.existsSync(accountsPath) && !fs.existsSync(encryptedAccountsPath)) {
+        if (!fs.existsSync(accountsExamplePath)) {
+            throw new Error('Cannot create src/accounts.json because src/accounts.example.json is missing')
+        }
+        created.accounts = copyExampleIfMissing(accountsExamplePath, accountsPath)
+        if (created.accounts) logger.log('[START] Created src/accounts.json from accounts.example.json')
+    }
+
+    return created
+}
+
 function migrateConfig(root, logger = console) {
     const userPath = path.join(root, 'src', 'config.json')
     const examplePath = path.join(root, 'src', 'config.example.json')
@@ -148,6 +190,7 @@ function migrateUserFiles(root, logger = console) {
 }
 
 module.exports = {
+    bootstrapUserFiles,
     mergeMissing,
     migrateLegacyCorePremium,
     migrateAccounts,

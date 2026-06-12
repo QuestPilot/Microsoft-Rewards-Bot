@@ -17,6 +17,63 @@ test('build no longer runs the legacy session migration', () => {
     assert.equal(fs.existsSync(path.join(__dirname, '..', 'scripts', 'migrate-legacy-sessions.js')), false)
 })
 
+test('first start creates missing config and account files from examples', () => {
+    const root = tempRoot()
+    try {
+        const src = path.join(root, 'src')
+        fs.mkdirSync(src, { recursive: true })
+        fs.writeFileSync(path.join(src, 'config.example.json'), '{"example":"config"}\n')
+        fs.writeFileSync(path.join(src, 'accounts.example.json'), '[{"example":"account"}]\n')
+
+        const created = startScript.bootstrapUserFiles(root, { log() {} })
+
+        assert.deepEqual(created, { config: true, accounts: true })
+        assert.equal(fs.readFileSync(path.join(src, 'config.json'), 'utf8'), '{"example":"config"}\n')
+        assert.equal(fs.readFileSync(path.join(src, 'accounts.json'), 'utf8'), '[{"example":"account"}]\n')
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+    }
+})
+
+test('first start never overwrites existing config or account storage', () => {
+    const root = tempRoot()
+    try {
+        const src = path.join(root, 'src')
+        fs.mkdirSync(src, { recursive: true })
+        fs.writeFileSync(path.join(src, 'config.example.json'), '{"example":true}')
+        fs.writeFileSync(path.join(src, 'accounts.example.json'), '[{"example":true}]')
+        fs.writeFileSync(path.join(src, 'config.json'), '{"user":true}')
+        fs.writeFileSync(path.join(src, 'accounts.enc.json'), '{"encrypted":true}')
+
+        const created = startScript.bootstrapUserFiles(root, { log() {} })
+
+        assert.deepEqual(created, { config: false, accounts: false })
+        assert.equal(fs.readFileSync(path.join(src, 'config.json'), 'utf8'), '{"user":true}')
+        assert.equal(fs.readFileSync(path.join(src, 'accounts.enc.json'), 'utf8'), '{"encrypted":true}')
+        assert.equal(fs.existsSync(path.join(src, 'accounts.json')), false)
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+    }
+})
+
+test('first start creates only the missing user file', () => {
+    const root = tempRoot()
+    try {
+        const src = path.join(root, 'src')
+        fs.mkdirSync(src, { recursive: true })
+        fs.writeFileSync(path.join(src, 'config.example.json'), '{"example":true}')
+        fs.writeFileSync(path.join(src, 'accounts.example.json'), '[{"example":true}]')
+        fs.writeFileSync(path.join(src, 'accounts.json'), '[{"user":true}]')
+
+        const created = startScript.bootstrapUserFiles(root, { log() {} })
+
+        assert.deepEqual(created, { config: true, accounts: false })
+        assert.equal(fs.readFileSync(path.join(src, 'accounts.json'), 'utf8'), '[{"user":true}]')
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+    }
+})
+
 test('background launch skips updater unless explicitly enabled', () => {
     assert.equal(startScript.shouldRunUpdater(['node', 'scripts/start.js'], {}), true)
     assert.equal(startScript.shouldRunUpdater(['node', 'scripts/start.js', '--background'], {}), false)

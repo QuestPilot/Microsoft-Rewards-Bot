@@ -2,6 +2,7 @@ const childProcess = require('child_process')
 const fs = require('fs')
 const path = require('path')
 const { UpdateManager } = require('./updater/UpdateManager')
+const { bootstrapUserFiles } = require('./updater/ConfigMigrator')
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -210,6 +211,8 @@ async function main() {
         )
     }
 
+    bootstrapUserFiles(ROOT)
+
     if (shouldBuildRuntime(process.argv, ROOT, process.env)) {
         runNpm(['run', 'build'])
     } else {
@@ -231,6 +234,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+    bootstrapUserFiles,
     hasBuiltRuntime,
     hasGuiEnvironment,
     isBackgroundLaunch,

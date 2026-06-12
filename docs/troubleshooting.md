@@ -84,6 +84,13 @@ Use the latest `main` branch. Older 4.0.1 builds could stop after `Already up to
 
 Sessions are stored in the root `sessions/` folder and are not modified by `npm run build`.
 
+## Config Or Accounts File Is Missing
+
+Run `npm start`. Before building, the launcher creates a missing `src/config.json` from
+`src/config.example.json`. It creates `src/accounts.json` from
+`src/accounts.example.json` only when neither `accounts.json` nor
+`accounts.enc.json` exists. Existing user files are never replaced.
+
 ## Core Plugin Does Not Load
 
 Check that `core` is `enabled` in `plugins/plugins.jsonc` (or toggle it from the **Plugins** page in Rewards Desk).
