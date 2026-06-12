@@ -612,18 +612,45 @@ function docTitle(name) {
 }
 
 function listDocs() {
+    const DOC_ORDER = [
+        'README.md',
+        'rewards-desk.md', 'updates.md', 'docker.md', 'node-version.md', 'scheduler.md', 'troubleshooting.md', 'licensing.md',
+        'core-plugin.md', 'core-plugin-reference.md', 'dashboard.md',
+        'plugins.md', 'create-plugin.md', 'plugin-api.md', 'plugin-marketplace.md',
+        'auto-update-release.md', 'core-release-security.md', 'dashboard-testing.md', 'safety-advisory.md', 'selectors-reference.md',
+    ]
+    const CORE_DOCS = new Set(['core-plugin.md', 'core-plugin-reference.md', 'dashboard.md'])
+    const CATEGORY_START = {
+        'rewards-desk.md': 'For Everyone',
+        'core-plugin.md': 'Core',
+        'plugins.md': 'Developers',
+        'auto-update-release.md': 'Maintainers',
+    }
     try {
-        const files = fs.readdirSync(DOCS_DIR).filter(f => /\.md$/i.test(f))
-        // Put README first
-        files.sort((a, b) => {
-            const ar = /^readme/i.test(a) ? 0 : 1
-            const br = /^readme/i.test(b) ? 0 : 1
-            return ar - br || a.localeCompare(b)
+        const found = fs.readdirSync(DOCS_DIR).filter(f => /\.md$/i.test(f))
+        found.sort((a, b) => {
+            const ai = DOC_ORDER.findIndex(n => n.toLowerCase() === a.toLowerCase())
+            const bi = DOC_ORDER.findIndex(n => n.toLowerCase() === b.toLowerCase())
+            const ap = ai === -1 ? 1000 : ai
+            const bp = bi === -1 ? 1000 : bi
+            return ap - bp || a.localeCompare(b)
         })
-        const list = files.map(name => ({ name, title: docTitle(name) }))
-        return { files: list, default: list.length ? list[0].name : null }
+        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+        const list = found.map(name => {
+            let isNew = false
+            try { isNew = (Date.now() - fs.statSync(path.join(DOCS_DIR, name)).mtimeMs) < SEVEN_DAYS } catch {}
+            return {
+                name,
+                title: docTitle(name),
+                core: CORE_DOCS.has(name.toLowerCase()),
+                category: CATEGORY_START[name.toLowerCase()] || null,
+                isNew,
+            }
+        })
+        const whatsNew = { name: 'whats-new', title: "What's New", core: false, category: null, isNew: false, virtual: true }
+        return { files: [whatsNew, ...list], default: list.length ? list[0].name : null, version: APP_VERSION }
     } catch {
-        return { files: [], default: null }
+        return { files: [], default: null, version: APP_VERSION }
     }
 }
 
@@ -1454,10 +1481,11 @@ function html() {
     .docs-wrap.vis{display:flex}
     .docs-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
     .docs-body{display:flex;gap:14px;flex:1;min-height:0}
-    .docs-nav{
-      width:210px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;
-      border-right:1px solid var(--border);padding-right:10px;
-    }
+    .docs-sidebar{width:210px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--border);padding-right:10px;min-height:0}
+    .docs-search{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:12.5px;outline:none;transition:border-color .15s;width:100%;flex-shrink:0}
+    .docs-search:focus{border-color:rgba(46,232,255,.3)}
+    .docs-search::placeholder{color:var(--muted)}
+    .docs-nav{overflow-y:auto;display:flex;flex-direction:column;gap:3px;flex:1}
     .docs-nav-item{
       padding:8px 11px;border-radius:8px;font-size:12.5px;color:var(--muted);
       cursor:pointer;transition:all .13s;border:1px solid transparent;
@@ -1485,6 +1513,40 @@ function html() {
     .docs-content blockquote{border-left:3px solid rgba(46,232,255,.4);margin:0 0 14px;padding:4px 16px;color:var(--muted);background:rgba(46,232,255,.04)}
     .docs-content hr{border:none;border-top:1px solid var(--border);margin:22px 0}
     .docs-loading{color:var(--muted);font-size:13px;padding:30px;text-align:center}
+    @keyframes fadeInDoc{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+    .docs-content{animation:fadeInDoc .18s ease}
+    .docs-nav-section{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:14px 11px 4px;opacity:.55;pointer-events:none;user-select:none}
+    .docs-nav-core{color:rgba(247,200,92,.85)}
+    .docs-nav-core:hover{background:rgba(247,200,92,.07)!important;color:var(--gold)!important}
+    .docs-nav-core.active{background:rgba(247,200,92,.12)!important;color:var(--gold)!important;border-color:rgba(247,200,92,.3)!important}
+    .docs-content-core{border-left:2px solid rgba(247,200,92,.2);padding-left:20px}
+    .docs-core-promo{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,rgba(247,200,92,.1),rgba(247,200,92,.04));border:1px solid rgba(247,200,92,.25);border-radius:12px;padding:12px 16px;margin-bottom:20px}
+    .docs-core-promo-left{display:flex;align-items:center;gap:10px}
+    .docs-core-promo-badge{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(247,200,92,.2);color:var(--gold);border:1px solid rgba(247,200,92,.35)}
+    .docs-core-promo-text{font-size:12.5px;color:var(--gold);font-weight:600}
+    .docs-core-promo-btn{padding:6px 14px;border-radius:8px;background:var(--gold);color:#0d0a00;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:all .15s ease;white-space:nowrap;flex-shrink:0}
+    .docs-core-promo-btn:hover{background:#ffe082;box-shadow:0 0 14px rgba(247,200,92,.4)}
+    .docs-badge-new{display:inline-flex;align-items:center;margin-left:6px;font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:1px 5px;border-radius:100px;background:rgba(47,210,125,.2);color:var(--green);border:1px solid rgba(47,210,125,.3);vertical-align:middle;flex-shrink:0;line-height:1.4}
+    .docs-nav-item-whats-new{color:var(--cyan)!important}
+    .docs-nav-item-whats-new:hover{background:rgba(46,232,255,.06)!important;color:var(--cyan)!important}
+    .docs-nav-item-whats-new.active{background:rgba(46,232,255,.1)!important;color:var(--cyan)!important;border-color:rgba(46,232,255,.2)!important}
+    .code-block-wrap{position:relative}
+    .code-copy-btn{position:absolute;top:8px;right:8px;padding:3px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;opacity:0;font-family:inherit}
+    .code-block-wrap:hover .code-copy-btn{opacity:1}
+    .code-copy-btn:hover{background:rgba(255,255,255,.14);color:var(--text)}
+    .code-copy-btn.copied{color:var(--green);border-color:rgba(47,210,125,.3);opacity:1}
+    .core-expiry-band{display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,rgba(247,200,92,.09),rgba(247,200,92,.03));border:1px solid rgba(247,200,92,.25);border-radius:12px;padding:14px 18px}
+    .core-expiry-left{flex:1;min-width:180px}
+    .core-expiry-text{font-size:13.5px;color:var(--gold);font-weight:700}
+    .core-expiry-sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .core-expiry-btn{flex-shrink:0;padding:8px 16px;border-radius:8px;background:var(--gold);color:#0d0a00;font-size:12.5px;font-weight:700;border:none;cursor:pointer;transition:all .15s ease;font-family:inherit}
+    .core-expiry-btn:hover{background:#ffe082;box-shadow:0 0 14px rgba(247,200,92,.35)}
+    .changelog-wrap{display:flex;flex-direction:column;gap:0}
+    .changelog-entry{padding:13px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+    .changelog-entry:last-child{border-bottom:none}
+    .changelog-hash{font-family:"Cascadia Code",Consolas,monospace;font-size:10.5px;color:var(--muted);padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid var(--border);white-space:nowrap;flex-shrink:0;margin-top:2px}
+    .changelog-msg{font-size:13px;color:var(--text);line-height:1.55}
+    .changelog-empty{color:var(--muted);font-size:13px;padding:24px 0;text-align:center}
 
     /* ── Core "active" retention view ───────────────────────────── */
     .core-active-hero{
@@ -1892,6 +1954,13 @@ function html() {
           <p class="core-active-sub">Your license is valid and the premium engine is running. Here's a realistic estimate of the points Core adds on top of the free open-source bot — based on typical Microsoft Rewards values across your enabled features and accounts.</p>
           <button class="btn btn-secondary btn-sm" id="core-manage-license" style="margin-top:14px">Manage this license</button>
         </div>
+        <div class="core-expiry-band" id="core-expiry-band">
+          <div class="core-expiry-left">
+            <div class="core-expiry-text"><span id="core-expiry-days">—</span> remaining</div>
+            <div class="core-expiry-sub">Renew before <span id="core-expiry-date">—</span> to keep your streak protected &amp; all features active</div>
+          </div>
+          <button class="core-expiry-btn" onclick="window.open('https://discord.gg/JWhCkhSYtg')">Renew on Discord →</button>
+        </div>
         <div class="core-est-card">
           <div class="core-est-label">Estimated extra points / month</div>
           <div class="core-est-value" id="core-est-value">—</div>
@@ -2038,7 +2107,10 @@ function html() {
         </div>
       </div>
       <div class="docs-body">
-        <div class="docs-nav" id="docs-nav"></div>
+        <div class="docs-sidebar">
+          <input class="docs-search" id="docs-search" type="text" placeholder="Search docs…" autocomplete="off" spellcheck="false">
+          <div class="docs-nav" id="docs-nav"></div>
+        </div>
         <div class="docs-content" id="docs-content"><div class="docs-loading">Loading documentation…</div></div>
       </div>
     </div>
@@ -3314,6 +3386,19 @@ function html() {
       G('core-est-accounts').textContent = String(accounts);
       G('core-compare-pts').textContent = total.toLocaleString();
       G('core-breakdown').innerHTML = rows || '<div style="color:var(--muted);font-size:13px;padding:12px">Enable Core features in Settings to see their estimated value.</div>';
+      // Expiry indicator — reads from already-loaded license state, no extra API call
+      var expiryBand = G('core-expiry-band');
+      if (expiryBand && _coreData && _coreData.expiresAt) {
+        var exp = new Date(_coreData.expiresAt);
+        var daysLeft = Math.ceil((exp - Date.now()) / 86400000);
+        if (daysLeft > 0 && daysLeft <= 30) {
+          G('core-expiry-days').textContent = daysLeft === 1 ? '1 day' : daysLeft + ' days';
+          G('core-expiry-date').textContent = exp.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+          expiryBand.style.display = 'flex';
+        } else {
+          expiryBand.style.display = 'none';
+        }
+      }
     }
 
     // ── Plugins page ───────────────────────────────────────────────
@@ -3353,6 +3438,7 @@ function html() {
 
     // ── Docs page ──────────────────────────────────────────────────
     var _docsLoaded = false;
+    var _allDocFiles = [];
     async function loadDocs() {
       if (_docsLoaded) return;
       var nav = G('docs-nav');
@@ -3361,26 +3447,111 @@ function html() {
       catch(e) { G('docs-content').innerHTML = '<div class="docs-loading">Could not load documentation.</div>'; return; }
       var files = data.files || [];
       if (!files.length) { G('docs-content').innerHTML = '<div class="docs-loading">No documentation found.</div>'; return; }
-      nav.innerHTML = files.map(function(f) {
-        return '<div class="docs-nav-item" data-doc="'+esc(f.name)+'">'+esc(f.title)+'</div>';
-      }).join('');
-      nav.querySelectorAll('[data-doc]').forEach(function(el) {
-        el.addEventListener('click', function() { openDoc(el.getAttribute('data-doc')); });
+      // Mark What's New as new if version changed since last visit
+      var lastVer = localStorage.getItem('msrb_whatsNewVersion');
+      files = files.map(function(f) {
+        if (f.virtual && f.name === 'whats-new') return Object.assign({}, f, { isNew: data.version && data.version !== lastVer });
+        return f;
       });
+      _allDocFiles = files;
+      function renderNav(list) {
+        nav.innerHTML = list.map(function(f) {
+          var cat = f.category ? '<div class="docs-nav-section">'+esc(f.category)+'</div>' : '';
+          var badge = f.isNew ? '<span class="docs-badge-new">New</span>' : '';
+          var extra = f.virtual ? ' docs-nav-item-whats-new' : (f.core ? ' docs-nav-core' : '');
+          var cls = 'docs-nav-item' + extra;
+          return cat + '<div class="'+cls+'" data-doc="'+esc(f.name)+'">'+esc(f.title)+badge+'</div>';
+        }).join('');
+        nav.querySelectorAll('[data-doc]').forEach(function(el) {
+          el.addEventListener('click', function() { openDoc(el.getAttribute('data-doc')); });
+        });
+      }
+      renderNav(files);
+      var searchEl = G('docs-search');
+      if (searchEl) {
+        searchEl.addEventListener('input', function() {
+          var q = searchEl.value.trim().toLowerCase();
+          if (!q) { renderNav(_allDocFiles); return; }
+          var filtered = _allDocFiles.filter(function(f) {
+            return f.title.toLowerCase().includes(q) || f.name.toLowerCase().includes(q);
+          }).map(function(f) { return Object.assign({}, f, { category: null }); });
+          renderNav(filtered);
+          nav.querySelectorAll('[data-doc]').forEach(function(el) {
+            if (el.getAttribute('data-doc') === _currentDoc) el.classList.add('active');
+          });
+        });
+      }
       _docsLoaded = true;
       openDoc(data.default || files[0].name);
     }
+    var _currentDoc = '';
     async function openDoc(name) {
+      _currentDoc = name;
+      var isCore = /^(core-plugin|core-plugin-reference|dashboard)\.md$/i.test(name);
+      var isWhatsNew = name === 'whats-new';
       G('docs-nav').querySelectorAll('[data-doc]').forEach(function(el) {
         el.classList.toggle('active', el.getAttribute('data-doc') === name);
       });
-      G('docs-content').innerHTML = '<div class="docs-loading">Loading…</div>';
-      var md;
-      try { md = await fetch('/api/docs?file=' + encodeURIComponent(name)).then(function(r){return r.text();}); }
-      catch(e) { G('docs-content').innerHTML = '<div class="docs-loading">Could not load this page.</div>'; return; }
-      G('docs-content').innerHTML = renderMarkdown(md);
-      G('docs-content').scrollTop = 0;
-      G('docs-content').querySelectorAll('a[href]').forEach(function(a) {
+      var content = G('docs-content');
+      content.innerHTML = '<div class="docs-loading">Loading…</div>';
+      var html = '';
+      if (isWhatsNew) {
+        // Mark as seen
+        try {
+          var verData = await fetch('/api/docs').then(function(r){return r.json();});
+          if (verData.version) localStorage.setItem('msrb_whatsNewVersion', verData.version);
+          // Remove NEW badge from What's New in nav
+          G('docs-nav').querySelectorAll('[data-doc="whats-new"] .docs-badge-new').forEach(function(b){b.remove();});
+        } catch(e) {}
+        var log;
+        try { log = await fetch('/api/whats-new').then(function(r){return r.json();}); }
+        catch(e) { log = null; }
+        var entries = log && log.commits ? log.commits : null;
+        if (!entries) {
+          html = '<h1>What\'s New</h1><div class="changelog-empty">Git history is not available in this install.</div>';
+        } else if (!entries.length) {
+          html = '<h1>What\'s New</h1><div class="changelog-empty">No recent changes found.</div>';
+        } else {
+          html = '<h1>What\'s New</h1><p style="color:var(--muted);font-size:13px;margin:0 0 20px">Recent changes to Microsoft Rewards Bot. Updates apply automatically on <code>npm start</code>.</p><div class="changelog-wrap">' +
+            entries.map(function(c){
+              return '<div class="changelog-entry"><span class="changelog-hash">'+esc(c.hash)+'</span><div class="changelog-msg">'+esc(c.message)+'</div></div>';
+            }).join('') + '</div>';
+        }
+      } else {
+        var md;
+        try { md = await fetch('/api/docs?file=' + encodeURIComponent(name)).then(function(r){return r.text();}); }
+        catch(e) { content.innerHTML = '<div class="docs-loading">Could not load this page.</div>'; return; }
+        content.classList.toggle('docs-content-core', isCore);
+        var promo = isCore
+          ? '<div class="docs-core-promo"><div class="docs-core-promo-left"><span class="docs-core-promo-badge">CORE</span><span class="docs-core-promo-text">3 free days — claim on Discord</span></div><button class="docs-core-promo-btn" onclick="window.open(\'https://discord.gg/JWhCkhSYtg\')">View Store →</button></div>'
+          : '';
+        html = promo + renderMarkdown(md);
+      }
+      content.innerHTML = html;
+      content.scrollTop = 0;
+      content.style.animation = 'none';
+      content.getBoundingClientRect();
+      content.style.animation = '';
+      // Add copy buttons to code blocks
+      content.querySelectorAll('pre').forEach(function(pre) {
+        var wrap = document.createElement('div');
+        wrap.className = 'code-block-wrap';
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+        var btn = document.createElement('button');
+        btn.className = 'code-copy-btn';
+        btn.textContent = 'Copy';
+        btn.addEventListener('click', function() {
+          var code = pre.querySelector('code');
+          navigator.clipboard.writeText(code ? code.innerText : pre.innerText).then(function() {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function(){ btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+          }).catch(function(){});
+        });
+        wrap.appendChild(btn);
+      });
+      content.querySelectorAll('a[href]').forEach(function(a) {
         var href = a.getAttribute('href');
         if (/^https?:/.test(href)) { a.addEventListener('click', function(e){ e.preventDefault(); window.open(href); }); }
         else if (/\\.md($|#)/.test(href)) {
@@ -3849,6 +4020,18 @@ const server = http.createServer((req, res) => {
         } catch (e) {
             res.writeHead(500); res.end(String(e.message))
         }
+        return
+    }
+    if (req.method === 'GET' && req.url === '/api/whats-new') {
+        childProcess.exec('git log --oneline --no-merges -30', { cwd: ROOT, timeout: 5000 }, (err, stdout) => {
+            if (err || !stdout) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ commits: [] })); return }
+            const commits = stdout.trim().split('\n').filter(Boolean).map(line => {
+                const sp = line.indexOf(' ')
+                return { hash: sp > 0 ? line.slice(0, sp) : line, message: sp > 0 ? line.slice(sp + 1).trim() : '' }
+            })
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ commits }))
+        })
         return
     }
     if (req.method === 'GET' && req.url.startsWith('/api/docs')) {

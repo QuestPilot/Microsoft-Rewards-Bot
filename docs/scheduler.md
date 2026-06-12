@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Built-in Scheduler
 
 The built-in scheduler lets the bot run immediately, finish all configured accounts, then wait inside the same process until the next daily run time. It works on Windows, macOS, Linux, and Docker without cron, systemd, Task Scheduler, or any third-party service.

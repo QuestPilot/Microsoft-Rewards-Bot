@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner-core.png" alt="Microsoft Rewards Bot — Core" width="100%">
+</div>
+
+---
+
 # Core Plugin Technical Reference
 
 This page documents how the official Core plugin behaves, what it covers, and how it is published. For the public-facing overview, see [Official Core plugin](./core-plugin.md).

@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Create a Plugin
 
 Navigation: [Documentation index](./README.md) → [Plugin system overview](./plugins.md) → [Plugin API reference](./plugin-api.md) → [Publishing a plugin](./plugin-marketplace.md)

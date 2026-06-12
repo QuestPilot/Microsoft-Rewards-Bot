@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Troubleshooting
 
 Navigation: [Documentation index](./README.md) -> [Install and auto-updates](./updates.md) -> [Node.js version](./node-version.md) -> [Plugin system overview](./plugins.md)

@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Docker
 
 Navigation: [Documentation index](./README.md) -> [Node.js version](./node-version.md) -> [Official Core plugin](./core-plugin.md) -> [Troubleshooting](./troubleshooting.md)

@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Documentation
 
 Welcome! This is the full guide to Microsoft Rewards Bot, split by what you want to do. The main [README](../README.md) is the front door — this folder is the detail.

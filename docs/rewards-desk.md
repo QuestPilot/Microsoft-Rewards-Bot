@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Rewards Desk
 
 Navigation: [Documentation index](./README.md) → [Install and auto-updates](./updates.md) → [Plugin system overview](./plugins.md)

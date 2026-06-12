@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Licensing and Allowed Use
 
 Navigation: [Documentation index](./README.md) -> [Official Core plugin](./core-plugin.md) -> [Plugin publishing](./plugin-marketplace.md)
