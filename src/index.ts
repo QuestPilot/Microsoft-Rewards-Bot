@@ -53,6 +53,16 @@ interface BrowserSession {
     fingerprint: BrowserFingerprintWithHeaders
 }
 
+interface StarBonusInfo {
+    activeLevelName: string
+    monthlyProgress: number
+    monthlyMax: number
+    weeklyProgress: number
+    weeklyState: string
+    levelBonusProgress: number
+    levelBonusMax: number
+}
+
 interface AccountStats {
     email: string
     initialPoints: number
@@ -62,6 +72,7 @@ interface AccountStats {
     success: boolean
     error?: string
     coreStats?: CoreRunStats
+    starBonus?: StarBonusInfo
 }
 
 interface CoreRunStats {
@@ -108,6 +119,7 @@ interface UserData {
     gainedPoints: number
     dashboardInfo: DashboardInfo | null
     coreStats: CoreRunStats
+    starBonus?: StarBonusInfo
 }
 
 export class MicrosoftRewardsBot {
@@ -458,7 +470,7 @@ export class MicrosoftRewardsBot {
                 this.axios = new HttpClient(account.proxy)
 
                 const result:
-                    | { initialPoints: number; collectedPoints: number; coreStats: CoreRunStats }
+                    | { initialPoints: number; collectedPoints: number; coreStats: CoreRunStats; starBonus?: StarBonusInfo }
                     | undefined = await this.Main(account).catch(error => {
                     void this.logger.error(
                         true,
@@ -482,7 +494,8 @@ export class MicrosoftRewardsBot {
                         collectedPoints: collectedPoints,
                         duration: parseFloat(durationSeconds),
                         success: true,
-                        coreStats: result.coreStats
+                        coreStats: result.coreStats,
+                        starBonus: result.starBonus
                     })
 
                     this.logger.info(
@@ -608,10 +621,14 @@ export class MicrosoftRewardsBot {
                 accountCore && (accountCore.claimPoints || accountCore.couponsApplied)
                     ? `\nCore: +${accountCore.claimPoints} claimed | ${accountCore.couponsApplied} coupon(s)`
                     : ''
+            const sb = stats.starBonus
+            const starLine = sb
+                ? `\nSTAR Bonus: ${sb.monthlyProgress}/${sb.monthlyMax} pts${sb.levelBonusMax > 0 ? ` | Tier bonus: ${sb.levelBonusProgress}/${sb.levelBonusMax}` : ''}`
+                : ''
             return {
                 name: `${stats.success ? 'Completed' : 'Failed'} - ${stats.email}`.slice(0, 256),
                 value: stats.success
-                    ? `**+${stats.collectedPoints} points**\n${stats.initialPoints} -> ${stats.finalPoints} | ${(stats.duration / 60).toFixed(1)} min${coreLine}`
+                    ? `**+${stats.collectedPoints} points**\n${stats.initialPoints} -> ${stats.finalPoints} | ${(stats.duration / 60).toFixed(1)} min${coreLine}${starLine}`
                     : `**Run failed**\n${String(stats.error || 'Unknown error').slice(0, 500)}`,
                 inline: true
             }
@@ -641,6 +658,21 @@ export class MicrosoftRewardsBot {
                     inline: false
                 })
             }
+        }
+
+        const starAccounts = accountStats.filter(s => s.success && s.starBonus?.monthlyMax)
+        if (starAccounts.length > 0) {
+            const totalMonthly = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyProgress ?? 0), 0)
+            const totalMonthlyMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyMax ?? 0), 0)
+            const totalTierBonus = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusProgress ?? 0), 0)
+            const totalTierMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusMax ?? 0), 0)
+            const levelName = starAccounts[0]?.starBonus?.activeLevelName || ''
+            const tierLine = totalTierMax > 0 ? `\nTier bonus: ${totalTierBonus}/${totalTierMax} pts` : ''
+            fields.push({
+                name: `STAR Bonus${levelName ? ` (${levelName})` : ''}`,
+                value: `Monthly: ${totalMonthly}/${totalMonthlyMax} pts${tierLine}\nCredited at the start of next month for consistent Bing usage.`,
+                inline: false
+            })
         }
 
         if (accountStats.length > 20) {
@@ -678,6 +710,7 @@ export class MicrosoftRewardsBot {
         const coreStats = this.aggregateCoreStats(accountStats)
         const hasCore = this.pluginManager.hasOfficialCoreEntitlement()
 
+        const starAccounts = accountStats.filter(s => s.success && s.starBonus?.monthlyMax)
         const lines = [
             'Microsoft Rewards Bot run complete',
             `Accounts: ${totalAccounts} | Success: ${successfulAccounts} | Failed: ${failedAccounts}`,
@@ -685,6 +718,14 @@ export class MicrosoftRewardsBot {
             `Balance: ${totalInitialPoints} -> ${totalFinalPoints}`,
             `Runtime: ${totalDurationMinutes}min`
         ]
+        if (starAccounts.length > 0) {
+            const totalMonthly = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyProgress ?? 0), 0)
+            const totalMonthlyMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyMax ?? 0), 0)
+            const totalTierBonus = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusProgress ?? 0), 0)
+            const totalTierMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusMax ?? 0), 0)
+            const tierPart = totalTierMax > 0 ? ` | Tier bonus: ${totalTierBonus}/${totalTierMax}` : ''
+            lines.push(`STAR Bonus: ${totalMonthly}/${totalMonthlyMax} pts this month${tierPart}`)
+        }
 
         if (includeCoreComparison) {
             if (hasCore) {
@@ -786,8 +827,23 @@ export class MicrosoftRewardsBot {
                 this.cookies.mobile = await initialContext.cookies()
                 this.fingerprint = mobileSession.fingerprint
 
+                this.userData.starBonus = undefined
                 const data: DashboardData = await this.browser.func.getDashboardData()
                 const appData: AppDashboardData = await this.browser.func.getAppDashboardData()
+
+                // Capture STAR Bonus and monthly tier bonus from the new dashboard
+                const li = data.userStatus.levelInfo
+                if ((li.bingStarMonthlyBonusMaximum ?? 0) > 0 || (li.monthlyLevelBonusMaximum ?? 0) > 0) {
+                    this.userData.starBonus = {
+                        activeLevelName: li.activeLevelName ?? '',
+                        monthlyProgress: li.bingStarMonthlyBonusProgress ?? 0,
+                        monthlyMax: li.bingStarMonthlyBonusMaximum ?? 0,
+                        weeklyProgress: li.bingStarBonusWeeklyProgress ?? 0,
+                        weeklyState: li.bingStarBonusWeeklyState ?? '',
+                        levelBonusProgress: li.monthlyLevelBonusProgress ?? 0,
+                        levelBonusMax: li.monthlyLevelBonusMaximum ?? 0,
+                    }
+                }
 
                 // Set geo
                 this.userData.geoLocale =
@@ -938,7 +994,8 @@ export class MicrosoftRewardsBot {
                 return {
                     initialPoints,
                     collectedPoints: collectedPoints || 0,
-                    coreStats: this.userData.coreStats
+                    coreStats: this.userData.coreStats,
+                    starBonus: this.userData.starBonus
                 }
             })
         } finally {

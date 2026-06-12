@@ -2406,7 +2406,7 @@ function html() {
     }
     setTimeout(function(){
       releaseBootOverlay();
-    }, 900);
+    }, 5000);
 
     function setButtonBusy(button, busy, label) {
       if (!button) return;
@@ -3508,11 +3508,11 @@ function html() {
         catch(e) { log = null; }
         var entries = log && log.commits ? log.commits : null;
         if (!entries) {
-          html = '<h1>What\'s New</h1><div class="changelog-empty">Git history is not available in this install.</div>';
+          html = '<h1>What\\'s New</h1><div class="changelog-empty">Git history is not available in this install.</div>';
         } else if (!entries.length) {
-          html = '<h1>What\'s New</h1><div class="changelog-empty">No recent changes found.</div>';
+          html = '<h1>What\\'s New</h1><div class="changelog-empty">No recent changes found.</div>';
         } else {
-          html = '<h1>What\'s New</h1><p style="color:var(--muted);font-size:13px;margin:0 0 20px">Recent changes to Microsoft Rewards Bot. Updates apply automatically on <code>npm start</code>.</p><div class="changelog-wrap">' +
+          html = '<h1>What\\'s New</h1><p style="color:var(--muted);font-size:13px;margin:0 0 20px">Recent changes to Microsoft Rewards Bot. Updates apply automatically on <code>npm start</code>.</p><div class="changelog-wrap">' +
             entries.map(function(c){
               return '<div class="changelog-entry"><span class="changelog-hash">'+esc(c.hash)+'</span><div class="changelog-msg">'+esc(c.message)+'</div></div>';
             }).join('') + '</div>';
@@ -3523,7 +3523,7 @@ function html() {
         catch(e) { content.innerHTML = '<div class="docs-loading">Could not load this page.</div>'; return; }
         content.classList.toggle('docs-content-core', isCore);
         var promo = isCore
-          ? '<div class="docs-core-promo"><div class="docs-core-promo-left"><span class="docs-core-promo-badge">CORE</span><span class="docs-core-promo-text">3 free days — claim on Discord</span></div><button class="docs-core-promo-btn" onclick="window.open(\'https://discord.gg/JWhCkhSYtg\')">View Store →</button></div>'
+          ? '<div class="docs-core-promo"><div class="docs-core-promo-left"><span class="docs-core-promo-badge">CORE</span><span class="docs-core-promo-text">3 free days — claim on Discord</span></div><button class="docs-core-promo-btn" onclick="window.open(\\'https://discord.gg/JWhCkhSYtg\\')">View Store →</button></div>'
           : '';
         html = promo + renderMarkdown(md);
       }
