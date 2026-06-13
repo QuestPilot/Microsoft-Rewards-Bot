@@ -3,6 +3,7 @@ const childProcess = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const semver = require('semver')
 const test = require('node:test')
 
 const { migrateUserFiles } = require('../scripts/updater/ConfigMigrator')
@@ -14,11 +15,7 @@ const {
     UpdateManager,
     resolveNpmInvocation
 } = require('../scripts/updater/UpdateManager')
-const {
-    compareReleaseVersions,
-    isReleaseVersion,
-    parseReleaseVersion
-} = require('../scripts/updater/ReleaseVersion')
+const { compareReleaseVersions, isReleaseVersion, parseReleaseVersion } = require('../scripts/updater/ReleaseVersion')
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-updater-'))
@@ -134,6 +131,11 @@ test('MSRB release versions support an optional fourth revision segment', () => 
     assert.equal(compareReleaseVersions('4.5.4.1', '4.5.4'), 1)
     assert.equal(compareReleaseVersions('4.5.4.10', '4.5.4.2'), 1)
     assert.equal(compareReleaseVersions('4.5.5', '4.5.4.99'), 1)
+})
+
+test('standard SemVer bridge releases migrate legacy updaters before fourth-segment releases', () => {
+    assert.equal(semver.gt('4.5.5', '4.5.4'), true)
+    assert.equal(compareReleaseVersions('4.5.5.1', '4.5.5'), 1)
 })
 
 test('updater detects a newer fourth-segment release', () => {
