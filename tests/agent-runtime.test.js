@@ -15,6 +15,15 @@ const {
     subscribeToAgentLogs
 } = require('../dist/core/AgentRuntime')
 
+async function waitFor(condition, message, timeoutMs = 2000) {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+        if (await condition()) return
+        await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    throw new Error(message)
+}
+
 test('background agent IPC writes state, answers ping, and clears state on stop', async () => {
     const previousCwd = process.cwd()
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-agent-'))
@@ -72,6 +81,7 @@ test('Rewards Desk can request runs, receive logs, and stop through authenticate
     const runtime = new AgentRuntime()
     let stopRequested = false
     let finishRun
+    let unsubscribe = () => {}
 
     try {
         process.chdir(tempDir)
@@ -80,7 +90,7 @@ test('Rewards Desk can request runs, receive logs, and stop through authenticate
         await runtime.start()
 
         const logs = []
-        const unsubscribe = await subscribeToAgentLogs(log => logs.push(log))
+        unsubscribe = await subscribeToAgentLogs(log => logs.push(log))
         assert.deepEqual(await requestAgentRun(), { accepted: true })
         assert.equal((await getAgentStatus()).runState, 'running')
         assert.equal((await requestAgentRun()).accepted, false)
@@ -93,16 +103,21 @@ test('Rewards Desk can request runs, receive logs, and stop through authenticate
             title: 'TEST',
             message: 'Desk received this log'
         })
-        await new Promise(resolve => setTimeout(resolve, 30))
-        assert.equal(logs.at(-1).message, 'Desk received this log')
+        await waitFor(
+            () => logs.some(log => log.message === 'Desk received this log'),
+            'Desk did not receive the published agent log'
+        )
 
         assert.equal(await requestAgentStop(), true)
         assert.equal(stopRequested, true)
         finishRun(0)
-        await new Promise(resolve => setTimeout(resolve, 30))
+        await waitFor(
+            async () => (await getAgentStatus()).lastExitCode === 0,
+            'Agent run did not report its exit code'
+        )
         assert.equal((await getAgentStatus()).lastExitCode, 0)
-        unsubscribe()
     } finally {
+        unsubscribe()
         await runtime.stop().catch(() => undefined)
         process.chdir(previousCwd)
         fs.rmSync(tempDir, { recursive: true, force: true })

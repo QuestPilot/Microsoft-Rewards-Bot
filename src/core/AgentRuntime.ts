@@ -263,6 +263,17 @@ export async function subscribeToAgentLogs(
     const socket = net.connect({ host: '127.0.0.1', port: state.port })
     socket.setEncoding('utf8')
     let buffer = ''
+    let attached = false
+    let resolveAttached: (() => void) | null = null
+    let rejectAttached: ((error: Error) => void) | null = null
+    const attachedPromise = new Promise<void>((resolve, reject) => {
+        resolveAttached = resolve
+        rejectAttached = reject
+    })
+    const attachTimeout = setTimeout(() => {
+        rejectAttached?.(new Error('Timed out while attaching to Core agent logs'))
+        socket.destroy()
+    }, 1500)
     socket.on('connect', () => {
         socket.write(JSON.stringify({ token: state.token, type: 'attach' }) + '\n')
     })
@@ -273,11 +284,29 @@ export async function subscribeToAgentLogs(
             const line = buffer.slice(0, newline)
             buffer = buffer.slice(newline + 1)
             const message = parseJson<{ type?: string; log?: DashboardLog }>(line)
+            if (message?.type === 'attached' && !attached) {
+                attached = true
+                clearTimeout(attachTimeout)
+                resolveAttached?.()
+            }
             if (message?.type === 'log' && message.log) onLog(message.log)
             newline = buffer.indexOf('\n')
         }
     })
-    socket.on('close', () => onClose?.())
+    socket.on('error', error => {
+        if (!attached) {
+            clearTimeout(attachTimeout)
+            rejectAttached?.(error)
+        }
+    })
+    socket.on('close', () => {
+        if (!attached) {
+            clearTimeout(attachTimeout)
+            rejectAttached?.(new Error('Core agent log connection closed before attachment'))
+        }
+        onClose?.()
+    })
+    await attachedPromise
     return () => socket.destroy()
 }
 
