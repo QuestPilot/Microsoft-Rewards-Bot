@@ -1,9 +1,9 @@
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
-const semver = require('semver')
 
 const { UpdateManager } = require('./updater/UpdateManager')
+const { compareReleaseVersions } = require('./updater/ReleaseVersion')
 const { readPublicKey, verifySignedBytes } = require('./security/SignedManifest')
 
 const ROOT = path.resolve(__dirname, '..')
@@ -177,7 +177,7 @@ async function main() {
 
     try {
         const remote = await updater.fetchRemoteRelease()
-        const updateResult = semver.gt(remote.version, packageJson.version)
+        const updateResult = compareReleaseVersions(remote.version, packageJson.version) > 0
             ? { status: 'update-available', remote, docker: isDocker }
             : { status: 'current', remote }
         if (remote) {

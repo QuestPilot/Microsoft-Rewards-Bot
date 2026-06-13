@@ -6,6 +6,7 @@ const path = require('path')
 const { URL } = require('url')
 
 const { migrateUserFiles } = require('./ConfigMigrator')
+const { compareReleaseVersions, isReleaseVersion } = require('./ReleaseVersion')
 const DEFAULT_REPO = 'QuestPilot/Microsoft-Rewards-Bot'
 const DEFAULT_BRANCH = 'main'
 const ALLOWED_UPDATE_HOSTS = new Set([
@@ -575,7 +576,7 @@ class UpdateManager {
         const packageUrl = this.githubApiUrl(`/repos/${this.repo}/contents/package.json?ref=${commitSha}`)
         const packageSource = await requestText(packageUrl, 20_000, { accept: 'application/vnd.github.raw' })
         const packageJson = JSON.parse(packageSource)
-        if (typeof packageJson.version !== 'string') {
+        if (!isReleaseVersion(packageJson.version)) {
             throw new Error(`Remote package.json at ${commitSha.slice(0, 12)} has no valid version`)
         }
 
@@ -595,16 +596,15 @@ class UpdateManager {
     }
 
     isNewer(remoteVersion) {
-        const semver = require('semver')
-        return semver.gt(remoteVersion, this.packageJson.version)
+        return compareReleaseVersions(remoteVersion, this.packageJson.version) > 0
     }
 
     updateDecision(remote, force = false) {
-        const semver = require('semver')
-        if (semver.gt(remote.version, this.packageJson.version)) {
+        const comparison = compareReleaseVersions(remote.version, this.packageJson.version)
+        if (comparison > 0) {
             return { apply: true, reason: 'newer' }
         }
-        if (force && semver.eq(remote.version, this.packageJson.version)) {
+        if (force && comparison === 0) {
             return { apply: true, reason: 'forced' }
         }
         return { apply: false, reason: 'current' }

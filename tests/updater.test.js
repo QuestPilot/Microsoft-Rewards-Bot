@@ -14,6 +14,11 @@ const {
     UpdateManager,
     resolveNpmInvocation
 } = require('../scripts/updater/UpdateManager')
+const {
+    compareReleaseVersions,
+    isReleaseVersion,
+    parseReleaseVersion
+} = require('../scripts/updater/ReleaseVersion')
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-updater-'))
@@ -118,6 +123,26 @@ test('config migrator adds missing keys without replacing user values', () => {
     assert.equal(accounts[0].proxy.url, 'http://proxy')
     assert.equal(accounts[0].proxy.port, 0)
     assert.equal(accounts[0].saveFingerprint.mobile, false)
+})
+
+test('MSRB release versions support an optional fourth revision segment', () => {
+    assert.deepEqual(parseReleaseVersion('v4.5.4'), [4, 5, 4, 0])
+    assert.deepEqual(parseReleaseVersion('4.5.4.12'), [4, 5, 4, 12])
+    assert.equal(isReleaseVersion('4.5.4.1'), true)
+    assert.equal(isReleaseVersion('4.5'), false)
+    assert.equal(isReleaseVersion('4.5.4-beta.1'), false)
+    assert.equal(compareReleaseVersions('4.5.4.1', '4.5.4'), 1)
+    assert.equal(compareReleaseVersions('4.5.4.10', '4.5.4.2'), 1)
+    assert.equal(compareReleaseVersions('4.5.5', '4.5.4.99'), 1)
+})
+
+test('updater detects a newer fourth-segment release', () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '4.5.4' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+
+    assert.deepEqual(updater.updateDecision({ version: '4.5.4.1' }), { apply: true, reason: 'newer' })
+    assert.deepEqual(updater.updateDecision({ version: '4.5.4' }), { apply: false, reason: 'current' })
 })
 
 test('config migration moves corePremium flags without overwriting modern values', () => {
