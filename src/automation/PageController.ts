@@ -14,6 +14,7 @@ import { URLS } from './DashboardSelectors'
 
 export default class PageController {
     private bot: MicrosoftRewardsBot
+    private static readonly BROWSER_CLOSE_TIMEOUT_MS = 10_000
 
     /**
      * Once the legacy JSON dashboard API (`/api/getuserinfo`) fails, Microsoft has
@@ -75,6 +76,17 @@ export default class PageController {
             }
         }
 
+            try {
+                const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
+                await page
+                    .goto(this.bot.config.baseURL, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+                    .catch(() => {})
+                const html = await page.content()
+                return this.parseDashboardHtml(html)
+            } catch (fallbackError) {
+                this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data')
+                throw fallbackError
+            }
         return this.getDashboardDataFromHtml()
     }
 
@@ -122,7 +134,11 @@ export default class PageController {
     private parseDashboardHtml(html: string): DashboardData {
         const legacyMatch = html.match(/var\s+dashboard\s*=\s*({.*?});/s)
         if (legacyMatch?.[1]) {
-            this.bot.logger.debug(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Extracted dashboard data from legacy HTML embed')
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'GET-DASHBOARD-DATA',
+                'Extracted dashboard data from legacy HTML embed'
+            )
             return JSON.parse(legacyMatch[1]) as DashboardData
         }
 
@@ -199,9 +215,7 @@ export default class PageController {
             const parsed = JSON.parse(callArgs) as unknown
             if (!Array.isArray(parsed)) return null
 
-            return parsed
-                .filter((part): part is string => typeof part === 'string')
-                .join('\n')
+            return parsed.filter((part): part is string => typeof part === 'string').join('\n')
         } catch {
             const stringValues: string[] = []
             const stringPattern = /"((?:\\.|[^"\\])*)"/gs
@@ -783,9 +797,9 @@ export default class PageController {
         }
     }
 
-    async closeBrowser(browser: BrowserContext, email: string) {
+    async closeBrowser(context: BrowserContext, email: string) {
         try {
-            const cookies = await browser.cookies()
+            const cookies = await context.cookies()
 
             // Save cookies
             this.bot.logger.debug(
@@ -798,7 +812,7 @@ export default class PageController {
             // Save localStorage from all open pages (rewards.bing.com, bing.com)
             try {
                 const storageOrigins: StorageOrigin[] = []
-                const pages = browser.pages()
+                const pages = context.pages()
                 const seenOrigins = new Set<string>()
 
                 for (const page of pages) {
@@ -847,16 +861,36 @@ export default class PageController {
 
             await this.bot.utils.wait(2000)
 
-            // Close browser
-            await browser.close()
+            await this.closeWithTimeout(() => context.close(), 'context')
             this.bot.logger.info(this.bot.isMobile, 'CLOSE-BROWSER', 'Browser closed cleanly!')
         } catch (error) {
+            await this.closeWithTimeout(() => context.close(), 'context').catch(() => {})
             this.bot.logger.error(
                 this.bot.isMobile,
                 'CLOSE-BROWSER',
                 `An error occurred: ${error instanceof Error ? error.message : String(error)}`
             )
             throw error
+        }
+    }
+
+    private async closeWithTimeout(close: () => Promise<void>, label: string): Promise<void> {
+        let timeout: NodeJS.Timeout | undefined
+        try {
+            await Promise.race([
+                close(),
+                new Promise<void>((_, reject) => {
+                    timeout = setTimeout(
+                        () =>
+                            reject(
+                                new Error(`${label} close timed out after ${PageController.BROWSER_CLOSE_TIMEOUT_MS}ms`)
+                            ),
+                        PageController.BROWSER_CLOSE_TIMEOUT_MS
+                    )
+                })
+            ])
+        } finally {
+            if (timeout) clearTimeout(timeout)
         }
     }
 

@@ -14,6 +14,10 @@ test('browser runtime requires Patchright Chromium instead of silently using sys
 
 test('browser processes are tracked and closed during shutdown paths', () => {
     assert.match(browserManager, /activeBrowsers = new Set/)
+    assert.match(browserManager, /BROWSER_CLOSE_TIMEOUT_MS = 10_000/)
+    assert.match(browserManager, /closeBrowserWithTimeout\(browser\)/)
+    assert.match(browserManager, /context\.once\('close', async \(\) =>/)
     assert.match(browserManager, /async closeAll\(\)/)
+    assert.match(browserManager, /browsers\.map\(browser => this\.closeBrowserWithTimeout\(browser\)\)/)
     assert.match(main, /await rewardsBot\.closeAllBrowsers\(\)/)
 })
