@@ -16,7 +16,7 @@ It never stores passwords, cookies, tokens, or unmasked account addresses.
   "config": {
     "historyLimit": 50,
     "warnOnZeroPoints": true,
-    "outputDir": "diagnostics/run-health"
+    "outputDir": "data/run-health"
   }
 }
 ```

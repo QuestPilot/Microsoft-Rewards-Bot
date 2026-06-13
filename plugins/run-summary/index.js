@@ -12,7 +12,7 @@ class RunSummaryPlugin {
         this.description = 'Writes local account run summaries for quick review after a bot run.'
         this.author = 'QuestPilot'
         this.license = 'MIT'
-        this.outputDir = 'diagnostics/run-summary'
+        this.outputDir = 'data/run-summary'
         this.includeEmails = false
         this.writeMarkdown = true
         this.log = null

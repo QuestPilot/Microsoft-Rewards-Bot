@@ -4,9 +4,9 @@ Run Summary is a free optional plugin that writes local account result summaries
 
 It creates:
 
-- `diagnostics/run-summary/accounts.jsonl`
-- `diagnostics/run-summary/latest.json`
-- `diagnostics/run-summary/latest.md`
+- `data/run-summary/accounts.jsonl`
+- `data/run-summary/latest.json`
+- `data/run-summary/latest.md`
 
 ## Configuration
 
@@ -17,7 +17,7 @@ Enable it in `plugins/plugins.jsonc`:
   "enabled": true,
   "priority": 40,
   "config": {
-    "outputDir": "diagnostics/run-summary",
+    "outputDir": "data/run-summary",
     "includeEmails": false,
     "writeMarkdown": true
   }

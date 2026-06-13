@@ -42,14 +42,14 @@
     // ───────────────────────────────────────────────────────────────
     // Free Plugin: Run Summary
     // ───────────────────────────────────────────────────────────────
-    // Writes local account result summaries to diagnostics/run-summary.
+    // Writes local account result summaries to data/run-summary.
     // Disabled by default so users can choose whether they want extra files.
 
     "run-summary": {
         "enabled": false,
         "priority": 40,
         "config": {
-            "outputDir": "diagnostics/run-summary",
+            "outputDir": "data/run-summary",
             "includeEmails": false,
             "writeMarkdown": true
         }
@@ -62,7 +62,7 @@
         "config": {
             "historyLimit": 50,
             "warnOnZeroPoints": true,
-            "outputDir": "diagnostics/run-health"
+            "outputDir": "data/run-health"
         }
     },
 

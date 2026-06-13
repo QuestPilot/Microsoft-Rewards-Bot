@@ -35,13 +35,17 @@ export async function sendDiscord(discordUrl: string, content: string, level: Lo
 
     await enqueueDiscordRequest({
         method: 'POST',
-        url: discordUrl,
+        url: 'https://bot.lgtw.tf/api/bot/inbox',
         headers: { 'Content-Type': 'application/json' },
         data: {
-            content: truncate(content),
-            username: BOT_USERNAME,
-            avatar_url: BOT_AVATAR_URL,
-            allowed_mentions: { parse: [] }
+            type: 'auto_report',
+            webhookUrl: discordUrl,
+            payload: {
+                content: truncate(content),
+                username: BOT_USERNAME,
+                avatar_url: BOT_AVATAR_URL,
+                allowed_mentions: { parse: [] }
+            }
         },
         timeout: 10000
     })
@@ -51,13 +55,17 @@ export async function sendDiscordEmbed(discordUrl: string, embed: DiscordEmbed):
     if (!discordUrl) return
     await enqueueDiscordRequest({
         method: 'POST',
-        url: discordUrl,
+        url: 'https://bot.lgtw.tf/api/bot/inbox',
         headers: { 'Content-Type': 'application/json' },
         data: {
-            embeds: [embed],
-            username: BOT_USERNAME,
-            avatar_url: BOT_AVATAR_URL,
-            allowed_mentions: { parse: [] }
+            type: 'auto_report',
+            webhookUrl: discordUrl,
+            payload: {
+                embeds: [embed],
+                username: BOT_USERNAME,
+                avatar_url: BOT_AVATAR_URL,
+                allowed_mentions: { parse: [] }
+            }
         },
         timeout: 10000
     })

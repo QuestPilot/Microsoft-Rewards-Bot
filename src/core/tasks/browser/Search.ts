@@ -3,6 +3,7 @@ import type { Page } from 'patchright'
 import type { Counters, DashboardData } from '../../../types/DashboardData'
 
 import { BING_SEARCH } from '../../../automation/DashboardSelectors'
+import { recordSearchQuery } from '../../../helpers/StatsRecorder'
 import { QueryProvider } from '../../QueryProvider'
 import { TaskBase } from '../../TaskBase'
 
@@ -86,6 +87,8 @@ export class Search extends TaskBase {
 
                 const rawGained = missingPointsTotal - newMissingPointsTotal
                 const gainedPoints = Math.max(0, rawGained)
+
+                void recordSearchQuery(query, isMobile, gainedPoints, this.bot.userData.userName)
 
                 if (gainedPoints === 0) {
                     stagnantLoop++
@@ -199,6 +202,8 @@ export class Search extends TaskBase {
 
                         const rawGained = missingPointsTotal - newMissingPointsTotal
                         const gainedPoints = Math.max(0, rawGained)
+
+                        void recordSearchQuery(query, isMobile, gainedPoints, this.bot.userData.userName)
 
                         if (gainedPoints === 0) {
                             stagnantLoop++
@@ -323,6 +328,8 @@ export class Search extends TaskBase {
 
             const newBalance = await this.safeGetBalance(prevBalance)
             const gainedPoints = Math.max(0, newBalance - prevBalance)
+
+            void recordSearchQuery(query, isMobile, gainedPoints, this.bot.userData.userName)
 
             if (gainedPoints > 0) {
                 plateau = 0

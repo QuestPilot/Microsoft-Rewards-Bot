@@ -49,7 +49,7 @@
                     {
                         "name":  "run-summary",
                         "version":  "1.0.0",
-                        "description":  "Free local summaries for account run results, written to diagnostics/run-summary.",
+                        "description":  "Free local summaries for account run results, written to data/run-summary.",
                         "license":  "MIT",
                         "price":  "free",
                         "botVersionRange":  "\u003e=4.0.0",

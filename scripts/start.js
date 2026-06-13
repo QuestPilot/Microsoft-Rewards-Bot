@@ -2,7 +2,7 @@ const childProcess = require('child_process')
 const fs = require('fs')
 const path = require('path')
 const { UpdateManager } = require('./updater/UpdateManager')
-const { bootstrapUserFiles } = require('./updater/ConfigMigrator')
+const { bootstrapUserFiles, migrateUserFiles } = require('./updater/ConfigMigrator')
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -212,6 +212,17 @@ async function main() {
     }
 
     bootstrapUserFiles(ROOT)
+
+    // Keep src/config.json and the accounts file in sync with the current
+    // example templates on every start (idempotent: only writes when a new key
+    // is added or a deprecated one is removed). This guarantees new features
+    // reach existing users even when the latest code arrived without going
+    // through the updater (manual copy, restore, etc.). Never block startup.
+    try {
+        migrateUserFiles(ROOT)
+    } catch (error) {
+        console.warn(`[START] Config migration skipped: ${error instanceof Error ? error.message : String(error)}`)
+    }
 
     if (shouldBuildRuntime(process.argv, ROOT, process.env)) {
         runNpm(['run', 'build'])

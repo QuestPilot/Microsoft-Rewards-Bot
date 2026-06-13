@@ -1070,29 +1070,69 @@ function html() {
     }
     .modal-bg.open{display:grid}
     .modal{
-      width:min(460px,100%);
-      background:linear-gradient(180deg,rgba(10,22,42,.99),rgba(4,11,24,.99));
-      border:1px solid rgba(46,232,255,.22);border-radius:16px;padding:26px;
-      box-shadow:0 40px 100px rgba(0,0,0,.6);animation:slideUp .22s ease-out;
+      width:min(490px,100%);position:relative;
+      background:linear-gradient(180deg,rgba(6,14,30,.99),rgba(2,7,18,.99));
+      border:1px solid rgba(46,232,255,.16);border-radius:22px;padding:32px;
+      overflow:hidden;box-shadow:0 60px 130px rgba(0,0,0,.75);
+      animation:licCardIn .34s cubic-bezier(.22,.68,0,1.08);
+    }
+    @keyframes licCardIn{
+      from{opacity:0;transform:translateY(34px) scale(.96)}
+      to{opacity:1;transform:none}
     }
     .modal-icon{
-      width:48px;height:48px;border-radius:14px;margin-bottom:16px;
-      background:linear-gradient(145deg,var(--blue),var(--cyan));
+      width:52px;height:52px;border-radius:16px;margin-bottom:20px;
+      background:linear-gradient(145deg,rgba(0,120,255,.2),rgba(0,255,255,.2));
+      border:1px solid rgba(0,255,255,.3);
       display:flex;align-items:center;justify-content:center;
       box-shadow:0 10px 28px rgba(30,155,255,.3);
+      backdrop-filter:blur(10px);
     }
     .modal-icon svg{width:24px;height:24px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-    .modal h2{font-size:21px;font-weight:800;margin-bottom:7px}
-    .modal p{color:var(--muted);font-size:13.5px;line-height:1.6;margin-bottom:18px}
+    .modal h2{font-size:24px;font-weight:800;margin-bottom:8px;background:linear-gradient(to right,#fff,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    .modal p{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:24px}
     .modal-input{
-      width:100%;background:rgba(2,7,16,.7);border:1px solid var(--border);
-      border-radius:9px;padding:12px 14px;color:var(--text);font:inherit;
-      font-size:14px;letter-spacing:.04em;outline:none;transition:border-color .15s;
-      margin-bottom:11px;
+      width:100%;background:rgba(2,7,16,.7);border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;padding:14px 16px;color:var(--text);font:inherit;
+      font-size:14.5px;letter-spacing:.04em;outline:none;transition:all .2s;
+      margin-bottom:14px;box-shadow:inset 0 2px 6px rgba(0,0,0,.2);
     }
-    .modal-input:focus{border-color:var(--cyan)}
+    .modal-input:focus{border-color:var(--cyan);background:rgba(255,255,255,.03);box-shadow:0 0 0 3px rgba(46,232,255,.15), inset 0 2px 6px rgba(0,0,0,.2);}
     .modal-input::placeholder{color:rgba(110,146,184,.4);letter-spacing:0}
-    .modal-actions{display:grid;grid-template-columns:1fr auto;gap:9px}
+    .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+    
+    .btn{
+      padding:11px 16px;border-radius:10px;font-weight:600;font-size:14px;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+      border:none;outline:none;transition:all .15s cubic-bezier(.22,.68,0,1.08);
+    }
+    .btn:hover:not(:disabled) { transform: scale(1.02); }
+    .btn:active:not(:disabled) { transform: scale(.98); }
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-primary{
+      background:var(--blue);color:#fff;
+      box-shadow:0 4px 12px rgba(30,155,255,.2);
+      border:1px solid rgba(255,255,255,.1);
+    }
+    .btn-primary:hover:not(:disabled){background:#2483d4;box-shadow:0 6px 16px rgba(30,155,255,.3);}
+    .btn-secondary{
+      background:rgba(255,255,255,.05);color:var(--text);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .btn-secondary:hover:not(:disabled){background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);}
+    
+    /* Toast Notification */
+    .toast {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
+      background: linear-gradient(180deg, rgba(6,14,30,.95), rgba(2,7,18,.95));
+      border: 1px solid rgba(46,232,255,.3); border-radius: 100px;
+      padding: 12px 24px; color: #fff; font-size: 14px; font-weight: 600;
+      box-shadow: 0 20px 40px rgba(0,0,0,.5), 0 0 20px rgba(46,232,255,.2);
+      opacity: 0; pointer-events: none; transition: all .4s cubic-bezier(.22,.68,0,1.08);
+      z-index: 10000; display: flex; align-items: center; gap: 10px;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    
     .modal-msg{min-height:17px;font-size:12px;color:var(--cyan);margin-top:9px}
     /* Accounts editor */
     .btn-icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;transition:all .15s;flex-shrink:0}
@@ -1104,6 +1144,116 @@ function html() {
     .acc-editor-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid transparent;transition:all .15s;margin-bottom:7px}
     .acc-editor-row:hover{border-color:var(--border);background:rgba(255,255,255,.045)}
     .acc-actions-cell{display:flex;gap:6px;flex-shrink:0}
+    /* Proxy Badges & Grouping Styles */
+    .acc-proxy-badge{
+      font-size:10.5px;
+      color:var(--cyan);
+      background:rgba(0, 240, 255, 0.05);
+      border:1px solid rgba(0, 240, 255, 0.12);
+      padding:2px 7px;
+      border-radius:6px;
+      display:inline-flex;
+      align-items:center;
+      cursor:pointer;
+      transition:all .15s;
+      max-width:fit-content;
+      margin-top:2px;
+      user-select:none;
+    }
+    .acc-proxy-badge:hover{
+      background:rgba(0, 240, 255, 0.1);
+      border-color:rgba(0, 240, 255, 0.25);
+      box-shadow:0 0 6px rgba(0, 240, 255, 0.15);
+    }
+    .acc-proxy-badge.testing{
+      color:var(--muted);
+      background:rgba(255, 255, 255, 0.03);
+      border-color:rgba(255, 255, 255, 0.08);
+      cursor:default;
+      box-shadow:none;
+    }
+    .acc-proxy-badge.success{
+      color:#10b981;
+      background:rgba(16, 185, 129, 0.06);
+      border-color:rgba(16, 185, 129, 0.18);
+    }
+    .acc-proxy-badge.success:hover{
+      background:rgba(16, 185, 129, 0.12);
+      border-color:rgba(16, 185, 129, 0.3);
+      box-shadow:0 0 6px rgba(16, 185, 129, 0.15);
+    }
+    .acc-proxy-badge.error{
+      color:#ff4b6e;
+      background:rgba(255, 75, 110, 0.06);
+      border-color:rgba(255, 75, 110, 0.18);
+    }
+    .acc-proxy-badge.error:hover{
+      background:rgba(255, 75, 110, 0.12);
+      border-color:rgba(255, 75, 110, 0.3);
+      box-shadow:0 0 6px rgba(255, 75, 110, 0.15);
+    }
+    .acc-group-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:8px 12px;
+      background:rgba(255, 255, 255, 0.02);
+      border-radius:8px;
+      margin-top:14px;
+      margin-bottom:8px;
+      cursor:pointer;
+      user-select:none;
+      transition:background .2s, border-color .2s;
+      border:1px solid rgba(255, 255, 255, 0.02);
+    }
+    .acc-group-header:hover{
+      background:rgba(255, 255, 255, 0.04);
+      border-color:rgba(255, 255, 255, 0.05);
+    }
+    .acc-group-arrow{
+      font-size:9px;
+      transition:transform .2s ease;
+      display:inline-block;
+      color:var(--muted);
+    }
+    .acc-group-arrow.collapsed{
+      transform:rotate(-90deg);
+    }
+    .acc-group-title{
+      font-weight:600;
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:0.5px;
+      text-transform:uppercase;
+    }
+    .acc-group-badge{
+      font-size:10px;
+      background:rgba(110, 146, 184, 0.1);
+      color:var(--muted);
+      padding:1px 6px;
+      border-radius:8px;
+    }
+    .acc-group-content{
+      display:flex;
+      flex-direction:column;
+      gap:1px;
+      transition:all .2s ease;
+    }
+    .acc-group-content.collapsed{
+      display:none;
+    }
+    .acc-editor-row.is-active{
+      border-color:rgba(0, 240, 255, 0.15);
+      background:rgba(0, 240, 255, 0.02);
+    }
+    .acc-editor-row.is-active:hover{
+      border-color:rgba(0, 240, 255, 0.3);
+      background:rgba(0, 240, 255, 0.04);
+    }
+    .acc-st.running{
+      color:var(--cyan);
+      font-weight:600;
+    }
     /* Toggle switch */
     .toggle{position:relative;display:inline-flex;width:40px;height:22px;flex-shrink:0}
     .toggle input{opacity:0;width:0;height:0;position:absolute}
@@ -1592,6 +1742,13 @@ function html() {
     }
     .core-compare .c-vs{font-size:13px;color:var(--muted);max-width:560px;line-height:1.6}
     .core-compare .c-vs b{color:var(--rose)}
+
+    /* Feedback Modal */
+    .rating-stars { display: flex; gap: 8px; justify-content: center; margin: 15px 0; }
+    .rating-star { font-size: 32px; color: rgba(110,146,184,.4); cursor: pointer; transition: transform .1s, color .15s; }
+    .rating-star:hover, .rating-star.active { color: var(--gold); transform: scale(1.15); }
+    .fb-textarea { width: 100%; height: 80px; background: rgba(2,7,16,.7); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; color: var(--text); font: inherit; font-size: 13.5px; outline: none; resize: none; margin-bottom: 12px; transition: border-color .15s; }
+    .fb-textarea:focus { border-color: var(--cyan); }
   </style>
 </head>
 <body>
@@ -1664,7 +1821,10 @@ function html() {
         <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         Install Rewards Desk
       </button>
-      <div class="ver">v${APP_VERSION}</div>
+      <div class="ver" style="display:flex; justify-content:center; gap:8px">
+        <span>v${APP_VERSION}</span>
+        <a id="btn-general-feedback" style="cursor:pointer; text-decoration:underline;">Feedback</a>
+      </div>
     </div>
   </aside>
 
@@ -1745,7 +1905,12 @@ function html() {
       <div class="full-card">
         <div class="card-head">
           <span class="card-label">Accounts</span>
-          <button class="btn btn-primary btn-sm" id="btn-add-acc">+ Add account</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" id="btn-test-proxies" style="display:none">
+              <svg style="width:12px;height:12px;vertical-align:middle;margin-right:4px;fill:none;stroke:currentColor;stroke-width:2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="23"></line><line x1="1" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="23" y2="12"></line></svg>Test Proxies
+            </button>
+            <button class="btn btn-primary btn-sm" id="btn-add-acc">+ Add account</button>
+          </div>
         </div>
         <div id="acc-editor-list" style="overflow-y:auto;flex:1"></div>
       </div>
@@ -2123,7 +2288,6 @@ function html() {
         <span><span class="footer-dot" id="fdot"></span><span id="ftxt">Bot ready</span></span>
         <span id="facc" style="opacity:.6"></span>
       </div>
-      <span id="ftime" style="opacity:.5">v${APP_VERSION}</span>
     </footer>
   </main>
 
@@ -2229,7 +2393,40 @@ function html() {
     </div>
   </div>
 
-  <!-- Core activation overlay -->
+    <!-- Feedback Modal -->
+    <div class="modal-bg" id="fb-modal">
+      <div class="modal" style="width: min(400px, 100%)">
+        <h2 style="text-align:center" id="fb-title">Rate Core</h2>
+        <p style="text-align:center; color: var(--muted); font-size: 13px; margin-top: 6px" id="fb-desc">How would you rate your experience with Core so far?</p>
+        <div class="rating-stars" id="fb-stars">
+          <div class="rating-star" data-val="1">★</div>
+          <div class="rating-star" data-val="2">★</div>
+          <div class="rating-star" data-val="3">★</div>
+          <div class="rating-star" data-val="4">★</div>
+          <div class="rating-star" data-val="5">★</div>
+        </div>
+        <textarea class="fb-textarea" id="fb-comment" placeholder="Tell us more... (optional)"></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="fb-btn-skip">Skip</button>
+          <button class="btn btn-primary" id="fb-btn-submit" disabled>Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Modal -->
+    <div class="modal-bg" id="comment-modal">
+      <div class="modal" style="width: min(450px, 100%)">
+        <h2 style="text-align:center">Leave a Comment</h2>
+        <p style="text-align:center; color: var(--muted); font-size: 13px; margin-top: 6px">Suggestions, issues, or general feedback.</p>
+        <textarea class="fb-textarea" id="general-comment" placeholder="Describe your thoughts here..." style="height: 120px; margin-top: 15px;"></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="comment-btn-cancel">Cancel</button>
+          <button class="btn btn-primary" id="comment-btn-submit">Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Core activation overlay -->
   <div class="lic-overlay" id="lic-overlay">
     <div class="lic-card">
       <div class="lic-confetti" id="lic-confetti"></div>
@@ -2606,6 +2803,7 @@ function html() {
       var data;
       try { data = await fetch('/api/state').then(function(r){return r.json();}); }
       catch(e) { G('st-text').textContent = 'Offline'; return; }
+      window._lastStateData = data;
       var s = data.status || 'Ready';
       var running = data.isRunning;
       var m = data.metrics || {};
@@ -2688,6 +2886,9 @@ function html() {
         }
         _licensePromptVisible = promptVisible;
       }
+      if (view === 'accounts' && _accountsLoaded) {
+        updateAccEditorRunningState(data.activeAccount);
+      }
     }
 
     // ── Start/Stop ────────────────────────────
@@ -2706,6 +2907,84 @@ function html() {
     var _raw = [];
     var _accountsLoading = false;
     var _accountsLoaded = false;
+    var _accGroupsCollapsed = JSON.parse(localStorage.getItem('acc_groups_collapsed') || '{"proxy":false,"direct":false}');
+    var _proxyTestResults = {};
+    var _testingProxies = false;
+    var _testingIndex = -1;
+
+    function emailMatchesMask(raw, masked) {
+      if (!raw || !masked) return false;
+      var rParts = raw.split('@');
+      var mParts = masked.split('@');
+      if (rParts.length !== 2 || mParts.length !== 2) return false;
+      if (rParts[1] !== mParts[1]) return false;
+      var rName = rParts[0];
+      var mName = mParts[0];
+      if (rName.length <= 2) return rName === mName;
+      if (rName.slice(0, 2) !== mName.slice(0, 2)) return false;
+      var expectedMasked = rName.slice(0, 2) + '*'.repeat(Math.min(5, rName.length - 2));
+      return expectedMasked === mName;
+    }
+
+    function toggleAccGroup(group) {
+      _accGroupsCollapsed[group] = !_accGroupsCollapsed[group];
+      localStorage.setItem('acc_groups_collapsed', JSON.stringify(_accGroupsCollapsed));
+      renderAccEditor();
+    }
+
+    async function runProxyTest(index) {
+      var isCore = typeof _coreData !== 'undefined' && _coreData && _coreData.tier === 'premium';
+      if (!isCore) {
+        licOpenOverlay('welcome');
+        showToast('Proxy testing is a Core Premium feature.', true);
+        return;
+      }
+      
+      _testingProxies = true;
+      _testingIndex = typeof index === 'number' ? index : -1;
+      renderAccEditor();
+      
+      try {
+        var response = await fetch('/api/test-proxies', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ index: _testingIndex })
+        });
+        var data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to test proxies');
+        
+        Object.assign(_proxyTestResults, data.results || {});
+        showToast('Proxy check complete.');
+      } catch(e) {
+        showToast(e.message, true);
+      } finally {
+        _testingProxies = false;
+        _testingIndex = -1;
+        renderAccEditor();
+      }
+    }
+
+    function updateAccEditorRunningState(activeEmail) {
+      var list = G('acc-editor-list');
+      if (!list) return;
+      var rows = list.querySelectorAll('.acc-editor-row');
+      rows.forEach(function(row) {
+        var email = row.getAttribute('data-email');
+        var isRunning = activeEmail && emailMatchesMask(email, activeEmail);
+        var statusEl = row.querySelector('.acc-st');
+        if (statusEl) {
+          var isEnabled = !row.classList.contains('is-disabled');
+          var currentText = statusEl.textContent;
+          var expectedText = isRunning ? 'Running' : (isEnabled ? 'Enabled' : 'Disabled');
+          if (currentText !== expectedText) {
+            statusEl.textContent = expectedText;
+            statusEl.className = isRunning ? 'acc-st running' : 'acc-st';
+            row.classList.toggle('is-active', isRunning);
+          }
+        }
+      });
+    }
+
     async function loadAccEditor() {
       if (_accountsLoading) return;
       if (_accountsLoaded) { renderAccEditor(); return; }
@@ -2724,34 +3003,144 @@ function html() {
         _accountsLoading = false;
       }
     }
+
     function renderAccEditor() {
       var list = G('acc-editor-list');
       if (!_raw.length) {
         list.innerHTML = '<div class="acc-empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg><p>No accounts yet. Click "+ Add account" to get started.</p></div>';
         return;
       }
-      list.innerHTML = _raw.map(function(a, i) {
-        var ini = String(a.email||'?').split('@')[0].slice(0,2).toUpperCase();
-        var ena = a.enabled !== false;
-        return '<div class="acc-editor-row">' +
-          '<div class="acc-avatar">' + esc(ini) + '</div>' +
-          '<div class="acc-info" style="flex:1;min-width:0">' +
-            '<div class="acc-email">' + esc(a.email||'(no email)') + '</div>' +
-            '<div class="acc-st">' + (ena ? 'Enabled' : 'Disabled') + '</div>' +
+
+      var proxyAccs = [];
+      var directAccs = [];
+      _raw.forEach(function(a, i) {
+        var accWithIdx = { account: a, index: i };
+        if (a.proxy && a.proxy.url) {
+          proxyAccs.push(accWithIdx);
+        } else {
+          directAccs.push(accWithIdx);
+        }
+      });
+
+      var activeEmail = window._lastStateData && window._lastStateData.isRunning ? window._lastStateData.activeAccount : null;
+      var html = '';
+
+      function renderGroupRows(groupAccs) {
+        return groupAccs.map(function(item) {
+          var a = item.account;
+          var i = item.index;
+          var ini = String(a.email||'?').split('@')[0].slice(0,2).toUpperCase();
+          var ena = a.enabled !== false;
+          var isRunning = activeEmail && emailMatchesMask(a.email, activeEmail);
+          
+          var statusText = isRunning ? 'Running' : (ena ? 'Enabled' : 'Disabled');
+          var statusClass = isRunning ? 'acc-st running' : 'acc-st';
+          var rowClass = 'acc-editor-row' + (isRunning ? ' is-active' : '') + (!ena ? ' is-disabled' : '');
+          
+          var proxyInfo = '';
+          if (a.proxy && a.proxy.url) {
+            var hostText = a.proxy.url;
+            if (a.proxy.port) hostText += ':' + a.proxy.port;
+            
+            var isThisTesting = _testingProxies && (_testingIndex === -1 || _testingIndex === i);
+            var testResult = _proxyTestResults[a.email];
+            
+            var badgeClass = 'acc-proxy-badge';
+            var resultText = '';
+            var statusIcon = '<svg style="width:11px;height:11px;margin-right:4px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="23"></line><line x1="1" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="23" y2="12"></line></svg>';
+            
+            if (isThisTesting) {
+              badgeClass += ' testing';
+              resultText = ' (testing...)';
+              statusIcon = '<svg class="inline-spinner" style="width:11px;height:11px;margin-right:4px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>';
+            } else if (testResult) {
+              if (testResult.ok) {
+                badgeClass += ' success';
+                resultText = ' (' + testResult.latencyMs + 'ms)';
+                statusIcon = '<svg style="width:11px;height:11px;margin-right:4px;flex-shrink:0;color:#10b981" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+              } else {
+                badgeClass += ' error';
+                resultText = ' (failed)';
+                statusIcon = '<svg style="width:11px;height:11px;margin-right:4px;flex-shrink:0;color:#ff4b6e" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+              }
+            }
+            
+            var tooltip = 'Proxy: ' + hostText;
+            if (testResult && !testResult.ok) tooltip += '\\nError: ' + testResult.error;
+            
+            proxyInfo = '<div class="' + badgeClass + '" title="' + esc(tooltip) + '" onclick="runProxyTest(' + i + '); event.stopPropagation();">' +
+              statusIcon +
+              esc(hostText.length > 28 ? hostText.slice(0, 26) + '...' : hostText) +
+              resultText +
+            '</div>';
+          }
+
+          return '<div class="' + rowClass + '" data-email="' + esc(a.email||'') + '">' +
+            '<div class="acc-avatar">' + esc(ini) + '</div>' +
+            '<div class="acc-info" style="flex:1;min-width:0">' +
+              '<div class="acc-email">' + esc(a.email||'(no email)') + '</div>' +
+              '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+                '<div class="' + statusClass + '">' + esc(statusText) + '</div>' +
+                proxyInfo +
+              '</div>' +
+            '</div>' +
+            '<div class="acc-actions-cell">' +
+              '<button class="btn-icon' + (ena ? ' btn-icon-on' : '') + '" title="' + (ena ? 'Disable account' : 'Enable account') + '" onclick="toggleAcc(' + i + ')">' +
+                '<svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>' +
+              '</button>' +
+              '<button class="btn-icon" title="Edit" onclick="openAccEdit(' + i + ')">' +
+                '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+              '</button>' +
+              '<button class="btn-icon danger" title="Delete" onclick="deleteAcc(' + i + ')">' +
+                '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>' +
+              '</button>' +
+            '</div></div>';
+        }).join('');
+      }
+
+      var hasProxies = proxyAccs.length > 0;
+      var btnTest = G('btn-test-proxies');
+      if (btnTest) {
+        btnTest.style.display = hasProxies ? '' : 'none';
+        btnTest.disabled = _testingProxies;
+        if (_testingProxies) {
+          btnTest.innerHTML = '<span class="inline-spinner"></span> Testing...';
+        } else {
+          btnTest.innerHTML = '<svg style="width:12px;height:12px;vertical-align:middle;margin-right:4px;fill:none;stroke:currentColor;stroke-width:2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="23"></line><line x1="1" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="23" y2="12"></line></svg>Test Proxies';
+        }
+      }
+
+      if (proxyAccs.length > 0) {
+        var isCollapsed = !!_accGroupsCollapsed.proxy;
+        html += '<div class="acc-group-header" onclick="toggleAccGroup(\\\'proxy\\\')">' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span class="acc-group-arrow' + (isCollapsed ? ' collapsed' : '') + '">▼</span>' +
+            '<span class="acc-group-title">Proxy Connections</span>' +
+            '<span class="acc-group-badge">' + proxyAccs.length + '</span>' +
           '</div>' +
-          '<div class="acc-actions-cell">' +
-            '<button class="btn-icon' + (ena ? ' btn-icon-on' : '') + '" title="' + (ena ? 'Disable account' : 'Enable account') + '" onclick="toggleAcc(' + i + ')">' +
-              '<svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>' +
-            '</button>' +
-            '<button class="btn-icon" title="Edit" onclick="openAccEdit(' + i + ')">' +
-              '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
-            '</button>' +
-            '<button class="btn-icon danger" title="Delete" onclick="deleteAcc(' + i + ')">' +
-              '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>' +
-            '</button>' +
-          '</div></div>';
-      }).join('');
+        '</div>' +
+        '<div class="acc-group-content' + (isCollapsed ? ' collapsed' : '') + '">' +
+          renderGroupRows(proxyAccs) +
+        '</div>';
+      }
+
+      if (directAccs.length > 0 || proxyAccs.length === 0) {
+        var isCollapsed = !!_accGroupsCollapsed.direct;
+        html += '<div class="acc-group-header" onclick="toggleAccGroup(\\\'direct\\\')">' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span class="acc-group-arrow' + (isCollapsed ? ' collapsed' : '') + '">▼</span>' +
+            '<span class="acc-group-title">Direct Connections</span>' +
+            '<span class="acc-group-badge">' + directAccs.length + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="acc-group-content' + (isCollapsed ? ' collapsed' : '') + '">' +
+          renderGroupRows(directAccs) +
+        '</div>';
+      }
+
+      list.innerHTML = html;
     }
+
     async function saveRaw() {
       try {
         var response = await fetch('/api/accounts-save', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(_raw)});
@@ -2999,6 +3388,7 @@ function html() {
     G('btn-stop').addEventListener('click', function() { fetch('/api/stop',{method:'POST'}).then(refresh); });
     G('btn-open-acc').addEventListener('click', function() { setView('accounts'); });
     G('btn-add-acc').addEventListener('click', openAccAdd);
+    G('btn-test-proxies').addEventListener('click', function() { runProxyTest(); });
     G('acc-modal-save').addEventListener('click', saveAccModal);
     G('acc-modal-cancel').addEventListener('click', function() { G('acc-modal').classList.remove('open'); });
     G('acc-email').addEventListener('keydown', function(e) { if (e.key==='Enter') G('acc-password').focus(); });
@@ -3651,6 +4041,108 @@ function html() {
     setInterval(function(){ syncDesktopInstallStatus().catch(function(){}); }, 30000);
     setInterval(refresh, 900);
     refresh();
+
+    // Feedback Logic
+    setTimeout(function() {
+      var isCore = typeof _coreData !== 'undefined' && _coreData && _coreData.tier === 'premium';
+      if (!isCore) return;
+
+      var fbState = JSON.parse(localStorage.getItem('core_fb') || '{"done":false,"runs":0}');
+      if (fbState.done) return;
+      fbState.runs++;
+      localStorage.setItem('core_fb', JSON.stringify(fbState));
+      if (fbState.runs >= 3) {
+        G('fb-modal').classList.add('open');
+        
+        var selectedRating = 0;
+        var stars = document.querySelectorAll('.rating-star');
+        stars.forEach(function(s) {
+          s.addEventListener('click', function() {
+            selectedRating = parseInt(this.getAttribute('data-val'));
+            stars.forEach(function(ss) {
+              ss.classList.toggle('active', parseInt(ss.getAttribute('data-val')) <= selectedRating);
+            });
+            G('fb-btn-submit').disabled = false;
+          });
+        });
+
+        G('fb-btn-skip').addEventListener('click', function() {
+          fbState.done = true;
+          localStorage.setItem('core_fb', JSON.stringify(fbState));
+          G('fb-modal').classList.remove('open');
+        });
+
+        G('fb-btn-submit').addEventListener('click', function() {
+          if (!selectedRating) return;
+          fbState.done = true;
+          localStorage.setItem('core_fb', JSON.stringify(fbState));
+          G('fb-modal').classList.remove('open');
+          var isCore = typeof _coreData !== 'undefined' && _coreData && _coreData.tier === 'premium';
+          fetch('https://bot.lgtw.tf/api/bot/inbox', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ type: 'rating', rating: selectedRating, comment: G('fb-comment').value, hasCore: isCore })
+          }).then(function(res) {
+            return res.json().catch(function(){ return { error: 'Connection or server error.' }; }).then(function(data) {
+              if (!res.ok) throw new Error(data.error || 'Failed to submit feedback');
+              showFeedbackToast(false);
+            });
+          }).catch(function(err) {
+            showFeedbackToast(true, err.message);
+          });
+        });
+      }
+    }, 5000);
+
+    // General Comment Logic
+    G('btn-general-feedback').addEventListener('click', function(e) {
+      e.preventDefault();
+      G('comment-modal').classList.add('open');
+    });
+
+    G('comment-btn-cancel').addEventListener('click', function() {
+      G('comment-modal').classList.remove('open');
+    });
+
+    G('comment-btn-submit').addEventListener('click', function() {
+      var comment = G('general-comment').value.trim();
+      if (!comment) return;
+      G('comment-modal').classList.remove('open');
+      G('general-comment').value = '';
+      var isCore = typeof _coreData !== 'undefined' && _coreData && _coreData.tier === 'premium';
+      fetch('https://bot.lgtw.tf/api/bot/inbox', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'comment', comment: comment, hasCore: isCore })
+      }).then(function(res) {
+        return res.json().catch(function(){ return { error: 'Connection or server error.' }; }).then(function(data) {
+          if (!res.ok) throw new Error(data.error || 'Failed to submit feedback');
+          showFeedbackToast(false);
+        });
+      }).catch(function(err) {
+        showFeedbackToast(true, err.message);
+      });
+    });
+
+    var _fbToastTimer = null;
+    function showFeedbackToast(isError, msg) {
+      var toast = G('feedback-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'feedback-toast';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+      }
+      toast.classList.toggle('error', !!isError);
+      if (isError) {
+        toast.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff4b6e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> ' + esc(msg || 'Error sending feedback.');
+      } else {
+        toast.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Feedback sent successfully!';
+      }
+      toast.classList.add('show');
+      clearTimeout(_fbToastTimer);
+      _fbToastTimer = setTimeout(function() { toast.classList.remove('show'); }, 4000);
+    }
   </script>
 </body>
 </html>`
@@ -3708,6 +4200,67 @@ function readApiBody(req, res, callback) {
     req.on('end', () => {
         if (!finished) callback(body)
     })
+}
+
+function getProxyAgent(proxy) {
+    if (!proxy || !proxy.url) return null;
+    let url = proxy.url;
+    if (!/^https?:\/\//i.test(url) && !/^socks/i.test(url)) {
+        url = 'http://' + url;
+    }
+    if (proxy.port && !/:[0-9]+$/.test(url)) {
+        url = url.replace(/\/+$/, '') + ':' + proxy.port;
+    }
+    if (proxy.username && proxy.password) {
+        const urlObj = new URL(url);
+        urlObj.username = encodeURIComponent(proxy.username);
+        urlObj.password = encodeURIComponent(proxy.password);
+        url = urlObj.toString();
+    } else if (proxy.username) {
+        const urlObj = new URL(url);
+        urlObj.username = encodeURIComponent(proxy.username);
+        url = urlObj.toString();
+    }
+    
+    if (/^socks/i.test(url)) {
+        const { SocksProxyAgent } = require('socks-proxy-agent');
+        return {
+            httpAgent: new SocksProxyAgent(url),
+            httpsAgent: new SocksProxyAgent(url)
+        };
+    } else {
+        const { HttpsProxyAgent } = require('https-proxy-agent');
+        const { HttpProxyAgent } = require('http-proxy-agent');
+        return {
+            httpAgent: new HttpProxyAgent(url),
+            httpsAgent: new HttpsProxyAgent(url)
+        };
+    }
+}
+
+async function testProxy(proxy) {
+    const start = Date.now();
+    const agents = getProxyAgent(proxy);
+    if (!agents) return { ok: false, error: 'No proxy configured' };
+    
+    try {
+        const axios = require('axios');
+        await axios.get('https://login.live.com', {
+            httpAgent: agents.httpAgent,
+            httpsAgent: agents.httpsAgent,
+            timeout: 8000,
+            validateStatus: () => true
+        });
+        return {
+            ok: true,
+            latencyMs: Date.now() - start
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            error: err.message || 'Connection timeout'
+        };
+    }
 }
 
 const server = http.createServer((req, res) => {
@@ -4026,6 +4579,48 @@ const server = http.createServer((req, res) => {
             })
             res.writeHead(200, { 'content-type': 'application/json' })
             res.end(JSON.stringify({ commits }))
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/test-proxies') {
+        if (state.deskLicense.tier !== 'premium') {
+            res.writeHead(403, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Proxy testing is a Core Premium advantage.' }))
+            return
+        }
+        readApiBody(req, res, async body => {
+            try {
+                const data = parseJson(body, {})
+                const targetIndex = typeof data.index === 'number' ? data.index : -1
+                
+                const storageResult = await accountStorageRequest('read')
+                const accounts = Array.isArray(storageResult.accounts) ? storageResult.accounts : []
+                
+                const results = {}
+                const tasks = []
+
+                if (targetIndex >= 0 && targetIndex < accounts.length) {
+                    const a = accounts[targetIndex]
+                    if (a.proxy && a.proxy.url) {
+                        tasks.push((async () => {
+                            results[a.email] = await testProxy(a.proxy)
+                        })())
+                    }
+                } else {
+                    accounts.forEach(a => {
+                        if (a.proxy && a.proxy.url) {
+                            tasks.push((async () => {
+                                results[a.email] = await testProxy(a.proxy)
+                            })())
+                        }
+                    })
+                }
+
+                await Promise.all(tasks)
+                jsonResponse(res, 200, { results })
+            } catch (error) {
+                jsonResponse(res, 500, { error: error.message })
+            }
         })
         return
     }

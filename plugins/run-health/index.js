@@ -12,7 +12,7 @@ class RunHealthPlugin {
         this.description = 'Tracks recent account outcomes and flags repeated failures or suspicious zero-point runs.'
         this.author = 'QuestPilot'
         this.license = 'MIT'
-        this.outputDir = 'diagnostics/run-health'
+        this.outputDir = 'data/run-health'
         this.historyLimit = 50
         this.warnOnZeroPoints = true
         this.log = null

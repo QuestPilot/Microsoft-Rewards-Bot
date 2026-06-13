@@ -2,6 +2,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import type { Page } from 'patchright'
 import { writeFileAtomic } from './AtomicFile'
+import { errorDir } from './DataManager'
 
 export async function errorDiagnostic(page: Page, error: Error, logFn?: (msg: string) => void): Promise<void> {
     const log = logFn ?? ((msg: string) => console.log(msg))
@@ -12,7 +13,7 @@ export async function errorDiagnostic(page: Page, error: Error, logFn?: (msg: st
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        const outputDir = path.join(process.cwd(), 'diagnostics', `error-${timestamp}`)
+        const outputDir = errorDir(timestamp)
 
         const errorLog = `Name: ${error.name}
 Message: ${error.message}

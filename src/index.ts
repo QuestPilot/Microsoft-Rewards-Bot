@@ -1,4 +1,6 @@
+import childProcess from 'child_process'
 import cluster, { Worker } from 'cluster'
+import path from 'path'
 import type { BrowserContext, Cookie, Page } from 'patchright'
 import readline from 'readline'
 
@@ -10,7 +12,9 @@ import { DESKTOP_BROWSER_VIEWPORT } from './automation/BrowserViewport'
 import PageController from './automation/PageController'
 
 import { loadAccounts, loadConfig } from './helpers/ConfigLoader'
+import { runDataCleanup } from './helpers/DataManager'
 import Helpers from './helpers/Helpers'
+import { recordAccountRun, recordRunComplete } from './helpers/StatsRecorder'
 import { getPackageMetadata } from './helpers/PackageMetadata'
 import { checkNodeVersion } from './helpers/SchemaValidator'
 import { IpcLog, LogService } from './notifications/LogService'
@@ -207,6 +211,8 @@ export class MicrosoftRewardsBot {
     async initialize(): Promise<void> {
         this.accounts = loadAccounts()
         await this.warnIfTooManyAccounts()
+
+        void runDataCleanup(msg => this.logger.debug('main', 'DATA-CLEANUP', msg))
 
         // Load plugins from plugins/ directory
         await this.pluginManager.loadPlugins()
@@ -510,6 +516,21 @@ export class MicrosoftRewardsBot {
                         starBonus: result.starBonus
                     })
 
+                    void recordAccountRun({
+                        email: accountEmail,
+                        initialPoints: accountInitialPoints,
+                        finalPoints: accountFinalPoints,
+                        collectedPoints: collectedPoints,
+                        durationSeconds: parseFloat(durationSeconds),
+                        success: true,
+                        coreStats: result.coreStats ? {
+                            claimPoints: result.coreStats.claimPoints,
+                            couponsApplied: result.coreStats.couponsApplied,
+                            couponPointsDiscount: result.coreStats.couponPointsDiscount
+                        } : undefined,
+                        starBonus: result.starBonus
+                    })
+
                     this.logger.info(
                         'main',
                         'ACCOUNT-END',
@@ -549,6 +570,15 @@ export class MicrosoftRewardsBot {
                     accountStats.push({
                         ...failedResult
                     })
+                    void recordAccountRun({
+                        email: accountEmail,
+                        initialPoints: 0,
+                        finalPoints: 0,
+                        collectedPoints: 0,
+                        durationSeconds: parseFloat(durationSeconds),
+                        success: false,
+                        error: 'Flow failed'
+                    })
                     await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
 
                     if (this.config.webhook.autoReport) {
@@ -574,6 +604,15 @@ export class MicrosoftRewardsBot {
 
                 accountStats.push({
                     ...failedResult
+                })
+                void recordAccountRun({
+                    email: accountEmail,
+                    initialPoints: 0,
+                    finalPoints: 0,
+                    collectedPoints: 0,
+                    durationSeconds: parseFloat(durationSeconds),
+                    success: false,
+                    error: error instanceof Error ? error.message : String(error)
                 })
                 await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
 
@@ -610,6 +649,25 @@ export class MicrosoftRewardsBot {
     }
 
     private async sendRunSummary(accountStats: AccountStats[], runStartTime: number): Promise<void> {
+        void recordRunComplete({
+            accountStats: accountStats.map(s => ({
+                email: s.email,
+                initialPoints: s.initialPoints,
+                finalPoints: s.finalPoints,
+                collectedPoints: s.collectedPoints,
+                durationSeconds: s.duration,
+                success: s.success,
+                error: s.error,
+                coreStats: s.coreStats ? {
+                    claimPoints: s.coreStats.claimPoints,
+                    couponsApplied: s.coreStats.couponsApplied,
+                    couponPointsDiscount: s.coreStats.couponPointsDiscount
+                } : undefined,
+                starBonus: s.starBonus
+            })),
+            runStartTime
+        })
+
         const sends: Promise<void>[] = []
 
         const summaryConfig = this.config.webhook.runSummary
@@ -1190,6 +1248,65 @@ async function runSingle(rewardsBot: MicrosoftRewardsBot): Promise<number> {
     return exitCode
 }
 
+/**
+ * Check for a published update before a scheduled run and, if one is applied,
+ * relaunch the bot in the SAME terminal on the new version.
+ *
+ * A long-lived scheduler process otherwise stays pinned to whatever version it
+ * booted on, because the launcher (`scripts/start.js`) only runs the updater
+ * once at startup. We call the same UpdateManager here so each scheduled run
+ * starts on the latest code. When an update lands, UpdateManager has already
+ * written the new files to disk; we then hand off to `start.js` (which rebuilds
+ * dist and re-enters the scheduler), so the fresh process resumes its normal
+ * schedule.
+ *
+ * @returns `true` when a restart was launched (the caller must stop the loop).
+ */
+async function checkForUpdateAndRestart(rewardsBot: MicrosoftRewardsBot): Promise<boolean> {
+    try {
+        const updaterPath = path.join(process.cwd(), 'scripts', 'updater', 'UpdateManager.js')
+        // UpdateManager is a launcher-side CommonJS module that lives outside the
+        // compiled bundle, so it is resolved at runtime rather than imported.
+        const { UpdateManager } = require(updaterPath) as { UpdateManager: new () => { run(): Promise<{ status: string; remote?: { version?: string } }> } }
+        const result = await new UpdateManager().run()
+        if (result.status !== 'updated') return false
+
+        rewardsBot.logger.info(
+            'main',
+            'SCHEDULER',
+            `Update to ${result.remote?.version ?? 'a new version'} applied. Restarting in this terminal...`
+        )
+
+        await rewardsBot.closeAllBrowsers()
+        await rewardsBot.pluginManager.destroyAll()
+        await flushAllWebhooks()
+
+        // Mirror start.js launchPostUpdateRestart: same console (stdio inherit),
+        // detached + unref so this process can exit, and MSRB_POST_UPDATE_RESTART
+        // so the launcher rebuilds dist and skips a redundant update check.
+        const child = childProcess.spawn(
+            process.execPath,
+            [path.join(process.cwd(), 'scripts', 'start.js'), ...process.argv.slice(2)],
+            {
+                cwd: process.cwd(),
+                detached: true,
+                stdio: 'inherit',
+                windowsHide: false,
+                env: { ...process.env, MSRB_POST_UPDATE_RESTART: '1' }
+            }
+        )
+        child.unref()
+        return true
+    } catch (error) {
+        rewardsBot.logger.warn(
+            'main',
+            'SCHEDULER',
+            `Pre-run update check failed, continuing on the current version: ${error instanceof Error ? error.message : String(error)}`
+        )
+        return false
+    }
+}
+
 async function runScheduled(rewardsBot: MicrosoftRewardsBot): Promise<number> {
     const scheduler = rewardsBot.config.scheduler
     if (!scheduler) return runSingle(rewardsBot)
@@ -1201,9 +1318,18 @@ async function runScheduled(rewardsBot: MicrosoftRewardsBot): Promise<number> {
     )
 
     let shouldRunNow = scheduler.runOnStartup
+    // The launcher already ran the updater moments ago, so the first startup run
+    // skips the check. Every later scheduled run re-checks first.
+    let bootChecked = true
 
     while (true) {
         if (shouldRunNow) {
+            if (!bootChecked) {
+                const restarting = await checkForUpdateAndRestart(rewardsBot)
+                if (restarting) return 0
+            }
+            bootChecked = false
+
             const exitCode = await runSingle(rewardsBot)
             if (exitCode !== 0) return exitCode
             if (rewardsBot.dashboardStopRequested) {
@@ -1214,6 +1340,8 @@ async function runScheduled(rewardsBot: MicrosoftRewardsBot): Promise<number> {
                 )
                 return 0
             }
+        } else {
+            bootChecked = false
         }
 
         const nextRun = getNextScheduledRun(scheduler)
