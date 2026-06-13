@@ -19,6 +19,13 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.release.tag_name || github.ref }}
+
+            - name: Read image version
+              id: version
+              shell: bash
+              run: echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
@@ -36,7 +43,7 @@ jobs:
               with:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
                   tags: |
-                      type=match,pattern=v(.*),group=1
+                      type=raw,value=${{ steps.version.outputs.version }}
                       type=raw,value=latest
 
             - name: Build and push Docker image
