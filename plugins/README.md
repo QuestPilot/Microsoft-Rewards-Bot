@@ -16,7 +16,7 @@ When `plugins/plugins.jsonc` exists, only the plugins listed there are eligible 
 ## Built-in Core Plugin
 
 `plugins/core/` contains the proprietary Core plugin that ships with the bot.
-It is compiled to V8 bytecode and loaded through the same plugin manager as third-party plugins.
+It is shipped as a compiled official artifact and loaded through the same plugin manager as third-party plugins.
 Its checksum is pinned in `plugins/official-core.json`; if it does not match, premium entitlement is not granted.
 
 ## Built-in Free Plugins
@@ -39,9 +39,9 @@ See these docs for the full contract:
 - [Plugin system overview](../docs/plugins.md)
 - [Create a plugin](../docs/create-plugin.md)
 - [Plugin API reference](../docs/plugin-api.md)
-- [Plugin publishing](../docs/plugin-marketplace.md)
+- [Publishing a plugin](../docs/plugin-marketplace.md)
 
-You can also run `npm run plugins` from the repository root to open the local Plugin Desk.
+To enable or disable plugins visually, open **Rewards Desk** (`npm start`) and go to the **Plugins** page — it edits `plugins/plugins.jsonc` for you.
 
 ## Plugin Safety
 

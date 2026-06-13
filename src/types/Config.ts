@@ -13,11 +13,16 @@ export interface Config {
     proxy: ConfigProxy
     consoleLogFilter: LogFilter
     webhook: ConfigWebhook
-    redeemGoal?: ConfigRedeemGoal
     backgroundAgent?: ConfigBackgroundAgent
+    terminal?: ConfigTerminal
     plugins?: ConfigPlugins
     scheduler?: ConfigScheduler
+    core?: ConfigCore
     safetyAdvisory?: ConfigSafetyAdvisory
+}
+
+export interface ConfigTerminal {
+    enabled: boolean
 }
 
 export interface ConfigBackgroundAgent {
@@ -34,6 +39,31 @@ export interface ConfigScheduler {
     randomDelay: ConfigDelay
 }
 
+/**
+ * Per-feature gating for the proprietary Core plugin. Each flag enables or
+ * disables one premium action — the compiled Core plugin reads these exactly
+ * like the open-source bot reads `workers.*`. A feature only ever runs (and is
+ * only ever counted) when a valid Core license is active AND its flag is not
+ * `false`. Without a license / with Core inactive these flags are inert because
+ * the premium tasks are never registered. Defaults are `true` (opt-out), except
+ * `dailySetUnlimited` which defaults to `false`.
+ *
+ */
+export interface ConfigCore {
+    doubleSearchPoints?: boolean
+    appReward?: boolean
+    readToEarn?: boolean
+    dailyCheckIn?: boolean
+    dailyStreak?: boolean
+    setGoal?: boolean
+    claimPoints?: boolean
+    applyCoupons?: boolean
+    temporaryPunchcards?: boolean
+    collectDashboardInfo?: boolean
+    streakProtection?: boolean
+    dashboardSync?: boolean
+}
+
 export interface ConfigSafetyAdvisory {
     enabled: boolean
     url: string
@@ -45,16 +75,6 @@ export interface ConfigPlugins {
     core?: {
         enabled: boolean
     }
-}
-
-export interface ConfigRedeemGoal {
-    enabled: boolean
-    /** Full SKU URL, e.g. "https://rewards.bing.com/redeem/sku/000499012010" */
-    skuUrl: string
-    /** SKU option value to select in the dropdown, e.g. "000499012011" for 800 Robux */
-    skuOptionValue?: string
-    /** Redeem mode: "auto" = auto-redeem when enough points, "manual" = track goal only */
-    redeemMode: 'auto' | 'manual'
 }
 
 export type QueryEngine = 'google' | 'wikipedia' | 'reddit' | 'local'
@@ -88,10 +108,9 @@ export interface ConfigWorkers {
     doDailyCheckIn: boolean
     doReadToEarn: boolean
     doDailyStreak: boolean
-    doRedeemGoal: boolean
     doDashboardInfo: boolean
     doClaimPoints: boolean
-    enforceCoreStreakProtectionGate: boolean
+    doApplyCoupons: boolean
 }
 
 // Webhooks
@@ -99,6 +118,25 @@ export interface ConfigWebhook {
     discord?: WebhookDiscordConfig
     ntfy?: WebhookNtfyConfig
     webhookLogFilter: LogFilter
+    runSummary?: WebhookRunSummaryConfig
+    autoReport?: AutoReportConfig
+}
+
+export interface AutoReportConfig {
+    enabled: boolean
+    discordUrl: string
+    reportRunStart?: boolean
+    reportAccountEnd?: boolean
+    reportRunSummary?: boolean
+    maskEmails?: boolean
+}
+
+export interface WebhookRunSummaryConfig {
+    enabled: boolean
+    discordUrl: string
+    includeCoreComparison?: boolean
+    /** Legacy name accepted during config migration. */
+    includeCorePitch?: boolean
 }
 
 export interface LogFilter {

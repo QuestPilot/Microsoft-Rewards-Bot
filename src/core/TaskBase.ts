@@ -164,7 +164,7 @@ export class TaskBase {
 
                     // Unsupported types
                     default: {
-                        this.bot.logger.warn(
+                        this.bot.logger.info(
                             this.bot.isMobile,
                             'SPECIAL-ACTIVITY',
                             `Skipped activity "${activity.title}" | offerId=${offerId} | Reason: Unsupported type "${activity.promotionType}"`
@@ -271,7 +271,7 @@ export class TaskBase {
 
                         // Unsupported types
                         default: {
-                            this.bot.logger.warn(
+                            this.bot.logger.info(
                                 this.bot.isMobile,
                                 'ACTIVITY',
                                 `Skipped activity "${activity.title}" | offerId=${offerId} | Reason: Unsupported type "${activity.promotionType}"`

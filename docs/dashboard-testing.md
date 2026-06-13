@@ -2,6 +2,32 @@
 
 Microsoft Rewards changes often. Use these checks when the dashboard starts failing, after refreshing files in `Page/`, or before publishing a release.
 
+## 0. Capture Fresh Pages (recommended)
+
+A browser "Save page as" only writes the static shell: it loses the authenticated
+RSC data (offerId/hash/`reportActivity` action ids, search counters) and can save
+the wrong route/locale. Use the capture script instead — it reuses the diagnostics
+session, walks every Rewards route, expands every disclosure/side-panel (read-only:
+only `aria-expanded` buttons, never links/logout/redeem), and saves the rendered
+DOM **plus** a HAR with every API/server-action response body.
+
+```powershell
+$env:MSRB_LIVE_DASHBOARD = "1"
+npm run capture:pages
+```
+
+Sign in **in the locale you want captured (English is the reference)**. If the
+dashboard is not ready, it waits 120s for you to finish login/welcome, then
+continues. Output lands in `diagnostics/capture/`:
+
+- `<route>.html` — full rendered DOM (build selectors from classes/structure, not text)
+- `<route>.flight.txt` — unescaped RSC flight (data models)
+- `network.har` — every XHR/fetch with response body (open in DevTools or a HAR viewer)
+- `summary.json` — per-page signals + analyzer output
+
+Selectors must stay language-agnostic (classes, `role`/`aria-*`/`data-*`,
+instrument names); use English text only when unavoidable.
+
 ## 1. Analyze Saved Pages
 
 Save the current Rewards pages in `Page/`, including the generated asset folders, then run:
@@ -86,4 +112,4 @@ npx tsc --noEmit
 npm audit --audit-level=moderate
 ```
 
-If Core was rebuilt, also verify `plugins/official-core.json` matches `plugins/core/index.jsc`.
+If Core was rebuilt, also run `npm run core:release-check`.

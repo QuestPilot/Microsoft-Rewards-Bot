@@ -209,8 +209,97 @@ function contextAround(text: string, index: number, radius = 900): string {
     return text.slice(Math.max(0, index - radius), Math.min(text.length, index + radius))
 }
 
+function findBalancedEnd(text: string, start: number, open: string, close: string): number {
+    let depth = 0
+    let inString = false
+    let escaped = false
+
+    for (let i = start; i < text.length; i++) {
+        const char = text[i]
+
+        if (inString) {
+            if (escaped) {
+                escaped = false
+            } else if (char === '\\') {
+                escaped = true
+            } else if (char === '"') {
+                inString = false
+            }
+            continue
+        }
+
+        if (char === '"') {
+            inString = true
+        } else if (char === open) {
+            depth++
+        } else if (char === close) {
+            depth--
+            if (depth === 0) return i
+        }
+    }
+
+    return -1
+}
+
+function extractJsonArraysAfterKey(text: string, key: string): unknown[][] {
+    const arrays: unknown[][] = []
+    const marker = `"${key}":[`
+    let searchFrom = 0
+
+    while (searchFrom < text.length) {
+        const markerIndex = text.indexOf(marker, searchFrom)
+        if (markerIndex === -1) break
+
+        const start = markerIndex + `"${key}":`.length
+        const end = findBalancedEnd(text, start, '[', ']')
+        if (end === -1) {
+            searchFrom = markerIndex + marker.length
+            continue
+        }
+
+        try {
+            const parsed = JSON.parse(text.slice(start, end + 1)) as unknown
+            if (Array.isArray(parsed)) arrays.push(parsed)
+        } catch {
+            // Keep scanning.
+        }
+
+        searchFrom = end + 1
+    }
+
+    return arrays
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function optionalString(value: unknown): string | undefined {
+    return typeof value === 'string' && value !== '$undefined' ? value : undefined
+}
+
 export function extractRewardsActivities(text: string): RewardsActivityModel[] {
     const activities: RewardsActivityModel[] = []
+
+    for (const items of extractJsonArraysAfterKey(text, 'dailySetItems')) {
+        for (const item of items) {
+            if (!isRecord(item)) continue
+            const offerId = optionalString(item.offerId)
+            if (!offerId) continue
+
+            activities.push({
+                type: 'dailyset',
+                offerId,
+                hash: optionalString(item.hash),
+                destination: optionalString(item.destination),
+                destinationUrl: optionalString(item.destination),
+                title: optionalString(item.title),
+                points: typeof item.points === 'number' ? item.points : undefined,
+                isCompleted: typeof item.isCompleted === 'boolean' ? item.isCompleted : undefined
+            })
+        }
+    }
+
     const modelMatches = text.matchAll(/"type"\s*:\s*"([^"]+)"[\s\S]{0,1200}?"model"\s*:\s*\{/g)
 
     for (const match of modelMatches) {
@@ -220,6 +309,8 @@ export function extractRewardsActivities(text: string): RewardsActivityModel[] {
         const hash = readStringField(context, 'hash') ?? readStringField(context, 'activationHash')
         const destination = readStringField(context, 'destination')
         const destinationUrl = readStringField(context, 'destinationUrl')
+
+        if (offerId && activities.some(activity => activity.offerId === offerId)) continue
 
         activities.push({
             type: match[1],

@@ -4,6 +4,8 @@ import rebrowser, { BrowserContext } from 'patchright'
 
 import { loadSessionData, saveFingerprintData } from '../helpers/ConfigLoader'
 import type { MicrosoftRewardsBot } from '../index'
+import { DESKTOP_BROWSER_VIEWPORT, DESKTOP_BROWSER_WINDOW_ARG } from './BrowserViewport'
+import { CORE_PROMO_BANNER_RUNTIME_CONFIG, installCorePromoBanner } from './CorePromoBanner'
 import { FingerprintManager } from './FingerprintManager'
 
 import type { Account, AccountProxy } from '../types/Account'
@@ -22,12 +24,12 @@ interface BrowserCreationResult {
 }
 
 type BrowserChannel = 'chrome' | 'msedge'
-type BrowserCandidate = BrowserChannel | undefined
 
 class BrowserManager {
     private readonly bot: MicrosoftRewardsBot
     private detectedBrowserChannel?: Promise<BrowserCandidate>
     private static readonly DETECTION_CLOSE_TIMEOUT_MS = 5_000
+    private readonly activeBrowsers = new Set<rebrowser.Browser>()
     private static readonly BROWSER_ARGS = [
         '--no-sandbox',
         '--mute-audio',
@@ -55,7 +57,9 @@ class BrowserManager {
         '--enforce-webrtc-ip-handling-policy',
         '--webrtc-ip-handling-policy=disable_non_proxied_udp',
         '--disable-webrtc-hw-encoding',
-        '--disable-webrtc-hw-decoding'
+        '--disable-webrtc-hw-decoding',
+        '--start-maximized',
+        DESKTOP_BROWSER_WINDOW_ARG
     ] as const
 
     constructor(bot: MicrosoftRewardsBot) {
@@ -96,9 +100,15 @@ class BrowserManager {
                     await this.closeDetectionBrowser(testBrowser).catch(() => {})
                 }
             }
+    private async assertBundledChromiumAvailable(): Promise<void> {
+        try {
+            const testBrowser = await rebrowser.chromium.launch({ headless: true })
+            await testBrowser.close()
+        } catch {
+            throw new Error(
+                'Patchright Chromium is not installed. Run `npx patchright install chromium` and try again.'
+            )
         }
-
-        throw new Error('No supported Chromium browser found. Run `npx patchright install chromium` and try again.')
     }
 
     private async closeDetectionBrowser(browser: rebrowser.Browser): Promise<void> {
@@ -144,19 +154,19 @@ class BrowserManager {
                   }
                 : undefined
 
-            channel = await this.detectBrowserChannel()
+            await this.assertBundledChromiumAvailable()
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BROWSER',
-                `Using browser channel: ${channel ?? 'chromium (bundled)'}`
+                'Using browser channel: chromium (Patchright bundled)'
             )
 
             browser = await rebrowser.chromium.launch({
                 headless: this.bot.config.headless,
-                ...(channel && { channel }),
                 ...(proxyConfig && { proxy: proxyConfig }),
                 args: [...BrowserManager.BROWSER_ARGS]
             })
+            this.activeBrowsers.add(browser)
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
             this.bot.logger.error(this.bot.isMobile, 'BROWSER', `Launch failed: ${errorMessage}`)
@@ -175,7 +185,17 @@ class BrowserManager {
                 sessionData.fingerprint ??
                 (await this.generateFingerprint(this.bot.isMobile, channel === 'msedge' ? 'edge' : 'chrome'))
 
-            const context = await newInjectedContext(browser as any, { fingerprint })
+            const context = await newInjectedContext(browser as any, {
+                fingerprint,
+                newContextOptions: {
+                    viewport: DESKTOP_BROWSER_VIEWPORT,
+                    screen: DESKTOP_BROWSER_VIEWPORT
+                }
+            })
+            context.once('close', () => {
+                this.activeBrowsers.delete(browser)
+                void browser.close().catch(() => {})
+            })
 
             await context.addInitScript(() => {
                 // Disable WebAuthn/FIDO
@@ -199,6 +219,8 @@ class BrowserManager {
                     }) as any
                 }
             })
+
+            await context.addInitScript(installCorePromoBanner, CORE_PROMO_BANNER_RUNTIME_CONFIG)
 
             context.setDefaultTimeout(this.bot.utils.stringToNumber(this.bot.config?.globalTimeout ?? 30000))
 
@@ -240,9 +262,16 @@ class BrowserManager {
 
             return { context: context as unknown as BrowserContext, fingerprint }
         } catch (error) {
+            this.activeBrowsers.delete(browser)
             await browser.close().catch(() => {})
             throw error
         }
+    }
+
+    async closeAll(): Promise<void> {
+        const browsers = [...this.activeBrowsers]
+        this.activeBrowsers.clear()
+        await Promise.allSettled(browsers.map(browser => browser.close()))
     }
 
     private formatProxyServer(proxy: AccountProxy): string {

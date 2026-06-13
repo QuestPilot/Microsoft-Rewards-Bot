@@ -64,3 +64,22 @@ test('dashboard parser extracts dashboard data from __NEXT_DATA__', () => {
 
     assert.equal(parsed.userStatus.availablePoints, 55)
 })
+
+test('dashboard parser extracts minimal data from Rewards Next.js RSC models when fixture exists', () => {
+    const fixture = path.join(root, 'Dash-Msn-Rw', 'New', 'Dashboard – Microsoft Rewards.html')
+    if (!fs.existsSync(fixture)) return
+
+    const controller = createController()
+    const parsed = controller.parseDashboardHtml(fs.readFileSync(fixture, 'utf8'))
+
+    assert.equal(parsed.userStatus.availablePoints, 2499)
+    assert.equal(parsed.userProfile.attributes.country, 'fr')
+    assert.ok(parsed.dailySetPromotions['06/04/2026']?.length >= 3)
+
+    const child2 = parsed.dailySetPromotions['06/04/2026'].find(
+        item => item.offerId === 'Global_DailySet_20260604_Child2'
+    )
+    assert.equal(child2.hash, 'e33cf04d34e275d4b878e60be5bd0f91d2dd24681e71d30351208250d975005c')
+    assert.equal(child2.pointProgressMax, 10)
+    assert.equal(child2.complete, true)
+})

@@ -1,17 +1,6 @@
 # Safety Advisory
 
-The safety advisory check lets maintainers publish a small JSON file when running the bot is temporarily risky. Users still keep control: they can stop, continue automatically, or continue manually after reading the warning.
-
-## Configuration
-
-```json
-"safetyAdvisory": {
-  "enabled": true,
-  "url": "https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/safety-advisory.json",
-  "timeout": "10sec",
-  "blockedBehavior": "prompt"
-}
-```
+The safety advisory check lets maintainers publish a small JSON file when running the bot is temporarily risky. It is enabled by default and is intentionally not part of the normal user configuration.
 
 ## Advisory File
 

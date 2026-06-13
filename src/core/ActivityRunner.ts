@@ -11,9 +11,9 @@ import { StreakProtectionGate } from './tasks/browser/StreakProtectionGate'
 
 // Types
 import type { Promotion } from '../types/AppDashboardData'
-import type { ConfigRedeemGoal } from '../types/Config'
 import type { BasePromotion, DashboardData, FindClippyPromotion, PurplePromotionalItem } from '../types/DashboardData'
 import type {
+    ApplyCouponsResult,
     ClaimPointsResult,
     DailyStreakInfo,
     DashboardInfo,
@@ -108,11 +108,11 @@ export default class ActivityRunner {
         return null
     }
 
-    doRedeemGoal = async (page: Page, config: ConfigRedeemGoal): Promise<void> => {
-        if (this.premiumTasks.doRedeemGoal) {
-            return this.premiumTasks.doRedeemGoal(page, config)
+    doSetGoal = async (page: Page): Promise<void> => {
+        if (this.premiumTasks.doSetGoal) {
+            return this.premiumTasks.doSetGoal(page)
         }
-        this.coreHint('Redeem Goal', 'Core can manage supported redeem-goal dashboard actions.')
+        this.coreHint('Set Goal', 'Core can automatically find and set a Rewards goal when none is active.')
     }
 
     collectDashboardInfo = async (page: Page): Promise<DashboardInfo> => {
@@ -138,6 +138,14 @@ export default class ActivityRunner {
         }
         this.coreHint('Claim Points', 'Core can claim supported ready-to-claim point cards automatically.')
         return { claimed: false, pointsClaimed: 0, entries: [] }
+    }
+
+    doApplyCoupons = async (page: Page): Promise<ApplyCouponsResult> => {
+        if (this.premiumTasks.doApplyCoupons) {
+            return this.premiumTasks.doApplyCoupons(page)
+        }
+        this.coreHint('Coupons', 'Core can detect and apply supported Rewards dashboard coupons automatically.')
+        return { available: 0, applied: 0, totalPointsDiscount: 0, coupons: [] }
     }
 
     doTemporaryPunchcards = async (page: Page): Promise<TemporaryPunchcardsResult> => {

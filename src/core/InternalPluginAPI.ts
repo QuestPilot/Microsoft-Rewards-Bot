@@ -9,7 +9,6 @@ import type { Page } from 'patchright'
 import type { MicrosoftRewardsBot } from '../index'
 import type { StreakProtectionSyncResult } from './tasks/browser/StreakProtectionGate'
 import type { Promotion } from '../types/AppDashboardData'
-import type { ConfigRedeemGoal } from '../types/Config'
 import type { PurplePromotionalItem } from '../types/DashboardData'
 import type {
     IPlugin,
@@ -50,9 +49,10 @@ export interface PremiumTaskMap {
     doReadToEarn: () => Promise<void>
     doDailyCheckIn: () => Promise<void>
     doDailyStreak: (page: Page) => Promise<DailyStreakInfo | null>
-    doRedeemGoal: (page: Page, config: ConfigRedeemGoal) => Promise<void>
+    doSetGoal: (page: Page) => Promise<void>
     collectDashboardInfo: (page: Page) => Promise<DashboardInfo>
     doClaimPoints: (page: Page) => Promise<ClaimPointsResult>
+    doApplyCoupons: (page: Page) => Promise<ApplyCouponsResult>
     doTemporaryPunchcards: (page: Page) => Promise<TemporaryPunchcardsResult>
     syncStreakProtection: (page: Page, desiredEnabled: boolean) => Promise<StreakProtectionSyncResult>
 }
@@ -68,6 +68,19 @@ export interface ClaimPointsResult {
     claimed: boolean
     pointsClaimed: number
     entries: ClaimEntry[]
+}
+
+export interface AppliedCoupon {
+    title: string | null
+    pointsDiscount: number | null
+    expiresText: string | null
+}
+
+export interface ApplyCouponsResult {
+    available: number
+    applied: number
+    totalPointsDiscount: number
+    coupons: AppliedCoupon[]
 }
 
 export interface TemporaryPunchcardsResult {

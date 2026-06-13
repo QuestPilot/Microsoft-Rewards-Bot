@@ -1,6 +1,6 @@
 QuestPilot Source Available License 1.0
 
-Copyright (c) 2025-2026 LightZirconite and QuestPilot.
+Copyright (c) 2025-2026 QuestPilot.
 All rights reserved except as expressly granted in this license.
 
 This license applies to the public Microsoft Rewards Bot repository, excluding
@@ -50,7 +50,7 @@ You may not publicly distribute, publish, mirror, host, package, release,
 promote, or make available the Software, a Fork, or a modified version except:
 
 a. as a contribution submitted to the Official Project; or
-b. with prior written permission from LightZirconite or QuestPilot.
+b. with prior written permission from QuestPilot.
 
 Creating a public repository that copies this Software outside the official
 GitHub fork flow is not permitted without prior written permission.
@@ -126,7 +126,7 @@ After termination, you must immediately stop using and distributing the Software
 and remove all unauthorized public copies, mirrors, packages, releases, and
 modified versions.
 
-LightZirconite or QuestPilot may reinstate permissions in writing after the
+QuestPilot may reinstate permissions in writing after the
 violation is corrected, but they are not required to do so.
 
 10. Reservation of Rights
@@ -143,7 +143,7 @@ purpose, title, and non-infringement. You use it at your own risk.
 
 12. Limitation of Liability
 
-To the maximum extent permitted by law, LightZirconite, QuestPilot, contributors,
+To the maximum extent permitted by law, QuestPilot, contributors,
 and maintainers will not be liable for any claim, damage, loss, liability,
 account action, service interruption, lost profits, lost data, or other harm
 arising from the Software or this license.

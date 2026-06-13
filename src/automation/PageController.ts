@@ -16,6 +16,15 @@ export default class PageController {
     private bot: MicrosoftRewardsBot
     private static readonly BROWSER_CLOSE_TIMEOUT_MS = 10_000
 
+    /**
+     * Once the legacy JSON dashboard API (`/api/getuserinfo`) fails, Microsoft has
+     * almost certainly migrated the account to the Next.js dashboard for this session.
+     * Re-hitting the dead endpoint on every points lookup wastes axios retries and
+     * floods the logs with identical warnings, so we remember the outage and route
+     * straight to the HTML dashboard for the remainder of the run.
+     */
+    private dashboardApiUnavailable = false
+
     constructor(bot: MicrosoftRewardsBot) {
         this.bot = bot
     }
@@ -31,56 +40,41 @@ export default class PageController {
      * @returns {DashboardData} Object of user bing rewards dashboard data
      */
     async getDashboardData(): Promise<DashboardData> {
-        try {
-            const request: AxiosRequestConfig = {
-                url: URLS.dashboardApi,
-                method: 'GET',
-                timeout: 15_000,
-                'axios-retry': { retries: 2 },
-                headers: {
-                    ...(this.bot.fingerprint?.headers ?? {}),
-                    Cookie: this.buildCookieHeader(this.bot.cookies.mobile, [
-                        'bing.com',
-                        'live.com',
-                        'microsoftonline.com'
-                    ]),
-                    Referer: 'https://rewards.bing.com/',
-                    Origin: 'https://rewards.bing.com'
-                }
-            } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
-
-            const response = await this.bot.axios.request(request)
-
-            if (response.data?.dashboard) {
-                return response.data.dashboard as DashboardData
-            }
-            throw new Error('Dashboard data missing from API response')
-        } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'API failed, trying HTML fallback')
-
+        // Skip the legacy JSON API entirely once it has failed this session (Next.js migration).
+        if (!this.dashboardApiUnavailable) {
             try {
                 const request: AxiosRequestConfig = {
-                    url: this.bot.config.baseURL,
+                    url: URLS.dashboardApi,
                     method: 'GET',
                     timeout: 15_000,
                     'axios-retry': { retries: 2 },
                     headers: {
                         ...(this.bot.fingerprint?.headers ?? {}),
-                        Cookie: this.buildCookieHeader(this.bot.cookies.mobile),
+                        Cookie: this.buildCookieHeader(this.bot.cookies.mobile, [
+                            'bing.com',
+                            'live.com',
+                            'microsoftonline.com'
+                        ]),
                         Referer: 'https://rewards.bing.com/',
                         Origin: 'https://rewards.bing.com'
                     }
                 } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
 
                 const response = await this.bot.axios.request(request)
-                return this.parseDashboardHtml(String(response.data))
+
+                if (response.data?.dashboard) {
+                    return response.data.dashboard as DashboardData
+                }
+                throw new Error('Dashboard data missing from API response')
             } catch {
+                this.dashboardApiUnavailable = true
                 this.bot.logger.warn(
                     this.bot.isMobile,
                     'GET-DASHBOARD-DATA',
-                    'HTML fallback failed, trying browser session fallback'
+                    'Direct JSON API unavailable (account migrated to Next.js dashboard) — using HTML parser for the rest of this session'
                 )
             }
+        }
 
             try {
                 const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
@@ -93,6 +87,47 @@ export default class PageController {
                 this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data')
                 throw fallbackError
             }
+        return this.getDashboardDataFromHtml()
+    }
+
+    /**
+     * Recover dashboard data without the legacy JSON API: first by fetching the
+     * dashboard HTML over axios, then (if that fails) by reading the already-open
+     * browser page. Both paths feed {@link parseDashboardHtml}.
+     */
+    private async getDashboardDataFromHtml(): Promise<DashboardData> {
+        try {
+            const request: AxiosRequestConfig = {
+                url: this.bot.config.baseURL,
+                method: 'GET',
+                timeout: 15_000,
+                'axios-retry': { retries: 2 },
+                headers: {
+                    ...(this.bot.fingerprint?.headers ?? {}),
+                    Cookie: this.buildCookieHeader(this.bot.cookies.mobile),
+                    Referer: 'https://rewards.bing.com/',
+                    Origin: 'https://rewards.bing.com'
+                }
+            } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
+
+            const response = await this.bot.axios.request(request)
+            return this.parseDashboardHtml(String(response.data))
+        } catch {
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'GET-DASHBOARD-DATA',
+                'HTML fetch failed, trying browser session fallback'
+            )
+        }
+
+        try {
+            const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
+            await page.goto(this.bot.config.baseURL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
+            const html = await page.content()
+            return this.parseDashboardHtml(html)
+        } catch (fallbackError) {
+            this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data')
+            throw fallbackError
         }
     }
 
@@ -130,6 +165,16 @@ export default class PageController {
                 )
                 return parsed
             }
+        }
+
+        const rewardsNextData = this.buildDashboardDataFromRewardsNextHtml(html)
+        if (rewardsNextData) {
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'GET-DASHBOARD-DATA',
+                'Extracted minimal dashboard data from Rewards Next.js RSC models'
+            )
+            return rewardsNextData
         }
 
         throw new Error('Dashboard data not found in HTML (tried legacy embed + Next.js chunks)')
@@ -202,6 +247,178 @@ export default class PageController {
         }
 
         return null
+    }
+
+    private buildDashboardDataFromRewardsNextHtml(html: string): DashboardData | null {
+        const flightText = this.extractNextFlightChunks(html).join('\n')
+        if (!flightText || !/"dailySetItems"|"balance"|"country"/.test(flightText)) return null
+
+        const availablePoints = this.readNumberFromText(flightText, 'balance') ?? 0
+        const country = this.readStringFromText(flightText, 'country') ?? 'us'
+        const dailySetPromotions = this.extractRewardsNextDailySetPromotions(flightText)
+        const morePromotions = this.extractRewardsNextOfferPromotions(flightText)
+
+        return {
+            userStatus: {
+                availablePoints,
+                counters: {
+                    pcSearch: [],
+                    mobileSearch: [],
+                    activityAndQuiz: [],
+                    dailyPoint: []
+                }
+            },
+            dailySetPromotions,
+            morePromotions,
+            morePromotionsWithoutPromotionalItems: [],
+            promotionalItems: [],
+            userProfile: {
+                attributes: {
+                    country
+                }
+            }
+        } as unknown as DashboardData
+    }
+
+    private extractRewardsNextDailySetPromotions(text: string): DashboardData['dailySetPromotions'] {
+        const grouped: Record<string, unknown[]> = {}
+
+        for (const items of this.extractJsonArraysAfterKey(text, 'dailySetItems')) {
+            for (const item of items) {
+                if (!this.isRecord(item)) continue
+                const offerId = this.stringValue(item.offerId)
+                const hash = this.stringValue(item.hash)
+                const date = this.stringValue(item.date)
+                if (!offerId || !hash || !date) continue
+
+                const promotion = this.createRewardsNextPromotion(item)
+                grouped[date] = grouped[date] ?? []
+                grouped[date]!.push(promotion)
+            }
+        }
+
+        return grouped as DashboardData['dailySetPromotions']
+    }
+
+    private extractRewardsNextOfferPromotions(text: string): DashboardData['morePromotions'] {
+        const promotions = new Map<string, DashboardData['morePromotions'][number]>()
+        const offerMatches = text.matchAll(/"offerId"\s*:\s*"([^"]+)"/g)
+
+        for (const match of offerMatches) {
+            if (match.index === undefined || !match[1] || promotions.has(match[1])) continue
+
+            const objectStart = text.lastIndexOf('{', match.index)
+            if (objectStart === -1) continue
+
+            const objectEnd = this.findBalancedEnd(text, objectStart, '{', '}')
+            if (objectEnd === -1 || objectEnd < match.index) continue
+
+            const parsed = this.parseJsonLike(text.slice(objectStart, objectEnd + 1))
+            if (!this.isRecord(parsed)) continue
+
+            const offerId = this.stringValue(parsed.offerId)
+            const hash = this.stringValue(parsed.hash)
+            const destination = this.stringValue(parsed.destination)
+            if (!offerId || !hash || !destination) continue
+
+            promotions.set(offerId, this.createRewardsNextPromotion(parsed))
+        }
+
+        return [...promotions.values()]
+    }
+
+    private createRewardsNextPromotion(item: Record<string, unknown>): DashboardData['morePromotions'][number] {
+        const points = this.numberValue(item.points)
+        const completed = this.booleanValue(item.isCompleted)
+        const destination = this.stringValue(item.destination)
+        const title = this.stringValue(item.title)
+        const description = this.stringValue(item.description)
+        const offerId = this.stringValue(item.offerId)
+        const hash = this.stringValue(item.hash)
+        const name = this.stringValue(item.name) ?? offerId ?? ''
+        const promotionType = this.inferRewardsNextPromotionType(destination, title)
+        const pointProgress = completed ? points : 0
+
+        return {
+            name,
+            offerId,
+            hash,
+            title: title ?? '',
+            description: description ?? title ?? '',
+            destinationUrl: destination ?? '',
+            promotionType,
+            complete: completed,
+            pointProgress,
+            pointProgressMax: points,
+            activityProgress: pointProgress,
+            activityProgressMax: points,
+            exclusiveLockedFeatureStatus: 'unlocked'
+        } as unknown as DashboardData['morePromotions'][number]
+    }
+
+    private inferRewardsNextPromotionType(destination?: string, title?: string): string {
+        const value = `${destination ?? ''} ${title ?? ''}`.toLowerCase()
+        if (value.includes('findclippy')) return 'findclippy'
+        if (value.includes('pollscenarioid')) return 'quiz'
+        return 'urlreward'
+    }
+
+    private extractJsonArraysAfterKey(text: string, key: string): unknown[][] {
+        const arrays: unknown[][] = []
+        const marker = `"${key}":[`
+        let searchFrom = 0
+
+        while (searchFrom < text.length) {
+            const markerIndex = text.indexOf(marker, searchFrom)
+            if (markerIndex === -1) break
+
+            const start = markerIndex + `"${key}":`.length
+            const end = this.findBalancedEnd(text, start, '[', ']')
+            if (end === -1) {
+                searchFrom = markerIndex + marker.length
+                continue
+            }
+
+            const parsed = this.parseJsonLike(text.slice(start, end + 1))
+            if (Array.isArray(parsed)) arrays.push(parsed)
+            searchFrom = end + 1
+        }
+
+        return arrays
+    }
+
+    private parseJsonLike(value: string): unknown {
+        try {
+            return JSON.parse(value)
+        } catch {
+            return null
+        }
+    }
+
+    private readNumberFromText(text: string, field: string): number | null {
+        const match = text.match(new RegExp(`"${field}"\\s*:\\s*(-?\\d+)`))
+        return match?.[1] ? Number(match[1]) : null
+    }
+
+    private readStringFromText(text: string, field: string): string | null {
+        const match = text.match(new RegExp(`"${field}"\\s*:\\s*"([^"]*)"`))
+        return match?.[1] && match[1] !== '$undefined' ? match[1] : null
+    }
+
+    private isRecord(value: unknown): value is Record<string, unknown> {
+        return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+    }
+
+    private stringValue(value: unknown): string | undefined {
+        return typeof value === 'string' && value !== '$undefined' ? value : undefined
+    }
+
+    private numberValue(value: unknown): number {
+        return typeof value === 'number' && Number.isFinite(value) ? value : 0
+    }
+
+    private booleanValue(value: unknown): boolean {
+        return value === true
     }
 
     private parseObjectContainingMarker(text: string, markerIndex: number): Record<string, unknown> | null {
@@ -356,6 +573,15 @@ export default class PageController {
     }
 
     /**
+     * Whether the dashboard actually exposed usable search-point counters.
+     * Microsoft's Next.js dashboard omits them; when this returns false, callers
+     * fall back to a balance-driven search run instead of the counter-delta logic.
+     */
+    hasSearchCounters(counters: Counters): boolean {
+        return (counters.pcSearch?.length ?? 0) > 0 || (counters.mobileSearch?.length ?? 0) > 0
+    }
+
+    /**
      * Get total earnable points with web browser
      */
     async getBrowserEarnablePoints(): Promise<BrowserEarnablePoints> {
@@ -425,7 +651,12 @@ export default class PageController {
                 return { readToEarn: 0, checkIn: 0, totalEarnablePoints: 0 }
             }
 
-            const eligibleOffers = ['ENUS_readarticle3_30points', 'Gamification_Sapphire_DailyCheckIn']
+            // Match by promotion `type` rather than a hardcoded offerid. The
+            // read-to-earn offerid is locale-prefixed (e.g. ENUS_/FRFR_), so an
+            // offerid allowlist silently excluded every non-US account. The loop
+            // below already discriminates by `attrs.type`, making this the safe,
+            // locale-agnostic source of truth.
+            const eligibleTypes = ['msnreadearn', 'checkin']
 
             const request: AxiosRequestConfig = {
                 url: 'https://prod.rewardsplatform.microsoft.com/dapi/me?channel=SAAndroid&options=613',
@@ -441,7 +672,7 @@ export default class PageController {
             const response = await this.bot.axios.request(request)
             const userData: AppUserData = response.data
             const eligibleActivities = userData.response.promotions.filter(x =>
-                eligibleOffers.includes(x.attributes.offerid ?? '')
+                eligibleTypes.includes(x.attributes?.type ?? '')
             )
 
             let readToEarn = 0

@@ -22,17 +22,14 @@ const DelaySchema = z.object({
 
 const QueryEngineSchema = z.enum(['google', 'wikipedia', 'reddit', 'local'])
 
-const RedeemGoalSchema = z.object({
-    enabled: z.boolean(),
-    skuUrl: z.string(),
-    skuOptionValue: z.string().optional(),
-    redeemMode: z.enum(['auto', 'manual'])
-})
-
 const BackgroundAgentSchema = z.object({
     enabled: z.boolean().default(true),
     allowDashboardAutostart: z.boolean().default(true),
     openConsole: z.boolean().default(true)
+})
+
+const TerminalSchema = z.object({
+    enabled: z.boolean().default(true)
 })
 
 const SchedulerSchema = z.object({
@@ -69,7 +66,15 @@ const WebhookSchema = z.object({
             priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional()
         })
         .optional(),
-    webhookLogFilter: LogFilterSchema
+    webhookLogFilter: LogFilterSchema,
+    runSummary: z
+        .object({
+            enabled: z.boolean().default(false),
+            discordUrl: z.string().default(''),
+            includeCoreComparison: z.boolean().optional(),
+            includeCorePitch: z.boolean().optional()
+        })
+        .optional()
 })
 
 // Config
@@ -90,10 +95,9 @@ export const ConfigSchema = z.object({
         doDailyCheckIn: z.boolean(),
         doReadToEarn: z.boolean(),
         doDailyStreak: z.boolean(),
-        doRedeemGoal: z.boolean(),
         doDashboardInfo: z.boolean(),
         doClaimPoints: z.boolean(),
-        enforceCoreStreakProtectionGate: z.boolean().default(true)
+        doApplyCoupons: z.boolean().default(true)
     }),
     searchOnBingLocalQueries: z.boolean(),
     globalTimeout: NumberOrString,
@@ -112,9 +116,23 @@ export const ConfigSchema = z.object({
     }),
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
-    redeemGoal: RedeemGoalSchema.optional(),
     backgroundAgent: BackgroundAgentSchema.optional(),
+    terminal: TerminalSchema.optional(),
     scheduler: SchedulerSchema.optional(),
+    core: z.object({
+        doubleSearchPoints: z.boolean().optional(),
+        appReward: z.boolean().optional(),
+        readToEarn: z.boolean().optional(),
+        dailyCheckIn: z.boolean().optional(),
+        dailyStreak: z.boolean().optional(),
+        setGoal: z.boolean().optional(),
+        claimPoints: z.boolean().optional(),
+        applyCoupons: z.boolean().optional(),
+        temporaryPunchcards: z.boolean().optional(),
+        collectDashboardInfo: z.boolean().optional(),
+        streakProtection: z.boolean().optional(),
+        dashboardSync: z.boolean().optional()
+    }).optional(),
     safetyAdvisory: SafetyAdvisorySchema.optional()
 })
 
@@ -123,7 +141,14 @@ export const AccountSchema = z.object({
     email: z.string(),
     enabled: z.boolean().optional(),
     password: z.string(),
-    totpSecret: z.string().optional(),
+    totpSecret: z.string().optional().refine(
+        v => {
+            if (!v) return true
+            const normalized = v.replace(/\s/g, '').replace(/=+$/, '')
+            return /^[A-Za-z2-7]+$/.test(normalized) && normalized.length >= 16
+        },
+        { message: 'totpSecret appears invalid: expected a base32 string (A-Z, 2-7) of at least 16 characters' }
+    ),
     recoveryEmail: z.string(),
     geoLocale: z.string(),
     langCode: z.string(),

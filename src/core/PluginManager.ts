@@ -87,7 +87,7 @@ export class PluginManager {
 
         const { config: pluginConfig, hasFile: hasConfigFile } = this.loadPluginConfig()
 
-        const ignoredFiles = new Set(['README.md', 'plugins.jsonc', 'official-core.json', 'catalog.json'])
+        const ignoredFiles = new Set(['README.md', 'plugins.jsonc', 'official-core.json', 'official-core.sig', 'catalog.json'])
         const entries = fs
             .readdirSync(pluginsDir, { withFileTypes: true })
             .filter(entry => !entry.name.startsWith('.') && !ignoredFiles.has(entry.name))
@@ -381,11 +381,27 @@ export class PluginManager {
         }
 
         const manifestPath = path.resolve(process.cwd(), 'plugins', 'official-core.json')
+        const signaturePath = path.resolve(process.cwd(), 'plugins', 'official-core.sig')
+        const publicKeyPath = path.resolve(process.cwd(), 'scripts', 'security', 'core-public-key.pem')
         if (!fs.existsSync(manifestPath)) {
             throw new Error('Official Core manifest missing: plugins/official-core.json')
         }
+        if (!fs.existsSync(signaturePath) || !fs.existsSync(publicKeyPath)) {
+            throw new Error('Official Core signature or public key is missing')
+        }
 
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as OfficialCoreManifest
+        const manifestPayload = fs.readFileSync(manifestPath)
+        const signature = Buffer.from(fs.readFileSync(signaturePath, 'utf8').trim(), 'base64')
+        const publicKey = crypto.createPublicKey(fs.readFileSync(publicKeyPath, 'utf8'))
+        if (
+            signature.length !== 64 ||
+            publicKey.asymmetricKeyType !== 'ed25519' ||
+            !crypto.verify(null, manifestPayload, publicKey, signature)
+        ) {
+            throw new Error('Official Core manifest signature verification failed')
+        }
+
+        const manifest = JSON.parse(manifestPayload.toString('utf8')) as OfficialCoreManifest
         if (manifest.plugin !== 'core') {
             throw new Error('Official Core manifest is invalid')
         }

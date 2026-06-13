@@ -6,6 +6,13 @@ import type { ConfigSafetyAdvisory } from '../types/Config'
 type AdvisoryStatus = 'ok' | 'blocked'
 type AdvisorySeverity = 'info' | 'warning' | 'critical'
 
+const DEFAULT_SAFETY_ADVISORY: ConfigSafetyAdvisory = {
+    enabled: true,
+    url: 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/safety-advisory.json',
+    timeout: '10sec',
+    blockedBehavior: 'prompt'
+}
+
 interface AdvisoryPayload {
     schemaVersion: 1
     status: AdvisoryStatus
@@ -15,7 +22,7 @@ interface AdvisoryPayload {
 }
 
 export async function checkSafetyAdvisory(bot: MicrosoftRewardsBot): Promise<boolean> {
-    const config = bot.config.safetyAdvisory
+    const config = bot.config.safetyAdvisory ?? DEFAULT_SAFETY_ADVISORY
     if (!config?.enabled) return true
 
     try {
@@ -82,7 +89,7 @@ function parseAdvisory(payload: unknown): AdvisoryPayload {
 
 async function handleBlockedAdvisory(config: ConfigSafetyAdvisory, bot: MicrosoftRewardsBot): Promise<boolean> {
     if (config.blockedBehavior === 'continue') {
-        bot.logger.warn('main', 'SAFETY-ADVISORY', 'Continuing because safetyAdvisory.blockedBehavior is "continue".')
+        bot.logger.warn('main', 'SAFETY-ADVISORY', 'Continuing because safety advisory behavior is "continue".')
         return true
     }
 
@@ -95,7 +102,7 @@ async function handleBlockedAdvisory(config: ConfigSafetyAdvisory, bot: Microsof
         bot.logger.error(
             'main',
             'SAFETY-ADVISORY',
-            'Run stopped in non-interactive mode. Set safetyAdvisory.blockedBehavior to "continue" to run at your own risk.'
+            'Run stopped in non-interactive mode because a safety advisory is active.'
         )
         return false
     }

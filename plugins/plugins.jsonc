@@ -26,7 +26,7 @@
 
     "core": {
         "enabled": true,
-        "priority": 100,
+        "priority": 100
         // The released Core plugin validates licenses against the official
         // Turso license database. Nothing is required here for normal users.
         // Override these values only for a custom backend/database.
@@ -52,6 +52,27 @@
             "outputDir": "diagnostics/run-summary",
             "includeEmails": false,
             "writeMarkdown": true
+        }
+    },
+
+    // Tracks recent failures, zero-point runs, and account duration locally.
+    "run-health": {
+        "enabled": false,
+        "priority": 30,
+        "config": {
+            "historyLimit": 50,
+            "warnOnZeroPoints": true,
+            "outputDir": "diagnostics/run-health"
+        }
+    },
+
+    // Checks whether saved browser sessions are missing, empty, or stale.
+    "session-health": {
+        "enabled": false,
+        "priority": 20,
+        "config": {
+            "sessionPath": "sessions",
+            "staleDays": 30
         }
     }
 

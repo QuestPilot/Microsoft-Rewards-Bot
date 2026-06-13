@@ -1,30 +1,25 @@
 import fs from 'fs/promises'
 import path from 'path'
 import type { Page } from 'patchright'
+import { writeFileAtomic } from './AtomicFile'
 
-export async function errorDiagnostic(page: Page, error: Error): Promise<void> {
+export async function errorDiagnostic(page: Page, error: Error, logFn?: (msg: string) => void): Promise<void> {
+    const log = logFn ?? ((msg: string) => console.log(msg))
+
     try {
+        if (!page || page.isClosed()) {
+            return
+        }
+
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        const folderName = `error-${timestamp}`
-        const outputDir = path.join(process.cwd(), 'diagnostics', folderName)
+        const outputDir = path.join(process.cwd(), 'diagnostics', `error-${timestamp}`)
 
-        if (!page) {
-            return
-        }
-
-        if (page.isClosed()) {
-            return
-        }
-
-        // Error log content
-        const errorLog = `
-Name: ${error.name}
+        const errorLog = `Name: ${error.name}
 Message: ${error.message}
 Timestamp: ${new Date().toISOString()}
 ---------------------------------------------------
 Stack Trace:
-${error.stack || 'No stack trace available'}
-        `.trim()
+${error.stack || 'No stack trace available'}`.trim()
 
         const [htmlContent, screenshotBuffer] = await Promise.all([
             page.content(),
@@ -34,13 +29,13 @@ ${error.stack || 'No stack trace available'}
         await fs.mkdir(outputDir, { recursive: true })
 
         await Promise.all([
-            fs.writeFile(path.join(outputDir, 'dump.html'), htmlContent),
-            fs.writeFile(path.join(outputDir, 'screenshot.png'), screenshotBuffer),
-            fs.writeFile(path.join(outputDir, 'error.txt'), errorLog)
+            writeFileAtomic(path.join(outputDir, 'dump.html'), htmlContent),
+            writeFileAtomic(path.join(outputDir, 'screenshot.png'), screenshotBuffer),
+            writeFileAtomic(path.join(outputDir, 'error.txt'), errorLog)
         ])
 
-        console.log(`Diagnostics saved to: ${outputDir}`)
-    } catch (error) {
-        console.error('Unable to create error diagnostics:', error)
+        log(`Diagnostics saved to: ${outputDir}`)
+    } catch (diagError) {
+        log(`Unable to create error diagnostics: ${diagError instanceof Error ? diagError.message : String(diagError)}`)
     }
 }

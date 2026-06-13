@@ -46,3 +46,14 @@ test('collectScriptsForPage supports browser _files asset directories', () => {
 
     assert.match(collectScriptsForPage(pageFile), /reportActivity/)
 })
+
+test('rewards page analyzer keeps daily set offer hashes paired with their item', () => {
+    const fixture = path.join(process.cwd(), 'Dash-Msn-Rw', 'New', 'Dashboard – Microsoft Rewards.html')
+    if (!fs.existsSync(fixture)) return
+
+    const analysis = analyzeRewardsPage(fs.readFileSync(fixture, 'utf8'))
+    const child2 = analysis.activities.find(activity => activity.offerId === 'Global_DailySet_20260604_Child2')
+
+    assert.equal(child2.hash, 'e33cf04d34e275d4b878e60be5bd0f91d2dd24681e71d30351208250d975005c')
+    assert.equal(child2.title, 'Russell’s summer bliss')
+})

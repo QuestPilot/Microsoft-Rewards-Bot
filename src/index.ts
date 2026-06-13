@@ -6,6 +6,7 @@ import type { BrowserFingerprintWithHeaders } from 'fingerprint-generator'
 
 import AutomationUtils from './automation/AutomationUtils'
 import BrowserManager from './automation/BrowserManager'
+import { DESKTOP_BROWSER_VIEWPORT } from './automation/BrowserViewport'
 import PageController from './automation/PageController'
 
 import { loadAccounts, loadConfig } from './helpers/ConfigLoader'
@@ -20,7 +21,7 @@ import ActivityRunner from './core/ActivityRunner'
 import { SearchOrchestrator } from './core/SearchOrchestrator'
 import { TaskBase } from './core/TaskBase'
 
-import type { DashboardInfo } from './core/InternalPluginAPI'
+import type { AppliedCoupon, DashboardInfo } from './core/InternalPluginAPI'
 import { PluginManager } from './core/PluginManager'
 import { checkSafetyAdvisory } from './core/SafetyAdvisory'
 import { formatScheduledRun, getNextScheduledRun, isSchedulerEnabled, waitUntil } from './core/Scheduler'
@@ -40,7 +41,12 @@ import {
     writeAccountSafetyWarningState
 } from './helpers/AccountSafetyWarning'
 import HttpClient from './helpers/HttpClient'
-import { flushDiscordQueue, sendDiscord } from './notifications/DiscordWebhook'
+import { flushDiscordQueue, sendDiscord, sendDiscordEmbed } from './notifications/DiscordWebhook'
+import {
+    sendAutoReportRunStart,
+    sendAutoReportAccountEnd,
+    sendAutoReportRunSummary
+} from './notifications/AutoReport'
 import { flushNtfyQueue, sendNtfy } from './notifications/NtfyWebhook'
 import type { Account } from './types/Account'
 import type { AppDashboardData } from './types/AppDashboardData'
@@ -52,6 +58,16 @@ interface BrowserSession {
     fingerprint: BrowserFingerprintWithHeaders
 }
 
+interface StarBonusInfo {
+    activeLevelName: string
+    monthlyProgress: number
+    monthlyMax: number
+    weeklyProgress: number
+    weeklyState: string
+    levelBonusProgress: number
+    levelBonusMax: number
+}
+
 interface AccountStats {
     email: string
     initialPoints: number
@@ -60,6 +76,17 @@ interface AccountStats {
     duration: number
     success: boolean
     error?: string
+    coreStats?: CoreRunStats
+    starBonus?: StarBonusInfo
+}
+
+interface CoreRunStats {
+    claimPoints: number
+    couponsAvailable: number
+    couponsApplied: number
+    couponPointsDiscount: number
+    coupons: AppliedCoupon[]
+    featuresUsed: string[]
 }
 
 // Re-exported so callers that already import from this module keep working
@@ -71,6 +98,23 @@ async function flushAllWebhooks(timeoutMs = 5000): Promise<void> {
     await Promise.allSettled([flushDiscordQueue(timeoutMs), flushNtfyQueue(timeoutMs)])
 }
 
+function createEmptyCoreRunStats(): CoreRunStats {
+    return {
+        claimPoints: 0,
+        couponsAvailable: 0,
+        couponsApplied: 0,
+        couponPointsDiscount: 0,
+        coupons: [],
+        featuresUsed: []
+    }
+}
+
+function addCoreFeature(stats: CoreRunStats, feature: string): void {
+    if (!stats.featuresUsed.includes(feature)) {
+        stats.featuresUsed.push(feature)
+    }
+}
+
 interface UserData {
     userName: string
     geoLocale: string
@@ -79,6 +123,8 @@ interface UserData {
     currentPoints: number
     gainedPoints: number
     dashboardInfo: DashboardInfo | null
+    coreStats: CoreRunStats
+    starBonus?: StarBonusInfo
 }
 
 export class MicrosoftRewardsBot {
@@ -109,6 +155,10 @@ export class MicrosoftRewardsBot {
     private activeWorkers: number
     private exitedWorkers: number[]
     private browserFactory: BrowserManager = new BrowserManager(this)
+
+    async closeAllBrowsers(): Promise<void> {
+        await this.browserFactory.closeAll()
+    }
     private accounts: Account[]
     private workers: TaskBase
     private login = new AuthManager(this)
@@ -124,7 +174,8 @@ export class MicrosoftRewardsBot {
             initialPoints: 0,
             currentPoints: 0,
             gainedPoints: 0,
-            dashboardInfo: null
+            dashboardInfo: null,
+            coreStats: createEmptyCoreRunStats()
         }
         this.logger = new LogService(this)
         this.accounts = []
@@ -183,6 +234,7 @@ export class MicrosoftRewardsBot {
         if (this.config.clusters > 1) {
             if (cluster.isPrimary) {
                 this.logRunStart(totalAccounts)
+                await this.sendAutoReportStart(totalAccounts)
                 return this.runMaster(enabledAccounts, runStartTime)
             } else {
                 this.runWorker(runStartTime)
@@ -190,7 +242,8 @@ export class MicrosoftRewardsBot {
             }
         } else {
             this.logRunStart(totalAccounts)
-                await this.runTasks(enabledAccounts, runStartTime)
+            await this.sendAutoReportStart(totalAccounts)
+            await this.runTasks(enabledAccounts, runStartTime)
             return 0
         }
     }
@@ -201,6 +254,11 @@ export class MicrosoftRewardsBot {
             'RUN-START',
             `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
         )
+    }
+
+    private async sendAutoReportStart(totalAccounts: number): Promise<void> {
+        if (!this.config.webhook.autoReport) return
+        await sendAutoReportRunStart(this.config.webhook.autoReport, totalAccounts)
     }
 
     private async warnIfTooManyAccounts(): Promise<void> {
@@ -362,6 +420,7 @@ export class MicrosoftRewardsBot {
                         message: `Processed ${allAccountStats.length} account(s), collected +${totalCollectedPoints} points in ${totalDurationMinutes}min.`,
                         level: 'info'
                     })
+                    await this.sendRunSummary(allAccountStats, runStartTime)
                     await flushAllWebhooks()
                     resolve(code ?? 0)
                 }
@@ -422,9 +481,9 @@ export class MicrosoftRewardsBot {
 
                 this.axios = new HttpClient(account.proxy)
 
-                const result: { initialPoints: number; collectedPoints: number } | undefined = await this.Main(
-                    account
-                ).catch(error => {
+                const result:
+                    | { initialPoints: number; collectedPoints: number; coreStats: CoreRunStats; starBonus?: StarBonusInfo }
+                    | undefined = await this.Main(account).catch(error => {
                     void this.logger.error(
                         true,
                         'FLOW',
@@ -446,7 +505,9 @@ export class MicrosoftRewardsBot {
                         finalPoints: accountFinalPoints,
                         collectedPoints: collectedPoints,
                         duration: parseFloat(durationSeconds),
-                        success: true
+                        success: true,
+                        coreStats: result.coreStats,
+                        starBonus: result.starBonus
                     })
 
                     this.logger.info(
@@ -464,6 +525,17 @@ export class MicrosoftRewardsBot {
                         duration: parseFloat(durationSeconds),
                         success: true
                     })
+
+                    if (this.config.webhook.autoReport) {
+                        await sendAutoReportAccountEnd(this.config.webhook.autoReport, {
+                            email: accountEmail,
+                            initialPoints: accountInitialPoints,
+                            finalPoints: accountFinalPoints,
+                            collectedPoints: collectedPoints,
+                            duration: parseFloat(durationSeconds),
+                            success: true
+                        })
+                    }
                 } else {
                     const failedResult = {
                         email: accountEmail,
@@ -478,6 +550,10 @@ export class MicrosoftRewardsBot {
                         ...failedResult
                     })
                     await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
+
+                    if (this.config.webhook.autoReport) {
+                        await sendAutoReportAccountEnd(this.config.webhook.autoReport, failedResult)
+                    }
                 }
             } catch (error) {
                 const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1)
@@ -500,6 +576,10 @@ export class MicrosoftRewardsBot {
                     ...failedResult
                 })
                 await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
+
+                if (this.config.webhook.autoReport) {
+                    await sendAutoReportAccountEnd(this.config.webhook.autoReport, failedResult)
+                }
             }
         }
 
@@ -522,15 +602,226 @@ export class MicrosoftRewardsBot {
                 level: 'info'
             })
 
+            await this.sendRunSummary(accountStats, runStartTime)
             await flushAllWebhooks()
         }
 
         return accountStats
     }
 
-    async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number }> {
+    private async sendRunSummary(accountStats: AccountStats[], runStartTime: number): Promise<void> {
+        const sends: Promise<void>[] = []
+
+        const summaryConfig = this.config.webhook.runSummary
+        if (summaryConfig?.enabled && !cluster.isWorker) {
+            const includeCoreComparison =
+                summaryConfig.includeCoreComparison ?? summaryConfig.includeCorePitch ?? true
+            const message = this.buildRunSummaryMessage(accountStats, runStartTime, includeCoreComparison)
+
+            if (summaryConfig.discordUrl) {
+                sends.push(
+                    sendDiscordEmbed(
+                        summaryConfig.discordUrl,
+                        this.buildRunSummaryEmbed(accountStats, runStartTime, includeCoreComparison)
+                    )
+                )
+            }
+            if (this.config.webhook.ntfy?.enabled && this.config.webhook.ntfy.url) {
+                sends.push(sendNtfy(this.config.webhook.ntfy, message, 'info'))
+            }
+        }
+
+        if (this.config.webhook.autoReport && !cluster.isWorker) {
+            sends.push(
+                sendAutoReportRunSummary(this.config.webhook.autoReport, accountStats, runStartTime)
+            )
+        }
+
+        await Promise.allSettled(sends)
+    }
+
+    private buildRunSummaryEmbed(
+        accountStats: AccountStats[],
+        runStartTime: number,
+        includeCoreComparison: boolean
+    ) {
+        const totalCollectedPoints = accountStats.reduce((sum, stats) => sum + stats.collectedPoints, 0)
+        const successfulAccounts = accountStats.filter(stats => stats.success).length
+        const failedAccounts = accountStats.length - successfulAccounts
+        const totalInitialPoints = accountStats.reduce((sum, stats) => sum + stats.initialPoints, 0)
+        const totalFinalPoints = accountStats.reduce((sum, stats) => sum + stats.finalPoints, 0)
+        const runtimeMinutes = ((Date.now() - runStartTime) / 1000 / 60).toFixed(1)
+        const coreStats = this.aggregateCoreStats(accountStats)
+        const hasCore = this.pluginManager.hasOfficialCoreEntitlement()
+        const accountFields = accountStats.slice(0, 20).map(stats => {
+            const accountCore = stats.coreStats
+            const coreLine =
+                accountCore && (accountCore.claimPoints || accountCore.couponsApplied)
+                    ? `\nCore: +${accountCore.claimPoints} claimed | ${accountCore.couponsApplied} coupon(s)`
+                    : ''
+            const sb = stats.starBonus
+            const starLine = sb
+                ? `\nSTAR Bonus: ${sb.monthlyProgress}/${sb.monthlyMax} pts${sb.levelBonusMax > 0 ? ` | Tier bonus: ${sb.levelBonusProgress}/${sb.levelBonusMax}` : ''}`
+                : ''
+            return {
+                name: `${stats.success ? 'Completed' : 'Failed'} - ${stats.email}`.slice(0, 256),
+                value: stats.success
+                    ? `**+${stats.collectedPoints} points**\n${stats.initialPoints} -> ${stats.finalPoints} | ${(stats.duration / 60).toFixed(1)} min${coreLine}${starLine}`
+                    : `**Run failed**\n${String(stats.error || 'Unknown error').slice(0, 500)}`,
+                inline: true
+            }
+        })
+
+        const fields = [
+            {
+                name: 'Run totals',
+                value: `**${successfulAccounts}/${accountStats.length} accounts completed**\n+${totalCollectedPoints} points | ${totalInitialPoints} -> ${totalFinalPoints}\nRuntime: ${runtimeMinutes} min`,
+                inline: false
+            },
+            ...accountFields
+        ]
+
+        if (includeCoreComparison) {
+            fields.push({
+                name: hasCore ? 'Core impact' : 'Core comparison',
+                value: hasCore
+                    ? `+${coreStats.claimPoints} dashboard points claimed\n${coreStats.couponsApplied}/${coreStats.couponsAvailable} coupons handled\n${coreStats.couponPointsDiscount} estimated coupon-discount points`
+                    : 'Core was inactive. Ready-to-claim dashboard points, coupon handling, app rewards, streak details, goals, punchcards, and remote control were not included.',
+                inline: false
+            })
+            if (hasCore && coreStats.coupons.length) {
+                fields.push({
+                    name: 'Coupons handled',
+                    value: this.formatCouponSummary(coreStats.coupons).slice(0, 1024),
+                    inline: false
+                })
+            }
+        }
+
+        const starAccounts = accountStats.filter(s => s.success && s.starBonus?.monthlyMax)
+        if (starAccounts.length > 0) {
+            const totalMonthly = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyProgress ?? 0), 0)
+            const totalMonthlyMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyMax ?? 0), 0)
+            const totalTierBonus = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusProgress ?? 0), 0)
+            const totalTierMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusMax ?? 0), 0)
+            const levelName = starAccounts[0]?.starBonus?.activeLevelName || ''
+            const tierLine = totalTierMax > 0 ? `\nTier bonus: ${totalTierBonus}/${totalTierMax} pts` : ''
+            fields.push({
+                name: `STAR Bonus${levelName ? ` (${levelName})` : ''}`,
+                value: `Monthly: ${totalMonthly}/${totalMonthlyMax} pts${tierLine}\nCredited at the start of next month for consistent Bing usage.`,
+                inline: false
+            })
+        }
+
+        if (accountStats.length > 20) {
+            fields.push({
+                name: 'Additional accounts',
+                value: `${accountStats.length - 20} more account(s) are included in the totals above.`,
+                inline: false
+            })
+        }
+
+        return {
+            title: failedAccounts ? 'Rewards run completed with warnings' : 'Rewards run complete',
+            description: failedAccounts
+                ? `${failedAccounts} account(s) require attention.`
+                : 'All configured accounts finished successfully.',
+            color: failedAccounts ? 0xf7c85c : 0x2fd27d,
+            fields,
+            footer: { text: 'Microsoft Rewards Bot - local run summary' },
+            timestamp: new Date().toISOString()
+        }
+    }
+
+    private buildRunSummaryMessage(
+        accountStats: AccountStats[],
+        runStartTime: number,
+        includeCoreComparison: boolean
+    ): string {
+        const totalAccounts = accountStats.length
+        const successfulAccounts = accountStats.filter(s => s.success).length
+        const failedAccounts = totalAccounts - successfulAccounts
+        const totalCollectedPoints = accountStats.reduce((sum, s) => sum + s.collectedPoints, 0)
+        const totalInitialPoints = accountStats.reduce((sum, s) => sum + s.initialPoints, 0)
+        const totalFinalPoints = accountStats.reduce((sum, s) => sum + s.finalPoints, 0)
+        const totalDurationMinutes = ((Date.now() - runStartTime) / 1000 / 60).toFixed(1)
+        const coreStats = this.aggregateCoreStats(accountStats)
+        const hasCore = this.pluginManager.hasOfficialCoreEntitlement()
+
+        const starAccounts = accountStats.filter(s => s.success && s.starBonus?.monthlyMax)
+        const lines = [
+            'Microsoft Rewards Bot run complete',
+            `Accounts: ${totalAccounts} | Success: ${successfulAccounts} | Failed: ${failedAccounts}`,
+            `Points collected: +${totalCollectedPoints}`,
+            `Balance: ${totalInitialPoints} -> ${totalFinalPoints}`,
+            `Runtime: ${totalDurationMinutes}min`
+        ]
+        if (starAccounts.length > 0) {
+            const totalMonthly = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyProgress ?? 0), 0)
+            const totalMonthlyMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.monthlyMax ?? 0), 0)
+            const totalTierBonus = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusProgress ?? 0), 0)
+            const totalTierMax = starAccounts.reduce((sum, s) => sum + (s.starBonus?.levelBonusMax ?? 0), 0)
+            const tierPart = totalTierMax > 0 ? ` | Tier bonus: ${totalTierBonus}/${totalTierMax}` : ''
+            lines.push(`STAR Bonus: ${totalMonthly}/${totalMonthlyMax} pts this month${tierPart}`)
+        }
+
+        if (includeCoreComparison) {
+            if (hasCore) {
+                lines.push(
+                    `Core impact: +${coreStats.claimPoints} claimed points | ${coreStats.couponsApplied}/${coreStats.couponsAvailable} coupon(s) handled | ${coreStats.couponPointsDiscount} estimated coupon-discount points`
+                )
+                if (coreStats.coupons.length) {
+                    lines.push(`Core coupons: ${this.formatCouponSummary(coreStats.coupons)}`)
+                }
+                lines.push(
+                    `Core features used: ${coreStats.featuresUsed.length ? coreStats.featuresUsed.join(', ') : 'none available this run'}`
+                )
+            } else {
+                lines.push(
+                    'Core inactive: premium dashboard scan unavailable, so ready-to-claim points and coupon savings were not handled.'
+                )
+                lines.push(
+                    'With Core, this summary can include claimed dashboard points, applied coupon names, coupon savings, app rewards, streak details, goals, punchcards, and remote dashboard control.'
+                )
+            }
+        }
+
+        return lines.join('\n')
+    }
+
+    private aggregateCoreStats(accountStats: AccountStats[]): CoreRunStats {
+        const aggregate = createEmptyCoreRunStats()
+        for (const account of accountStats) {
+            const stats = account.coreStats
+            if (!stats) continue
+            aggregate.claimPoints += stats.claimPoints
+            aggregate.couponsAvailable += stats.couponsAvailable
+            aggregate.couponsApplied += stats.couponsApplied
+            aggregate.couponPointsDiscount += stats.couponPointsDiscount
+            aggregate.coupons.push(...stats.coupons)
+            for (const feature of stats.featuresUsed) {
+                addCoreFeature(aggregate, feature)
+            }
+        }
+        return aggregate
+    }
+
+    private formatCouponSummary(coupons: AppliedCoupon[]): string {
+        const visibleCoupons = coupons.slice(0, 5).map(coupon => {
+            const title = coupon.title || 'coupon'
+            const discount = coupon.pointsDiscount !== null ? `${coupon.pointsDiscount} pts` : 'discount unknown'
+            const expires = coupon.expiresText ? `, ${coupon.expiresText}` : ''
+            return `${title} (${discount}${expires})`
+        })
+
+        const remaining = coupons.length - visibleCoupons.length
+        return remaining > 0 ? `${visibleCoupons.join('; ')}; +${remaining} more` : visibleCoupons.join('; ')
+    }
+
+    async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number; coreStats: CoreRunStats }> {
         const accountEmail = account.email
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`)
+        this.userData.coreStats = createEmptyCoreRunStats()
 
         let mobileSession: BrowserSession | null = null
         let mobileContextClosed = false
@@ -541,8 +832,8 @@ export class MicrosoftRewardsBot {
                 const initialContext: BrowserContext = mobileSession.context
                 this.mainMobilePage = await initialContext.newPage()
 
-                // Set a tablet-sized viewport for a comfortable visual while keeping mobile UA
-                await this.mainMobilePage.setViewportSize({ width: 768, height: 1024 })
+                // Keep a full desktop-sized visual surface even when the run uses mobile attribution.
+                await this.mainMobilePage.setViewportSize(DESKTOP_BROWSER_VIEWPORT)
 
                 this.logger.info('main', 'BROWSER', `Mobile Browser started | ${accountEmail}`)
 
@@ -574,8 +865,23 @@ export class MicrosoftRewardsBot {
                 this.cookies.mobile = await initialContext.cookies()
                 this.fingerprint = mobileSession.fingerprint
 
+                this.userData.starBonus = undefined
                 const data: DashboardData = await this.browser.func.getDashboardData()
                 const appData: AppDashboardData = await this.browser.func.getAppDashboardData()
+
+                // Capture STAR Bonus and monthly tier bonus from the new dashboard
+                const li = data.userStatus.levelInfo
+                if ((li.bingStarMonthlyBonusMaximum ?? 0) > 0 || (li.monthlyLevelBonusMaximum ?? 0) > 0) {
+                    this.userData.starBonus = {
+                        activeLevelName: li.activeLevelName ?? '',
+                        monthlyProgress: li.bingStarMonthlyBonusProgress ?? 0,
+                        monthlyMax: li.bingStarMonthlyBonusMaximum ?? 0,
+                        weeklyProgress: li.bingStarBonusWeeklyProgress ?? 0,
+                        weeklyState: li.bingStarBonusWeeklyState ?? '',
+                        levelBonusProgress: li.monthlyLevelBonusProgress ?? 0,
+                        levelBonusMax: li.monthlyLevelBonusMaximum ?? 0,
+                    }
+                }
 
                 // Set geo
                 this.userData.geoLocale =
@@ -605,10 +911,28 @@ export class MicrosoftRewardsBot {
                     } | App: ${appEarnable?.totalEarnablePoints ?? 0} | ${accountEmail} | locale: ${this.userData.geoLocale}`
                 )
 
+                if (this.config.workers.doApplyCoupons) {
+                    const couponResult = await this.activities.doApplyCoupons(this.mainMobilePage)
+                    this.userData.coreStats.couponsAvailable += couponResult.available
+                    this.userData.coreStats.couponsApplied += couponResult.applied
+                    this.userData.coreStats.couponPointsDiscount += couponResult.totalPointsDiscount
+                    this.userData.coreStats.coupons.push(...couponResult.coupons)
+                    if (couponResult.applied > 0) {
+                        addCoreFeature(this.userData.coreStats, 'Coupons')
+                        this.logger.info(
+                            'main',
+                            'COUPONS',
+                            `Applied ${couponResult.applied}/${couponResult.available} coupon(s) | Estimated discount: ${couponResult.totalPointsDiscount} points`
+                        )
+                    }
+                }
+
                 // Claim ready dashboard points before spending time on other activities.
                 if (this.config.workers.doClaimPoints) {
                     const claimResult = await this.activities.doClaimPoints(this.mainMobilePage)
                     if (claimResult.claimed) {
+                        this.userData.coreStats.claimPoints += claimResult.pointsClaimed
+                        addCoreFeature(this.userData.coreStats, 'Claimable point cards')
                         this.logger.info(
                             'main',
                             'CLAIM-POINTS',
@@ -628,7 +952,7 @@ export class MicrosoftRewardsBot {
                 if (this.config.workers.doSpecialPromotions) await this.workers.doSpecialPromotions(data)
                 if (this.config.workers.doMorePromotions) {
                     await this.workers.doMorePromotions(data, this.mainMobilePage)
-                    if (this.pluginManager.hasOfficialCoreEntitlement()) {
+                    if (this.pluginManager.hasOfficialCoreEntitlement() && this.config.core?.temporaryPunchcards !== false) {
                         await this.activities.doTemporaryPunchcards(this.mainMobilePage)
                     }
                 }
@@ -655,18 +979,39 @@ export class MicrosoftRewardsBot {
                     }
                 }
 
-                if (this.config.workers.enforceCoreStreakProtectionGate) {
-                    const desiredEnabled = this.pluginManager.hasOfficialCoreEntitlement()
-                    await this.activities.syncStreakProtection(this.mainMobilePage, desiredEnabled)
+                // Streak protection is managed exclusively by Core. The open-source
+                // edition never toggles the user's streak protection switch — when Core
+                // is entitled it enables/maintains protection through its own task (which
+                // also honours the Core `streakProtection` config flag). Without Core the
+                // switch is left untouched.
+                if (this.pluginManager.hasOfficialCoreEntitlement()) {
+                    await this.activities.syncStreakProtection(this.mainMobilePage, true)
                 }
 
-                // Redeem Goal: set auto-redeem goal if configured
-                if (this.config.workers.doRedeemGoal && this.config.redeemGoal?.enabled) {
-                    await this.activities.doRedeemGoal(this.mainMobilePage, this.config.redeemGoal)
+                // Set Rewards goal: auto-discover the first eligible gift card and set it
+                // as the active goal when no goal is currently active. Skipped automatically
+                // for 30 days after a run that finds no eligible card. Opt-in (false by default).
+                if (this.pluginManager.hasOfficialCoreEntitlement() && this.config.core?.setGoal === true) {
+                    await this.activities.doSetGoal(this.mainMobilePage)
                 }
 
                 const searchPoints = await this.browser.func.getSearchPoints()
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true)
+
+                // Microsoft's Next.js dashboard no longer exposes the search-point counters,
+                // so missingSearchPoints reports 0 and the search manager would skip every
+                // search. When the counters are absent, schedule searches with an estimated
+                // target — the search task measures real gains from the balance and stops at
+                // Microsoft's daily cap, so the estimate only needs to be positive.
+                if (!this.browser.func.hasSearchCounters(searchPoints)) {
+                    missingSearchPoints.mobilePoints = missingSearchPoints.mobilePoints || 90
+                    missingSearchPoints.desktopPoints = missingSearchPoints.desktopPoints || 90
+                    this.logger.warn(
+                        'main',
+                        'POINTS',
+                        'Search counters unavailable — scheduling searches with estimated targets (real gains measured by balance)'
+                    )
+                }
 
                 this.cookies.mobile = await initialContext.cookies()
 
@@ -693,7 +1038,9 @@ export class MicrosoftRewardsBot {
 
                 return {
                     initialPoints,
-                    collectedPoints: collectedPoints || 0
+                    collectedPoints: collectedPoints || 0,
+                    coreStats: this.userData.coreStats,
+                    starBonus: this.userData.starBonus
                 }
             })
         } finally {
@@ -746,6 +1093,10 @@ async function main(): Promise<void> {
     }
 
     const rewardsBot = new MicrosoftRewardsBot()
+    rewardsBot.agentRuntime.setRunHandler(() => runSingle(rewardsBot))
+    rewardsBot.agentRuntime.setStopHandler(() => {
+        rewardsBot.dashboardStopRequested = true
+    })
 
     process.on('beforeExit', () => {
         void rewardsBot.agentRuntime.stop()
@@ -754,6 +1105,7 @@ async function main(): Promise<void> {
     })
     process.on('SIGINT', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGINT received, flushing and exiting...')
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
@@ -761,6 +1113,7 @@ async function main(): Promise<void> {
     })
     process.on('SIGTERM', async () => {
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGTERM received, flushing and exiting...')
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
@@ -768,12 +1121,14 @@ async function main(): Promise<void> {
     })
     process.on('uncaughtException', async error => {
         rewardsBot.logger.error('main', 'UNCAUGHT-EXCEPTION', error)
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
         process.exit(1)
     })
     process.on('unhandledRejection', async reason => {
         rewardsBot.logger.error('main', 'UNHANDLED-REJECTION', reason as Error)
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
         process.exit(1)
@@ -796,12 +1151,14 @@ async function main(): Promise<void> {
             : await runSingle(rewardsBot)
 
         await rewardsBot.agentRuntime.stop()
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.pluginManager.destroyAll()
         await flushAllWebhooks()
         process.exit(exitCode)
     } catch (error) {
         rewardsBot.dashboardRunState = 'error'
         rewardsBot.logger.error('main', 'MAIN-ERROR', error as Error)
+        await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
     }

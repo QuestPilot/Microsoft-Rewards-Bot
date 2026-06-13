@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Plugin System Overview
 
 Navigation: [Documentation index](./README.md) -> [Create a plugin](./create-plugin.md) -> [Plugin API reference](./plugin-api.md) -> [Official Core plugin](./core-plugin.md)
@@ -32,8 +38,10 @@ The source-available public release can ship optional free plugins beside Core. 
 | Plugin | Default | Purpose |
 | --- | --- | --- |
 | `run-summary` | Disabled | Writes local account result summaries to `diagnostics/run-summary/` after each account finishes. |
+| `run-health` | Disabled | Tracks repeated failures, zero-point completions, and account duration using masked local history. |
+| `session-health` | Disabled | Reports missing, empty, or stale directories under the official `sessions/` path without reading cookies. |
 
-Enable one in `plugins/plugins.jsonc` or through the local Plugin Desk.
+Enable one in `plugins/plugins.jsonc` or from the **Plugins** page in Rewards Desk.
 
 ### Example Activation
 
@@ -50,17 +58,18 @@ Enable one in `plugins/plugins.jsonc` or through the local Plugin Desk.
 }
 ```
 
-The plugin writes local diagnostics only. It does not send account data to a remote service.
+These plugins write or inspect local diagnostics only. They do not send account data to a remote service.
 
 ## Managing Plugins
 
-Run:
+Open **Rewards Desk** (it launches automatically on `npm start`) and go to the **Plugins** page. There you can:
 
-```bash
-npm run plugins
-```
+- see every plugin listed in `plugins/plugins.jsonc`
+- toggle each plugin on or off (the change is written straight back to `plugins.jsonc`)
+- spot the official Core plugin and whether your license unlocks it
+- jump to the guide for building your own plugin
 
-The local Plugin Desk edits `plugins/plugins.jsonc`, verifies checksums against `plugins/catalog.json`, and shows the Core manifest status.
+You can also edit `plugins/plugins.jsonc` by hand if you prefer. The bot still verifies the Core bytecode checksum against `plugins/official-core.json` and any catalog checksums in `plugins/catalog.json` at startup.
 
 ## How to Learn More
 

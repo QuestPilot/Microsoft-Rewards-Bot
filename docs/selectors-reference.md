@@ -4,6 +4,30 @@
 > Framework: **Next.js** + **React Aria** + **Tailwind CSS**  
 > Base URL: `https://rewards.bing.com/`
 
+> ### ⚠️ 2026-06 update — design-system overhaul
+> Microsoft **renamed its entire Tailwind token set**. Class examples throughout this
+> document (e.g. `bg-neutralBg1`, `rounded-2xl`, `text-body1Strong`, `text-title1`,
+> `text-statusSuccessFg1`) are **stale** and must not be used as selectors. Verified
+> renames:
+>
+> | Old token | New token |
+> | --- | --- |
+> | `bg-neutralBg1` | `bg-bgCardOnPrimaryDefaultRest` |
+> | `rounded-2xl` | `rounded-cornerCardDefault` |
+> | `rounded-full` (badges) | `rounded-cornerCircular` |
+> | `text-statusSuccessFg1` | `text-statusSuccessTintFg` |
+> | `bg-statusSuccessBg3` | `bg-statusSuccessRewardsBg` |
+>
+> **Rule:** build selectors from **structure** — section ids, `role`, `aria-*`, `slot`,
+> `data-rac`, `data-react-aria-pressable`, React-Aria classes — plus locale-independent
+> image `src` fragments. **Never** key off visible/localized text. Treat design tokens as
+> the last, most fragile resort. Other confirmed changes: the active nav link no longer
+> carries `aria-current="page"` (use `a[data-selected="true"]`); the Earn "Explore on Bing"
+> section id `#exploreonbing` is gone — tasks now live under `#moreactivities` (and
+> `#quests` for punchcards). Current Earn section ids: `#streaks #levelup #quests
+> #moreactivities #microsoft`. The canonical, maintained selector set is
+> `Core-Source/src/PremiumSelectors.ts`.
+
 ---
 
 ## Table of Contents

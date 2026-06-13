@@ -5,11 +5,29 @@ const path = require('path')
 const ROOT = path.resolve(__dirname, '..')
 const CORE_DIR = path.join(ROOT, 'plugins', 'core')
 const OFFICIAL_CORE_PATH = path.join(ROOT, 'plugins', 'official-core.json')
+const OFFICIAL_CORE_SIGNATURE_PATH = path.join(ROOT, 'plugins', 'official-core.sig')
+const CORE_PUBLIC_KEY_PATH = path.join(ROOT, 'scripts', 'security', 'core-public-key.pem')
 const CATALOG_PATH = path.join(ROOT, 'plugins', 'catalog.json')
+const CORE_API_POLICY_PATH = path.resolve(ROOT, '..', 'Core-API', 'config', 'core-version-policy.json')
 
 const FORBIDDEN_EXTENSIONS = new Set(['.ts', '.tsx', '.map', '.env', '.pem', '.key'])
 const FORBIDDEN_NAMES = new Set(['.env', '.env.local', '.env.production'])
 const ALLOWED_JS_FILES = new Set(['index.js'])
+const ALLOWED_TOP_LEVEL_CORE_FILES = new Set(['index.js', 'package.json', 'package-lock.json', 'LICENSE'])
+const FORBIDDEN_BYTECODE_MARKERS = [
+    '__MSRB_RELEASE_DASHBOARD_CLIENT_SECRET__',
+    'MSRB_RELEASE_DASHBOARD_CLIENT_SECRET',
+    'CORE_DASHBOARD_CLIENT_SECRET',
+    '.env.dashboard.local'
+]
+const REQUIRED_TARGETS = new Set([
+    'win32-x64-node-24.15.0',
+    'linux-x64-node-24.15.0',
+    'linux-arm64-node-24.15.0',
+    'darwin-x64-node-24.15.0'
+])
+const DARWIN_COMPAT_TARGET = 'darwin-x64-node-24.15.0'
+const DARWIN_COMPAT_SOURCE = 'linux-x64-node-24.15.0'
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -17,6 +35,15 @@ function readJson(filePath) {
 
 function sha256(filePath) {
     return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+}
+
+function assertNoForbiddenBytecodeMarkers(filePath, label) {
+    const artifact = fs.readFileSync(filePath)
+    for (const marker of FORBIDDEN_BYTECODE_MARKERS) {
+        if (artifact.includes(Buffer.from(marker))) {
+            fail(`${label} contains forbidden release marker ${marker}`)
+        }
+    }
 }
 
 function walk(dir, base = dir) {
@@ -43,27 +70,95 @@ function fail(message) {
     process.exitCode = 1
 }
 
+function assertSameVersion(label, actual, expected) {
+    if (actual !== expected) {
+        fail(`${label} version ${actual || '(missing)'} does not match Core package version ${expected}`)
+    }
+}
+
+function assertTargetSet(label, targets) {
+    const ids = new Set(Object.keys(targets || {}))
+    for (const required of REQUIRED_TARGETS) {
+        if (!ids.has(required)) {
+            fail(`${label} is missing required Core bytecode target ${required}`)
+        }
+    }
+    for (const id of ids) {
+        if (!REQUIRED_TARGETS.has(id)) {
+            fail(`${label} contains unsupported Core bytecode target ${id}`)
+        }
+    }
+}
+
+function assertTargetMetadata(targetId, target, sourceLabel) {
+    const match = targetId.match(/^(win32|linux|darwin)-(x64|arm64)-node-(\d+\.\d+\.\d+)$/)
+    if (!match) {
+        fail(`${sourceLabel} target id ${targetId} is not in platform-arch-node-version format`)
+        return
+    }
+
+    const [, platform, arch, node] = match
+    if (target.bytecodeTarget?.platform !== platform || target.bytecodeTarget?.arch !== arch || target.bytecodeTarget?.node !== node) {
+        fail(`${sourceLabel} ${targetId} bytecodeTarget metadata does not match its target id`)
+    }
+}
+
 function main() {
     if (!fs.existsSync(CORE_DIR)) {
         fail('plugins/core is missing')
         return
     }
 
+    const corePackage = readJson(path.join(CORE_DIR, 'package.json'))
+    const enforceSingleEntryBytecode = corePackage.msrb?.releaseShape === 'single-entry-bytecode'
     const files = walk(CORE_DIR)
     for (const file of files) {
+        const parts = file.relativePath.split('/')
         if (FORBIDDEN_NAMES.has(file.name.toLowerCase()) || FORBIDDEN_EXTENSIONS.has(file.extension)) {
             fail(`Forbidden Core artifact file: plugins/core/${file.relativePath}`)
         }
         if (file.extension === '.js' && !ALLOWED_JS_FILES.has(file.relativePath)) {
             fail(`Forbidden Core JavaScript source file: plugins/core/${file.relativePath}`)
         }
+        if (enforceSingleEntryBytecode) {
+            if (parts[0] === 'targets') {
+                if (parts.length !== 3 || parts[2] !== 'index.jsc' || !REQUIRED_TARGETS.has(parts[1])) {
+                    fail(`Forbidden Core target artifact shape: plugins/core/${file.relativePath}`)
+                }
+            } else if (file.extension === '.jsc') {
+                fail(`Forbidden legacy Core bytecode location: plugins/core/${file.relativePath}`)
+            } else if (parts.length !== 1 || !ALLOWED_TOP_LEVEL_CORE_FILES.has(parts[0])) {
+                fail(`Forbidden Core artifact file: plugins/core/${file.relativePath}`)
+            }
+        }
     }
 
-    const officialCore = readJson(OFFICIAL_CORE_PATH)
-    const corePackage = readJson(path.join(CORE_DIR, 'package.json'))
+    const manifestPayload = fs.readFileSync(OFFICIAL_CORE_PATH)
+    const signature = Buffer.from(fs.readFileSync(OFFICIAL_CORE_SIGNATURE_PATH, 'utf8').trim(), 'base64')
+    const publicKey = crypto.createPublicKey(fs.readFileSync(CORE_PUBLIC_KEY_PATH, 'utf8'))
+    if (signature.length !== 64 || publicKey.asymmetricKeyType !== 'ed25519' || !crypto.verify(null, manifestPayload, publicKey, signature)) {
+        fail('plugins/official-core.json signature verification failed')
+    }
+    const officialCore = JSON.parse(manifestPayload.toString('utf8'))
     const catalog = readJson(CATALOG_PATH)
     const catalogCore = Array.isArray(catalog.plugins) ? catalog.plugins.find(plugin => plugin.name === 'core') : null
     const targets = officialCore.targets || corePackage.msrb?.targets || null
+    const coreVersion = corePackage.version
+
+    assertSameVersion('plugins/official-core.json', officialCore.version, coreVersion)
+    assertSameVersion('plugins/catalog.json core', catalogCore?.version, coreVersion)
+
+    if (fs.existsSync(CORE_API_POLICY_PATH)) {
+        const policy = readJson(CORE_API_POLICY_PATH)
+        if (policy.required_core_version !== coreVersion) {
+            fail(`Core-API required_core_version ${policy.required_core_version || '(missing)'} does not match Core package version ${coreVersion}`)
+        }
+        if (policy.minimum_core_version !== coreVersion) {
+            fail(`Core-API minimum_core_version ${policy.minimum_core_version || '(missing)'} does not match Core package version ${coreVersion}`)
+        }
+    } else {
+        console.warn('[CORE-RELEASE-CHECK] Core-API policy file not found beside this repository; skipping server version policy check.')
+    }
 
     if (targets && typeof targets === 'object') {
         if (!catalogCore?.targets || typeof catalogCore.targets !== 'object') {
@@ -71,12 +166,19 @@ function main() {
         }
         const packageTargets = corePackage.msrb?.targets || {}
         const catalogTargets = catalogCore?.targets || {}
+        assertTargetSet('plugins/official-core.json', officialCore.targets)
+        assertTargetSet('plugins/core/package.json', packageTargets)
+        assertTargetSet('plugins/catalog.json', catalogTargets)
         for (const [targetId, target] of Object.entries(targets)) {
             const indexJsc = path.join(CORE_DIR, 'targets', targetId, 'index.jsc')
             if (!fs.existsSync(indexJsc)) {
                 fail(`plugins/core/targets/${targetId}/index.jsc is missing`)
                 continue
             }
+            assertTargetMetadata(targetId, target, 'plugins/official-core.json')
+            assertTargetMetadata(targetId, packageTargets[targetId] || {}, 'plugins/core/package.json')
+            assertTargetMetadata(targetId, catalogTargets[targetId] || {}, 'plugins/catalog.json')
+            assertNoForbiddenBytecodeMarkers(indexJsc, `plugins/core/targets/${targetId}/index.jsc`)
             const actualHash = sha256(indexJsc)
             if (target.indexSha256 !== actualHash) {
                 fail(`plugins/official-core.json ${targetId} indexSha256 does not match the target bytecode`)
@@ -91,6 +193,20 @@ function main() {
                 fail(`plugins/official-core.json ${targetId} bytecodeTarget metadata is incomplete`)
             }
         }
+        const darwinTarget = targets[DARWIN_COMPAT_TARGET]
+        const linuxSource = targets[DARWIN_COMPAT_SOURCE]
+        if (darwinTarget?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
+            fail(`plugins/official-core.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
+        }
+        if (packageTargets[DARWIN_COMPAT_TARGET]?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
+            fail(`plugins/core/package.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
+        }
+        if (catalogTargets[DARWIN_COMPAT_TARGET]?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
+            fail(`plugins/catalog.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
+        }
+        if (darwinTarget?.indexSha256 !== linuxSource?.indexSha256) {
+            fail(`macOS compatibility target must remain byte-for-byte identical to ${DARWIN_COMPAT_SOURCE}`)
+        }
         const targetList = Object.keys(targets).join(', ')
         console.log(`[CORE-RELEASE-CHECK] Core bytecode targets: ${targetList}`)
     } else {
@@ -100,6 +216,7 @@ function main() {
             return
         }
 
+        assertNoForbiddenBytecodeMarkers(indexJsc, 'plugins/core/index.jsc')
         const actualHash = sha256(indexJsc)
         if (officialCore.indexSha256 !== actualHash) {
             fail('plugins/official-core.json indexSha256 does not match plugins/core/index.jsc')

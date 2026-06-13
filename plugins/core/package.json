@@ -1,6 +1,6 @@
 {
     "name":  "microsoft-rewards-bot-core",
-    "version":  "1.0.5",
+    "version":  "2.0.0",
     "description":  "Official Core plugin for Microsoft Rewards Bot",
     "author":  "LightZirconite",
     "license":  "SEE LICENSE IN LICENSE",
@@ -11,9 +11,10 @@
                 },
     "msrb":  {
                  "officialPlugin":  "core",
+                 "releaseShape":  "single-entry-bytecode",
                  "targets":  {
                                  "win32-x64-node-24.15.0":  {
-                                                                "indexSha256":  "6b1d6bc69cb159d70fcd5c00c0192df98263e2c8445e412f7ddd2c763823e1ff",
+                                                                "indexSha256":  "dbd371f2fbbee0df45496f78ed07de4ddc65dae1bac0be0a41cd2f65712d7544",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "win32",
@@ -21,7 +22,7 @@
                                                                                    }
                                                             },
                                  "linux-x64-node-24.15.0":  {
-                                                                "indexSha256":  "0fc2b913d2b356c004a508d4cce142051b54e7f0c8f3d591d924fa529d53366d",
+                                                                "indexSha256":  "dc2e28a0ee269281ceb3c45b091814c7603d4297f392535a0752b1e31bb51d17",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "linux",
@@ -29,13 +30,22 @@
                                                                                    }
                                                             },
                                  "linux-arm64-node-24.15.0":  {
-                                                                  "indexSha256":  "a3a42ed786163e2544ad66aa3d8f67fead691cd501de2afc1ddeceaa980f0809",
+                                                                  "indexSha256":  "fc0a6aba680a762cb7423b99531df01cc020963908b1a61a65ef0c2d18a20736",
                                                                   "bytecodeTarget":  {
                                                                                          "node":  "24.15.0",
                                                                                          "platform":  "linux",
                                                                                          "arch":  "arm64"
                                                                                      }
-                                                              }
+                                                              },
+                                 "darwin-x64-node-24.15.0":  {
+                                                                 "indexSha256":  "dc2e28a0ee269281ceb3c45b091814c7603d4297f392535a0752b1e31bb51d17",
+                                                                 "bytecodeTarget":  {
+                                                                                        "node":  "24.15.0",
+                                                                                        "platform":  "darwin",
+                                                                                        "arch":  "x64"
+                                                                                    },
+                                                                 "compatibleArtifactSource":  "linux-x64-node-24.15.0"
+                                                             }
                              }
              },
     "dependencies":  {
