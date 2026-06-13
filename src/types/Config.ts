@@ -119,6 +119,16 @@ export interface ConfigWebhook {
     ntfy?: WebhookNtfyConfig
     webhookLogFilter: LogFilter
     runSummary?: WebhookRunSummaryConfig
+    autoReport?: AutoReportConfig
+}
+
+export interface AutoReportConfig {
+    enabled: boolean
+    discordUrl: string
+    reportRunStart?: boolean
+    reportAccountEnd?: boolean
+    reportRunSummary?: boolean
+    maskEmails?: boolean
 }
 
 export interface WebhookRunSummaryConfig {

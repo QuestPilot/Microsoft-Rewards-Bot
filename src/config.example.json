@@ -72,6 +72,14 @@
             "enabled": false,
             "discordUrl": "",
             "includeCoreComparison": true
+        },
+        "autoReport": {
+            "enabled": false,
+            "discordUrl": "",
+            "reportRunStart": true,
+            "reportAccountEnd": true,
+            "reportRunSummary": true,
+            "maskEmails": true
         }
     },
     "core": {

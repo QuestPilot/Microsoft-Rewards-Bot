@@ -42,6 +42,11 @@ import {
 } from './helpers/AccountSafetyWarning'
 import HttpClient from './helpers/HttpClient'
 import { flushDiscordQueue, sendDiscord, sendDiscordEmbed } from './notifications/DiscordWebhook'
+import {
+    sendAutoReportRunStart,
+    sendAutoReportAccountEnd,
+    sendAutoReportRunSummary
+} from './notifications/AutoReport'
 import { flushNtfyQueue, sendNtfy } from './notifications/NtfyWebhook'
 import type { Account } from './types/Account'
 import type { AppDashboardData } from './types/AppDashboardData'
@@ -229,6 +234,7 @@ export class MicrosoftRewardsBot {
         if (this.config.clusters > 1) {
             if (cluster.isPrimary) {
                 this.logRunStart(totalAccounts)
+                await this.sendAutoReportStart(totalAccounts)
                 return this.runMaster(enabledAccounts, runStartTime)
             } else {
                 this.runWorker(runStartTime)
@@ -236,6 +242,7 @@ export class MicrosoftRewardsBot {
             }
         } else {
             this.logRunStart(totalAccounts)
+            await this.sendAutoReportStart(totalAccounts)
             await this.runTasks(enabledAccounts, runStartTime)
             return 0
         }
@@ -247,6 +254,11 @@ export class MicrosoftRewardsBot {
             'RUN-START',
             `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
         )
+    }
+
+    private async sendAutoReportStart(totalAccounts: number): Promise<void> {
+        if (!this.config.webhook.autoReport) return
+        await sendAutoReportRunStart(this.config.webhook.autoReport, totalAccounts)
     }
 
     private async warnIfTooManyAccounts(): Promise<void> {
@@ -513,6 +525,17 @@ export class MicrosoftRewardsBot {
                         duration: parseFloat(durationSeconds),
                         success: true
                     })
+
+                    if (this.config.webhook.autoReport) {
+                        await sendAutoReportAccountEnd(this.config.webhook.autoReport, {
+                            email: accountEmail,
+                            initialPoints: accountInitialPoints,
+                            finalPoints: accountFinalPoints,
+                            collectedPoints: collectedPoints,
+                            duration: parseFloat(durationSeconds),
+                            success: true
+                        })
+                    }
                 } else {
                     const failedResult = {
                         email: accountEmail,
@@ -527,6 +550,10 @@ export class MicrosoftRewardsBot {
                         ...failedResult
                     })
                     await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
+
+                    if (this.config.webhook.autoReport) {
+                        await sendAutoReportAccountEnd(this.config.webhook.autoReport, failedResult)
+                    }
                 }
             } catch (error) {
                 const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1)
@@ -549,6 +576,10 @@ export class MicrosoftRewardsBot {
                     ...failedResult
                 })
                 await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
+
+                if (this.config.webhook.autoReport) {
+                    await sendAutoReportAccountEnd(this.config.webhook.autoReport, failedResult)
+                }
             }
         }
 
@@ -579,24 +610,31 @@ export class MicrosoftRewardsBot {
     }
 
     private async sendRunSummary(accountStats: AccountStats[], runStartTime: number): Promise<void> {
-        const summaryConfig = this.config.webhook.runSummary
-        if (!summaryConfig?.enabled || cluster.isWorker) return
-
-        const includeCoreComparison =
-            summaryConfig.includeCoreComparison ?? summaryConfig.includeCorePitch ?? true
-        const message = this.buildRunSummaryMessage(accountStats, runStartTime, includeCoreComparison)
-
         const sends: Promise<void>[] = []
-        if (summaryConfig.discordUrl) {
-            sends.push(
-                sendDiscordEmbed(
-                    summaryConfig.discordUrl,
-                    this.buildRunSummaryEmbed(accountStats, runStartTime, includeCoreComparison)
+
+        const summaryConfig = this.config.webhook.runSummary
+        if (summaryConfig?.enabled && !cluster.isWorker) {
+            const includeCoreComparison =
+                summaryConfig.includeCoreComparison ?? summaryConfig.includeCorePitch ?? true
+            const message = this.buildRunSummaryMessage(accountStats, runStartTime, includeCoreComparison)
+
+            if (summaryConfig.discordUrl) {
+                sends.push(
+                    sendDiscordEmbed(
+                        summaryConfig.discordUrl,
+                        this.buildRunSummaryEmbed(accountStats, runStartTime, includeCoreComparison)
+                    )
                 )
-            )
+            }
+            if (this.config.webhook.ntfy?.enabled && this.config.webhook.ntfy.url) {
+                sends.push(sendNtfy(this.config.webhook.ntfy, message, 'info'))
+            }
         }
-        if (this.config.webhook.ntfy?.enabled && this.config.webhook.ntfy.url) {
-            sends.push(sendNtfy(this.config.webhook.ntfy, message, 'info'))
+
+        if (this.config.webhook.autoReport && !cluster.isWorker) {
+            sends.push(
+                sendAutoReportRunSummary(this.config.webhook.autoReport, accountStats, runStartTime)
+            )
         }
 
         await Promise.allSettled(sends)
