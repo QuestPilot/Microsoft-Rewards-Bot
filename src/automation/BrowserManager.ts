@@ -23,12 +23,9 @@ interface BrowserCreationResult {
     fingerprint: BrowserFingerprintWithHeaders
 }
 
-type BrowserChannel = 'chrome' | 'msedge'
-
 class BrowserManager {
     private readonly bot: MicrosoftRewardsBot
-    private detectedBrowserChannel?: Promise<BrowserCandidate>
-    private static readonly DETECTION_CLOSE_TIMEOUT_MS = 5_000
+    private static readonly BROWSER_CLOSE_TIMEOUT_MS = 10_000
     private readonly activeBrowsers = new Set<rebrowser.Browser>()
     private static readonly BROWSER_ARGS = [
         '--no-sandbox',
@@ -66,40 +63,6 @@ class BrowserManager {
         this.bot = bot
     }
 
-    /**
-     * Attempts to find the best Chromium-based browser.
-     * Preference: Patchright bundled Chromium > Google Chrome > Microsoft Edge.
-     * Edge can block account.live.com on some Windows installations.
-     */
-    private async detectBrowserChannel(): Promise<BrowserCandidate> {
-        if (this.detectedBrowserChannel) {
-            return this.detectedBrowserChannel
-        }
-
-        this.detectedBrowserChannel = this.detectBrowserChannelOnce().catch(error => {
-            this.detectedBrowserChannel = undefined
-            throw error
-        })
-
-        return this.detectedBrowserChannel
-    }
-
-    private async detectBrowserChannelOnce(): Promise<BrowserCandidate> {
-        for (const channel of [undefined, 'chrome', 'msedge'] as const) {
-            let testBrowser: rebrowser.Browser | undefined
-            try {
-                testBrowser = await rebrowser.chromium.launch({
-                    headless: true,
-                    ...(channel && { channel })
-                })
-                return channel
-            } catch {
-                // Channel not available, try next
-            } finally {
-                if (testBrowser?.isConnected()) {
-                    await this.closeDetectionBrowser(testBrowser).catch(() => {})
-                }
-            }
     private async assertBundledChromiumAvailable(): Promise<void> {
         try {
             const testBrowser = await rebrowser.chromium.launch({ headless: true })
@@ -111,7 +74,7 @@ class BrowserManager {
         }
     }
 
-    private async closeDetectionBrowser(browser: rebrowser.Browser): Promise<void> {
+    private async closeBrowserWithTimeout(browser: rebrowser.Browser): Promise<void> {
         let timeout: NodeJS.Timeout | undefined
         try {
             await Promise.race([
@@ -121,10 +84,10 @@ class BrowserManager {
                         () =>
                             reject(
                                 new Error(
-                                    `Browser detection close timed out after ${BrowserManager.DETECTION_CLOSE_TIMEOUT_MS}ms`
+                                    `Browser close timed out after ${BrowserManager.BROWSER_CLOSE_TIMEOUT_MS}ms`
                                 )
                             ),
-                        BrowserManager.DETECTION_CLOSE_TIMEOUT_MS
+                        BrowserManager.BROWSER_CLOSE_TIMEOUT_MS
                     )
                 })
             ])
@@ -135,12 +98,11 @@ class BrowserManager {
 
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
         let browser: rebrowser.Browser
-        let channel: BrowserChannel | undefined
         try {
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BROWSER',
-                'Initializing browser — detecting available channel (Chromium › Chrome › Edge)...'
+                'Initializing browser — verifying Patchright bundled Chromium...'
             )
 
             const proxyConfig = account.proxy.url
@@ -182,8 +144,7 @@ class BrowserManager {
             )
 
             const fingerprint =
-                sessionData.fingerprint ??
-                (await this.generateFingerprint(this.bot.isMobile, channel === 'msedge' ? 'edge' : 'chrome'))
+                sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile, 'chrome'))
 
             const context = await newInjectedContext(browser as any, {
                 fingerprint,
@@ -192,9 +153,11 @@ class BrowserManager {
                     screen: DESKTOP_BROWSER_VIEWPORT
                 }
             })
-            context.once('close', () => {
+            context.once('close', async () => {
                 this.activeBrowsers.delete(browser)
-                void browser.close().catch(() => {})
+                if (browser.isConnected()) {
+                    await this.closeBrowserWithTimeout(browser).catch(() => {})
+                }
             })
 
             await context.addInitScript(() => {
@@ -263,7 +226,7 @@ class BrowserManager {
             return { context: context as unknown as BrowserContext, fingerprint }
         } catch (error) {
             this.activeBrowsers.delete(browser)
-            await browser.close().catch(() => {})
+            await this.closeBrowserWithTimeout(browser).catch(() => {})
             throw error
         }
     }
@@ -271,7 +234,7 @@ class BrowserManager {
     async closeAll(): Promise<void> {
         const browsers = [...this.activeBrowsers]
         this.activeBrowsers.clear()
-        await Promise.allSettled(browsers.map(browser => browser.close()))
+        await Promise.allSettled(browsers.map(browser => this.closeBrowserWithTimeout(browser)))
     }
 
     private formatProxyServer(proxy: AccountProxy): string {

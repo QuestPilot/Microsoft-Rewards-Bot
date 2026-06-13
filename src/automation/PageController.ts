@@ -1,5 +1,5 @@
 import type { AxiosRequestConfig } from 'axios'
-import type { Browser, BrowserContext, Cookie, Page } from 'patchright'
+import type { BrowserContext, Cookie, Page } from 'patchright'
 
 import type { StorageOrigin } from '../helpers/ConfigLoader'
 import { saveSessionData, saveStorageState } from '../helpers/ConfigLoader'
@@ -798,10 +798,7 @@ export default class PageController {
     }
 
     async closeBrowser(context: BrowserContext, email: string) {
-        let parentBrowser: Browser | null = null
-
         try {
-            parentBrowser = context.browser()
             const cookies = await context.cookies()
 
             // Save cookies
@@ -865,19 +862,9 @@ export default class PageController {
             await this.bot.utils.wait(2000)
 
             await this.closeWithTimeout(() => context.close(), 'context')
-            const browserToClose = parentBrowser
-            if (browserToClose?.isConnected()) {
-                await this.closeWithTimeout(() => browserToClose.close(), 'browser')
-            }
             this.bot.logger.info(this.bot.isMobile, 'CLOSE-BROWSER', 'Browser closed cleanly!')
         } catch (error) {
-            const browserToClose = parentBrowser
-            await Promise.allSettled([
-                this.closeWithTimeout(() => context.close(), 'context').catch(() => {}),
-                browserToClose?.isConnected()
-                    ? this.closeWithTimeout(() => browserToClose.close(), 'browser').catch(() => {})
-                    : Promise.resolve()
-            ])
+            await this.closeWithTimeout(() => context.close(), 'context').catch(() => {})
             this.bot.logger.error(
                 this.bot.isMobile,
                 'CLOSE-BROWSER',
