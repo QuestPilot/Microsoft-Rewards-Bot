@@ -76,6 +76,7 @@
         "autoReport": {
             "enabled": false,
             "discordUrl": "",
+            "channelId": "",
             "reportRunStart": true,
             "reportAccountEnd": true,
             "reportRunSummary": true,

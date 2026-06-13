@@ -15,6 +15,8 @@ if (!privateKey) {
     throw new Error('MSRB_CORE_PRIVATE_KEY or MSRB_CORE_PRIVATE_KEY_PATH is required')
 }
 
-const signature = signBytes(fs.readFileSync(manifestPath), privateKey)
+const manifestPayload = fs.readFileSync(manifestPath, 'utf8').replace(/\r\n?/g, '\n')
+fs.writeFileSync(manifestPath, manifestPayload, 'utf8')
+const signature = signBytes(Buffer.from(manifestPayload, 'utf8'), privateKey)
 fs.writeFileSync(outputPath, `${signature}\n`)
 console.log(`[CORE-SIGN] Signed ${manifestPath}`)

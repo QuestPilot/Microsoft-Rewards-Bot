@@ -57,6 +57,8 @@ Allowed Core artifact types:
 
 The detached `plugins/official-core.sig` signature and the pinned public verification key
 under `scripts/security/` are also required public release files.
+`plugins/official-core.json` and `plugins/official-core.sig` must remain LF-normalized so
+Git checkouts and GitHub archives verify the same exact manifest bytes on every platform.
 
 ## Release Gate
 

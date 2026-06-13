@@ -67,8 +67,7 @@ export function loadAccounts(): Account[] {
             const storage = createAccountStorage({ root: projectRoot })
             if (fs.existsSync(storage.encryptedPath) || fs.existsSync(path.join(projectRoot, 'src', 'accounts.json'))) {
                 const accountsData = storage.readAccounts()
-                validateAccounts(accountsData)
-                return accountsData
+                return validateAccounts(accountsData)
             }
         }
 
@@ -79,9 +78,7 @@ export function loadAccounts(): Account[] {
         const accountDir = resolveFirstExistingFile(accountCandidates, 'accounts file')
         const accountsData = readJsonFile<Account[]>(accountDir, 'accounts file')
 
-        validateAccounts(accountsData)
-
-        return accountsData
+        return validateAccounts(accountsData)
     } catch (error) {
         throw new Error(errorMessage(error))
     }

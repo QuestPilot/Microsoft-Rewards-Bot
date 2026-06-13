@@ -7,6 +7,7 @@ const test = require('node:test')
 
 const startScript = require('../scripts/start')
 const packageJson = require('../package.json')
+const startSource = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'start.js'), 'utf8')
 
 function tempRoot() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-start-'))
@@ -15,6 +16,14 @@ function tempRoot() {
 test('build no longer runs the legacy session migration', () => {
     assert.equal(packageJson.scripts.prebuild, undefined)
     assert.equal(fs.existsSync(path.join(__dirname, '..', 'scripts', 'migrate-legacy-sessions.js')), false)
+})
+
+test('launcher ensures Patchright Chromium before opening the interface', () => {
+    assert.match(startSource, /ensurePatchrightChromium\(\{ root: ROOT \}\)/)
+    assert.ok(
+        startSource.indexOf('ensurePatchrightChromium({ root: ROOT })') <
+            startSource.indexOf('if (shouldLaunchInterface())')
+    )
 })
 
 test('first start creates missing config and account files from examples', () => {

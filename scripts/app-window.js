@@ -2019,6 +2019,7 @@ function html() {
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Streak protection</div><div class="toggle-sub">Keep streak protection enabled on the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-streakProtection"><span class="toggle-slider"></span></label></div>
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Temporary punchcards<span class="beta-badge">Beta</span></div><div class="toggle-sub">Complete limited-time punchcard offers</div></div><label class="toggle"><input type="checkbox" id="tog-core-temporaryPunchcards"><span class="toggle-slider"></span></label></div>
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Dashboard data</div><div class="toggle-sub">Rich dashboard snapshots, ready-to-claim &amp; streak info</div></div><label class="toggle"><input type="checkbox" id="tog-core-collectDashboardInfo"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Set Rewards goal</div><div class="toggle-sub">Auto-pick an eligible gift card as your Rewards goal</div></div><label class="toggle"><input type="checkbox" id="tog-core-setGoal"><span class="toggle-slider"></span></label></div>
         </div>
       </div>
       <div class="settings-section">
@@ -2606,7 +2607,7 @@ function html() {
 
     // ── Core feature gating (config.json core.*) ──
     var CORE_KEYS = ['claimPoints','applyCoupons','doubleSearchPoints','appReward','readToEarn',
-      'dailyCheckIn','dailyStreak','streakProtection','temporaryPunchcards','collectDashboardInfo'];
+      'dailyCheckIn','dailyStreak','streakProtection','temporaryPunchcards','collectDashboardInfo','setGoal'];
     // Core features whose run also depends on an open-source worker flag being on.
     var CORE_WORKER_MAP = {
       claimPoints:'doClaimPoints', applyCoupons:'doApplyCoupons', readToEarn:'doReadToEarn',
@@ -3278,10 +3279,13 @@ function html() {
     function saveAccModal() {
       var email = G('acc-email').value.trim();
       if (!email) { G('acc-modal-msg').textContent = 'Email is required.'; return; }
+      var totpSecret = G('acc-totp').value
+        .replace(/[\s\u200B-\u200D\uFEFF]/g, '')
+        .replace(/=+$/, '')
+        .toUpperCase();
       var acc = {
         email: email,
         password: G('acc-password').value,
-        totpSecret: G('acc-totp').value.trim(),
         recoveryEmail: G('acc-recovery').value.trim(),
         geoLocale: G('acc-geo').value.trim() || 'auto',
         langCode: G('acc-lang').value.trim() || 'en',
@@ -3297,6 +3301,7 @@ function html() {
           mobile: G('acc-fp-mobile').checked
         }
       };
+      if (totpSecret) acc.totpSecret = totpSecret;
       if (accEditIdx === -1) {
         acc.enabled = true;
         _raw.push(acc);
@@ -4042,57 +4047,115 @@ function html() {
     setInterval(refresh, 900);
     refresh();
 
-    // Feedback Logic
-    setTimeout(function() {
-      var isCore = typeof _coreData !== 'undefined' && _coreData && _coreData.tier === 'premium';
-      if (!isCore) return;
+    // ── Feedback / review prompt (Core users only) ──────────────────────
+    // Smart timing so we never nag:
+    //  - only Core (premium) users are ever asked;
+    //  - first ask only after a bit of real usage (>= MIN_RUNS app opens);
+    //  - we prefer "good moments" (a run that just finished with points);
+    //  - after a skip we wait at least one month before asking again;
+    //  - once a review is actually submitted, we never ask again.
+    (function initFeedbackPrompt() {
+      var MIN_RUNS = 3;
+      var REASK_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 1 month
+      var STARTUP_DELAY_MS = 6000;
 
-      var fbState = JSON.parse(localStorage.getItem('core_fb') || '{"done":false,"runs":0}');
-      if (fbState.done) return;
-      fbState.runs++;
-      localStorage.setItem('core_fb', JSON.stringify(fbState));
-      if (fbState.runs >= 3) {
-        G('fb-modal').classList.add('open');
-        
-        var selectedRating = 0;
-        var stars = document.querySelectorAll('.rating-star');
-        stars.forEach(function(s) {
-          s.addEventListener('click', function() {
-            selectedRating = parseInt(this.getAttribute('data-val'));
-            stars.forEach(function(ss) {
-              ss.classList.toggle('active', parseInt(ss.getAttribute('data-val')) <= selectedRating);
-            });
-            G('fb-btn-submit').disabled = false;
-          });
-        });
+      function load() { try { return JSON.parse(localStorage.getItem('core_fb') || '{}'); } catch (e) { return {}; } }
+      function save(st) { localStorage.setItem('core_fb', JSON.stringify(st)); }
 
-        G('fb-btn-skip').addEventListener('click', function() {
-          fbState.done = true;
-          localStorage.setItem('core_fb', JSON.stringify(fbState));
-          G('fb-modal').classList.remove('open');
-        });
-
-        G('fb-btn-submit').addEventListener('click', function() {
-          if (!selectedRating) return;
-          fbState.done = true;
-          localStorage.setItem('core_fb', JSON.stringify(fbState));
-          G('fb-modal').classList.remove('open');
-          var isCore = typeof _coreData !== 'undefined' && _coreData && _coreData.tier === 'premium';
-          fetch('https://bot.lgtw.tf/api/bot/inbox', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ type: 'rating', rating: selectedRating, comment: G('fb-comment').value, hasCore: isCore })
-          }).then(function(res) {
-            return res.json().catch(function(){ return { error: 'Connection or server error.' }; }).then(function(data) {
-              if (!res.ok) throw new Error(data.error || 'Failed to submit feedback');
-              showFeedbackToast(false);
-            });
-          }).catch(function(err) {
-            showFeedbackToast(true, err.message);
-          });
-        });
+      var st = load();
+      // Migrate the legacy {done,runs} shape: done meant "asked once".
+      if (st.done && typeof st.submitted === 'undefined') {
+        st = { submitted: false, runs: st.runs || 0, asks: 1, lastAskAt: Date.now(), lastFinishedAt: null };
       }
-    }, 5000);
+      st.submitted = !!st.submitted;
+      st.runs = st.runs || 0;
+      st.asks = st.asks || 0;
+      st.lastAskAt = st.lastAskAt || 0;
+      st.lastFinishedAt = st.lastFinishedAt || null;
+      st.runs++; // this app open is one usage signal
+      save(st);
+
+      var modalOpen = false;
+      var selectedRating = 0;
+
+      function isCoreUser() {
+        return typeof _coreData !== 'undefined' && _coreData && _coreData.tier === 'premium';
+      }
+      function eligible() {
+        if (st.submitted) return false;
+        if (!isCoreUser()) return false;
+        if (st.runs < MIN_RUNS) return false;
+        if (st.asks > 0 && (Date.now() - st.lastAskAt) < REASK_COOLDOWN_MS) return false;
+        return true;
+      }
+      function openModal() {
+        if (modalOpen || !eligible()) return;
+        if (G('fb-modal').classList.contains('open')) return;
+        modalOpen = true;
+        selectedRating = 0;
+        G('fb-btn-submit').disabled = true;
+        document.querySelectorAll('.rating-star').forEach(function(ss) { ss.classList.remove('active'); });
+        if (G('fb-comment')) G('fb-comment').value = '';
+        st.asks++;
+        st.lastAskAt = Date.now(); // starts the >= 1 month cooldown
+        save(st);
+        G('fb-modal').classList.add('open');
+      }
+
+      // Bind the modal controls ONCE.
+      document.querySelectorAll('.rating-star').forEach(function(s) {
+        s.addEventListener('click', function() {
+          selectedRating = parseInt(this.getAttribute('data-val'));
+          document.querySelectorAll('.rating-star').forEach(function(ss) {
+            ss.classList.toggle('active', parseInt(ss.getAttribute('data-val')) <= selectedRating);
+          });
+          G('fb-btn-submit').disabled = false;
+        });
+      });
+
+      G('fb-btn-skip').addEventListener('click', function() {
+        // Skip = ask again later. Cooldown was already set when the modal opened.
+        modalOpen = false;
+        G('fb-modal').classList.remove('open');
+      });
+
+      G('fb-btn-submit').addEventListener('click', function() {
+        if (!selectedRating) return;
+        st.submitted = true; // submitted a review -> never ask again
+        save(st);
+        modalOpen = false;
+        G('fb-modal').classList.remove('open');
+        fetch('https://bot.lgtw.tf/api/bot/inbox', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ type: 'rating', rating: selectedRating, comment: G('fb-comment').value, hasCore: isCoreUser() })
+        }).then(function(res) {
+          return res.json().catch(function() { return { error: 'Connection or server error.' }; }).then(function(data) {
+            if (!res.ok) throw new Error(data.error || 'Failed to submit feedback');
+            showFeedbackToast(false);
+          });
+        }).catch(function(err) { showFeedbackToast(true, err.message); });
+      });
+
+      // Driver: catch a freshly finished successful run (best moment to ask),
+      // and otherwise fall back to one ask per session once eligible.
+      var sessionStart = Date.now();
+      var fallbackDone = false;
+      setInterval(function() {
+        var d = window._lastStateData;
+        if (d && !d.isRunning && d.finishedAt && d.finishedAt !== st.lastFinishedAt) {
+          var ok = d.exitCode === 0;
+          var pts = d.metrics && typeof d.metrics.points === 'number' ? d.metrics.points : 0;
+          st.lastFinishedAt = d.finishedAt;
+          save(st);
+          if (ok && pts > 0) { openModal(); return; }
+        }
+        if (!fallbackDone && (Date.now() - sessionStart) > STARTUP_DELAY_MS && !(d && d.isRunning)) {
+          fallbackDone = true;
+          openModal();
+        }
+      }, 2000);
+    })();
 
     // General Comment Logic
     G('btn-general-feedback').addEventListener('click', function(e) {

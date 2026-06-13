@@ -22,6 +22,22 @@ const DelaySchema = z.object({
 
 const QueryEngineSchema = z.enum(['google', 'wikipedia', 'reddit', 'local'])
 
+const TotpSecretSchema = z.preprocess(
+    value => {
+        if (typeof value !== 'string') return value
+        const normalized = value
+            .replace(/[\s\u200B-\u200D\uFEFF]/g, '')
+            .replace(/=+$/, '')
+            .toUpperCase()
+        return normalized || undefined
+    },
+    z
+        .string()
+        .min(16, 'totpSecret appears invalid: expected a base32 string (A-Z, 2-7) of at least 16 characters')
+        .regex(/^[A-Z2-7]+$/, 'totpSecret appears invalid: expected a base32 string (A-Z, 2-7) of at least 16 characters')
+        .optional()
+)
+
 const BackgroundAgentSchema = z.object({
     enabled: z.boolean().default(true),
     allowDashboardAutostart: z.boolean().default(true),
@@ -141,14 +157,7 @@ export const AccountSchema = z.object({
     email: z.string(),
     enabled: z.boolean().optional(),
     password: z.string(),
-    totpSecret: z.string().optional().refine(
-        v => {
-            if (!v) return true
-            const normalized = v.replace(/\s/g, '').replace(/=+$/, '')
-            return /^[A-Za-z2-7]+$/.test(normalized) && normalized.length >= 16
-        },
-        { message: 'totpSecret appears invalid: expected a base32 string (A-Z, 2-7) of at least 16 characters' }
-    ),
+    totpSecret: TotpSecretSchema,
     recoveryEmail: z.string(),
     geoLocale: z.string(),
     langCode: z.string(),
@@ -170,7 +179,7 @@ export function validateConfig(data: unknown): Config {
 }
 
 export function validateAccounts(data: unknown): Account[] {
-    return z.array(AccountSchema).parse(data)
+    return z.array(AccountSchema).parse(data) as Account[]
 }
 
 export function checkNodeVersion(): void {

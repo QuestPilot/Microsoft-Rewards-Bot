@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const { UpdateManager } = require('./updater/UpdateManager')
 const { bootstrapUserFiles, migrateUserFiles } = require('./updater/ConfigMigrator')
+const { ensurePatchrightChromium } = require('./ensure-patchright-browser')
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -228,6 +229,9 @@ async function main() {
         runNpm(['run', 'build'])
     } else {
         console.log('[START] Background launch: using existing dist build.')
+    }
+    if (!isAttachLaunch()) {
+        ensurePatchrightChromium({ root: ROOT })
     }
     if (shouldLaunchInterface()) {
         console.log('[START] Opening app window. Use npm start -- --terminal for developer logs.')

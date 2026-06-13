@@ -48,6 +48,18 @@ function footerText(version: string): string {
     return `Microsoft Rewards Bot v${version} • Auto Report`
 }
 
+/**
+ * Returns the webhook URL with the configured channel/thread id appended as a
+ * `thread_id` query parameter so Discord delivers the report into that thread.
+ * Without a channelId the plain webhook URL is used unchanged.
+ */
+function resolveReportUrl(config: AutoReportConfig): string {
+    const channelId = config.channelId?.trim()
+    if (!channelId) return config.discordUrl
+    const separator = config.discordUrl.includes('?') ? '&' : '?'
+    return `${config.discordUrl}${separator}thread_id=${encodeURIComponent(channelId)}`
+}
+
 export async function sendAutoReportRunStart(
     config: AutoReportConfig,
     accountCount: number
@@ -56,7 +68,7 @@ export async function sendAutoReportRunStart(
 
     const pkg = getPackageMetadata()
 
-    await sendDiscordEmbed(config.discordUrl, {
+    await sendDiscordEmbed(resolveReportUrl(config), {
         title: 'Run Started',
         description: 'A new Microsoft Rewards run has been initiated.',
         color: COLOR_INFO,
@@ -79,8 +91,10 @@ export async function sendAutoReportAccountEnd(
     const pkg = getPackageMetadata()
     const email = sanitize(maskEmail(stats.email, config.maskEmails !== false))
 
+    const reportUrl = resolveReportUrl(config)
+
     if (stats.success) {
-        await sendDiscordEmbed(config.discordUrl, {
+        await sendDiscordEmbed(reportUrl, {
             title: 'Account Completed',
             color: COLOR_SUCCESS,
             fields: [
@@ -93,7 +107,7 @@ export async function sendAutoReportAccountEnd(
             timestamp: new Date().toISOString()
         })
     } else {
-        await sendDiscordEmbed(config.discordUrl, {
+        await sendDiscordEmbed(reportUrl, {
             title: 'Account Failed',
             color: COLOR_ERROR,
             fields: [
@@ -165,7 +179,7 @@ export async function sendAutoReportRunSummary(
         })
     }
 
-    await sendDiscordEmbed(config.discordUrl, {
+    await sendDiscordEmbed(resolveReportUrl(config), {
         title: hasFailures ? 'Run Completed with Warnings' : 'Run Completed',
         description: hasFailures
             ? `${failed.length} account(s) encountered errors.`

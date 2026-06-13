@@ -125,6 +125,12 @@ export interface ConfigWebhook {
 export interface AutoReportConfig {
     enabled: boolean
     discordUrl: string
+    /**
+     * Optional Discord channel/thread id. When set, reports are routed to that
+     * thread (via the webhook's `thread_id` parameter). The thread must live in
+     * the same channel as the webhook (or be a forum-channel thread).
+     */
+    channelId?: string
     reportRunStart?: boolean
     reportAccountEnd?: boolean
     reportRunSummary?: boolean

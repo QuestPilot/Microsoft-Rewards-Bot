@@ -1,5 +1,6 @@
 import { BrowserFingerprintWithHeaders, FingerprintGenerator } from 'fingerprint-generator'
 import { newInjectedContext } from 'fingerprint-injector'
+import fs from 'fs'
 import rebrowser, { BrowserContext } from 'patchright'
 
 import { loadSessionData, saveFingerprintData } from '../helpers/ConfigLoader'
@@ -64,13 +65,10 @@ class BrowserManager {
         this.bot = bot
     }
 
-    private async assertBundledChromiumAvailable(): Promise<void> {
-        try {
-            const testBrowser = await rebrowser.chromium.launch({ headless: true })
-            await testBrowser.close()
-        } catch {
+    private assertBundledChromiumAvailable(): void {
+        if (!fs.existsSync(rebrowser.chromium.executablePath())) {
             throw new Error(
-                'Patchright Chromium is not installed. Run `npx patchright install chromium` and try again.'
+                'Patchright Chromium is not installed. Restart the launcher to repair it, or run `npm run browser:install`.'
             )
         }
     }
@@ -96,7 +94,7 @@ class BrowserManager {
                   }
                 : undefined
 
-            await this.assertBundledChromiumAvailable()
+            this.assertBundledChromiumAvailable()
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BROWSER',

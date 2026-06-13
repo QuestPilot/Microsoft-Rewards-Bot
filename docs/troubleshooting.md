@@ -60,10 +60,11 @@ Docker, CI, and forced-headless launches stay in terminal mode automatically. Us
 
 The Desk window can fall back to an installed Chrome, Chromium, or Edge browser. Automation runs are stricter: they always use Patchright's bundled Chromium so behavior is consistent across Windows, Linux, and macOS.
 
-If an automation run reports that Patchright Chromium is missing, run:
+The launcher checks for Patchright Chromium before opening Rewards Desk and installs it
+automatically when it is missing. If that automatic repair is interrupted or fails, run:
 
 ```console
-npx patchright install chromium
+npm run browser:install
 ```
 
 The bot no longer silently runs automation in the user's installed Chrome or Edge. Tracked automation browser processes are closed during normal completion, interruption signals, and fatal-error shutdown paths.

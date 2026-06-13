@@ -6,11 +6,23 @@ const test = require('node:test')
 
 const { analyzeSavedPage, analyzeRewardsPage, collectScriptsForPage } = require('../scripts/rewards-page-analyzer')
 
-test('rewards page analyzer extracts models from saved earn page when fixture exists', { skip: !fs.existsSync(path.join(process.cwd(), 'Page')) }, () => {
+// Skip unless the actual earn-page fixture file is present. A bare (possibly
+// empty) Page/ directory must not turn this optional fixture test into a failure.
+function findEarnFixture() {
     const pageDir = path.join(process.cwd(), 'Page')
-    const file = fs
-        .readdirSync(pageDir)
-        .find(entry => entry.toLowerCase().includes('gagner') && /\.html?$/i.test(entry))
+    if (!fs.existsSync(pageDir)) return null
+    try {
+        return fs
+            .readdirSync(pageDir)
+            .find(entry => entry.toLowerCase().includes('gagner') && /\.html?$/i.test(entry)) || null
+    } catch {
+        return null
+    }
+}
+
+test('rewards page analyzer extracts models from saved earn page when fixture exists', { skip: !findEarnFixture() }, () => {
+    const pageDir = path.join(process.cwd(), 'Page')
+    const file = findEarnFixture()
 
     assert.ok(file, 'earn page fixture should exist')
 

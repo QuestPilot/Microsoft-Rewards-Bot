@@ -7,7 +7,9 @@ const browserManager = fs.readFileSync(path.resolve(__dirname, '../src/automatio
 const main = fs.readFileSync(path.resolve(__dirname, '../src/index.ts'), 'utf8')
 
 test('browser runtime requires Patchright Chromium instead of silently using system Chrome', () => {
-    assert.match(browserManager, /npx patchright install chromium/)
+    assert.match(browserManager, /npm run browser:install/)
+    assert.match(browserManager, /chromium\.executablePath\(\)/)
+    assert.doesNotMatch(browserManager, /testBrowser/)
     assert.match(browserManager, /chromium \(Patchright bundled\)/)
     assert.doesNotMatch(browserManager, /for \(const channel of \[undefined, 'chrome', 'msedge'\]/)
 })
