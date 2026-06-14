@@ -1,6 +1,6 @@
 {
     "name":  "microsoft-rewards-bot-core",
-    "version":  "2.0.1.1",
+    "version":  "2.0.1.2",
     "description":  "Official Core plugin for Microsoft Rewards Bot",
     "author":  "LightZirconite",
     "license":  "SEE LICENSE IN LICENSE",
@@ -14,7 +14,7 @@
                  "releaseShape":  "single-entry-bytecode",
                  "targets":  {
                                  "win32-x64-node-24.15.0":  {
-                                                                "indexSha256":  "8527518785d56e5e1a0186eb3ae95af0185708590c2a9d8d98a167b4d488cf52",
+                                                                "indexSha256":  "5d99c975177deda2a92f161a68050dca6e647ad2431f358646f9acbdfa7f15b7",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "win32",
@@ -22,7 +22,7 @@
                                                                                    }
                                                             },
                                  "linux-x64-node-24.15.0":  {
-                                                                "indexSha256":  "61aa2e80d43d0102509c8dc9d9913f32938b878bf752ce8e58a52ec5eb8cc820",
+                                                                "indexSha256":  "030be1b6e5bb4e8b0050e19d2b641e282a25bef92f34c918a4f70214d56be685",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "linux",
@@ -30,7 +30,7 @@
                                                                                    }
                                                             },
                                  "linux-arm64-node-24.15.0":  {
-                                                                  "indexSha256":  "75ca398a66236f9d90043fe27ef13749532e5e8dc6cccfbbb23832867bbd87a1",
+                                                                  "indexSha256":  "1463b541923e75d7a33652b9358cc7788fe0785bc83de30aab349de918f45aa2",
                                                                   "bytecodeTarget":  {
                                                                                          "node":  "24.15.0",
                                                                                          "platform":  "linux",
@@ -38,7 +38,7 @@
                                                                                      }
                                                               },
                                  "darwin-x64-node-24.15.0":  {
-                                                                 "indexSha256":  "61aa2e80d43d0102509c8dc9d9913f32938b878bf752ce8e58a52ec5eb8cc820",
+                                                                 "indexSha256":  "030be1b6e5bb4e8b0050e19d2b641e282a25bef92f34c918a4f70214d56be685",
                                                                  "bytecodeTarget":  {
                                                                                         "node":  "24.15.0",
                                                                                         "platform":  "darwin",
