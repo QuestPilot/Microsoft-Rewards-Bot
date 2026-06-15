@@ -51,6 +51,7 @@ import {
     sendAutoReportAccountEnd,
     sendAutoReportRunSummary
 } from './notifications/AutoReport'
+import { reportError } from './notifications/ErrorReport'
 import { flushNtfyQueue, sendNtfy } from './notifications/NtfyWebhook'
 import type { Account } from './types/Account'
 import type { AppDashboardData } from './types/AppDashboardData'
@@ -249,7 +250,16 @@ export class MicrosoftRewardsBot {
         } else {
             this.logRunStart(totalAccounts)
             await this.sendAutoReportStart(totalAccounts)
-            await this.runTasks(enabledAccounts, runStartTime)
+            try {
+                await this.runTasks(enabledAccounts, runStartTime)
+            } catch (error) {
+                await reportError(this.config.webhook, {
+                    kind: 'run_fatal',
+                    error: error instanceof Error ? error.message : String(error),
+                    hasCore: this.pluginManager.hasOfficialCoreEntitlement()
+                })
+                throw error
+            }
             return 0
         }
     }
@@ -462,6 +472,11 @@ export class MicrosoftRewardsBot {
                     'CLUSTER-WORKER-ERROR',
                     `Worker task crash: ${error instanceof Error ? error.message : String(error)}`
                 )
+                await reportError(this.config.webhook, {
+                    kind: 'run_fatal',
+                    error: error instanceof Error ? error.message : String(error),
+                    hasCore: this.pluginManager.hasOfficialCoreEntitlement()
+                })
                 await flushAllWebhooks()
                 process.exit(1)
             }
@@ -557,6 +572,18 @@ export class MicrosoftRewardsBot {
                             success: true
                         })
                     }
+
+                    // A run that finished cleanly but earned 0 points is the signature
+                    // of the "rewards logged in but Bing search session anonymous" issue.
+                    if (collectedPoints <= 0) {
+                        await reportError(this.config.webhook, {
+                            kind: 'account_zero_points',
+                            email: accountEmail,
+                            error: `Run completed but collected 0 points (balance ${accountInitialPoints} → ${accountFinalPoints})`,
+                            hasCore: this.pluginManager.hasOfficialCoreEntitlement(),
+                            durationSeconds: parseFloat(durationSeconds)
+                        })
+                    }
                 } else {
                     const failedResult = {
                         email: accountEmail,
@@ -584,6 +611,14 @@ export class MicrosoftRewardsBot {
                     if (this.config.webhook.autoReport) {
                         await sendAutoReportAccountEnd(this.config.webhook.autoReport, failedResult)
                     }
+
+                    await reportError(this.config.webhook, {
+                        kind: 'account_failed',
+                        email: accountEmail,
+                        error: failedResult.error,
+                        hasCore: this.pluginManager.hasOfficialCoreEntitlement(),
+                        durationSeconds: parseFloat(durationSeconds)
+                    })
                 }
             } catch (error) {
                 const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1)
@@ -619,6 +654,14 @@ export class MicrosoftRewardsBot {
                 if (this.config.webhook.autoReport) {
                     await sendAutoReportAccountEnd(this.config.webhook.autoReport, failedResult)
                 }
+
+                await reportError(this.config.webhook, {
+                    kind: 'account_failed',
+                    email: accountEmail,
+                    error: failedResult.error,
+                    hasCore: this.pluginManager.hasOfficialCoreEntitlement(),
+                    durationSeconds: parseFloat(durationSeconds)
+                })
             }
         }
 

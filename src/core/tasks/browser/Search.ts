@@ -66,6 +66,40 @@ export class Search extends TaskBase {
             await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
             await this.bot.browser.utils.tryDismissAllMessages(page)
 
+            // Guard: Bing only credits searches when bing.com itself carries the
+            // signed-in account. The rewards login can succeed while the Bing search
+            // session stays anonymous (common on fresh accounts), which silently
+            // burns the whole run for 0 points. Detect that here and re-establish the
+            // session once before committing to the search loop.
+            if (!isMobile && (await this.bot['login'].isBingSignedOut(page))) {
+                this.bot.logger.warn(
+                    isMobile,
+                    'SEARCH-BING',
+                    'Bing search session is signed out — re-establishing before searching (searches would otherwise earn 0 points)'
+                )
+
+                await this.bot['login'].verifyBingSession(page)
+
+                await page.goto(targetUrl).catch(() => {})
+                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+                await this.bot.browser.utils.tryDismissAllMessages(page)
+
+                // Only bail out when Bing still *positively* shows the signed-out state.
+                // If detection is ambiguous we fall through and search as before, so a
+                // drifted selector can never skip a genuinely signed-in account's run.
+                if (await this.bot['login'].isBingSignedOut(page)) {
+                    this.bot.logger.error(
+                        isMobile,
+                        'SEARCH-BING',
+                        'Bing search session is still signed out — searches will not be credited. ' +
+                            'This usually means the account must open Bing manually once (region/terms not yet accepted) or is flagged. Skipping search run.'
+                    )
+                    return 0
+                }
+
+                this.bot.logger.info(isMobile, 'SEARCH-BING', 'Bing search session re-established, continuing')
+            }
+
             // When Microsoft serves the Next.js dashboard, the legacy search-point
             // counters are absent, so missingSearchPoints() reports 0 and the
             // counter-driven loop below would stop after a single search. Detect

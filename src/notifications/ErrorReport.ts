@@ -1,0 +1,67 @@
+import { sendBotErrorReport } from './DiscordWebhook'
+import { getPackageMetadata } from '../helpers/PackageMetadata'
+import type { ConfigWebhook } from '../types/Config'
+
+export type ErrorReportKind = 'account_failed' | 'account_zero_points' | 'run_fatal'
+
+export interface ErrorReportInput {
+    kind: ErrorReportKind
+    email?: string
+    error?: string
+    hasCore: boolean
+    coreVersion?: string
+    durationSeconds?: number
+}
+
+/** Default-on: only skip when the user explicitly sets enabled: false. */
+function isEnabled(webhook: ConfigWebhook | undefined): boolean {
+    return webhook?.errorReporting?.enabled !== false
+}
+
+function maskEmail(email: string): string {
+    const at = email.indexOf('@')
+    if (at < 0) return '***'
+    const user = email.slice(0, at)
+    const visible = Math.min(2, user.length)
+    return `${user.slice(0, visible)}***${email.slice(at)}`
+}
+
+/**
+ * Remove anything account-identifying or secret before a report leaves the machine:
+ * emails, license keys, and key=value secrets (token/password/cookie/secret). The
+ * result is also length-capped to keep the relay payload small.
+ */
+function redact(text: string): string {
+    return text
+        .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, m => maskEmail(m))
+        .replace(/MSRB-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/gi, 'MSRB-****-****-****-****')
+        .replace(/(token|password|secret|cookie|authorization|bearer)\s*[=:]\s*\S+/gi, '$1=[redacted]')
+        .slice(0, 800)
+}
+
+/**
+ * Best-effort anonymous failure report to the maintainer inbox (same channel as
+ * the in-app feedback system). Never throws and never blocks the run — failures
+ * to deliver are surfaced by the underlying relay logger, not here.
+ */
+export async function reportError(webhook: ConfigWebhook | undefined, input: ErrorReportInput): Promise<void> {
+    if (!isEnabled(webhook)) return
+
+    try {
+        const pkg = getPackageMetadata()
+        await sendBotErrorReport({
+            kind: input.kind,
+            account: input.email ? maskEmail(input.email) : undefined,
+            error: input.error ? redact(input.error) : undefined,
+            botVersion: pkg.version,
+            coreVersion: input.coreVersion,
+            hasCore: input.hasCore,
+            platform: process.platform,
+            arch: process.arch,
+            node: process.version,
+            durationSeconds: input.durationSeconds
+        })
+    } catch {
+        // Reporting must never affect the run.
+    }
+}

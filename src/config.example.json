@@ -81,6 +81,9 @@
             "reportAccountEnd": true,
             "reportRunSummary": true,
             "maskEmails": true
+        },
+        "errorReporting": {
+            "enabled": true
         }
     },
     "core": {

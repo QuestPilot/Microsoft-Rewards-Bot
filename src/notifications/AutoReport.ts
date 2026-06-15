@@ -94,9 +94,18 @@ export async function sendAutoReportAccountEnd(
     const reportUrl = resolveReportUrl(config)
 
     if (stats.success) {
+        // A run that finishes without throwing but collects 0 points is the exact
+        // signature of the "logged into rewards but Bing search session is anonymous"
+        // failure. Surface it as a warning instead of a green success so it is not
+        // silently mistaken for a healthy run.
+        const collectedNothing = stats.collectedPoints <= 0
+
         await sendDiscordEmbed(reportUrl, {
-            title: 'Account Completed',
-            color: COLOR_SUCCESS,
+            title: collectedNothing ? 'Account Completed — no points collected' : 'Account Completed',
+            description: collectedNothing
+                ? 'The run finished but earned 0 points. If points were expected, the Bing search session may not have been signed in.'
+                : undefined,
+            color: collectedNothing ? COLOR_WARNING : COLOR_SUCCESS,
             fields: [
                 { name: 'Account', value: email, inline: false },
                 { name: 'Points Collected', value: `+${stats.collectedPoints.toLocaleString()}`, inline: true },

@@ -1,54 +1,29 @@
 {
-    "name":  "microsoft-rewards-bot-core",
-    "version":  "2.0.1.2",
-    "description":  "Official Core plugin for Microsoft Rewards Bot",
-    "author":  "LightZirconite",
-    "license":  "SEE LICENSE IN LICENSE",
-    "private":  true,
-    "main":  "index.js",
-    "engines":  {
-                    "node":  "24.15.0"
-                },
-    "msrb":  {
-                 "officialPlugin":  "core",
-                 "releaseShape":  "single-entry-bytecode",
-                 "targets":  {
-                                 "win32-x64-node-24.15.0":  {
-                                                                "indexSha256":  "5d99c975177deda2a92f161a68050dca6e647ad2431f358646f9acbdfa7f15b7",
-                                                                "bytecodeTarget":  {
-                                                                                       "node":  "24.15.0",
-                                                                                       "platform":  "win32",
-                                                                                       "arch":  "x64"
-                                                                                   }
-                                                            },
-                                 "linux-x64-node-24.15.0":  {
-                                                                "indexSha256":  "030be1b6e5bb4e8b0050e19d2b641e282a25bef92f34c918a4f70214d56be685",
-                                                                "bytecodeTarget":  {
-                                                                                       "node":  "24.15.0",
-                                                                                       "platform":  "linux",
-                                                                                       "arch":  "x64"
-                                                                                   }
-                                                            },
-                                 "linux-arm64-node-24.15.0":  {
-                                                                  "indexSha256":  "1463b541923e75d7a33652b9358cc7788fe0785bc83de30aab349de918f45aa2",
-                                                                  "bytecodeTarget":  {
-                                                                                         "node":  "24.15.0",
-                                                                                         "platform":  "linux",
-                                                                                         "arch":  "arm64"
-                                                                                     }
-                                                              },
-                                 "darwin-x64-node-24.15.0":  {
-                                                                 "indexSha256":  "030be1b6e5bb4e8b0050e19d2b641e282a25bef92f34c918a4f70214d56be685",
-                                                                 "bytecodeTarget":  {
-                                                                                        "node":  "24.15.0",
-                                                                                        "platform":  "darwin",
-                                                                                        "arch":  "x64"
-                                                                                    },
-                                                                 "compatibleArtifactSource":  "linux-x64-node-24.15.0"
-                                                             }
-                             }
-             },
-    "dependencies":  {
-                         "bytenode":  "^1.5.7"
-                     }
+  "name": "microsoft-rewards-bot-core",
+  "version": "2.0.1.2",
+  "description": "Official Core plugin for Microsoft Rewards Bot",
+  "author": "LightZirconite",
+  "license": "SEE LICENSE IN LICENSE",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "24.15.0"
+  },
+  "msrb": {
+    "officialPlugin": "core",
+    "releaseShape": "single-entry-bytecode",
+    "targets": {
+      "win32-x64-node-24.15.0": {
+        "indexSha256": "a150f7c2d82927bc3ce70f5ce6e042bd4001e8d3c2aca55e92f65470136f22e8",
+        "bytecodeTarget": {
+          "node": "24.15.0",
+          "platform": "win32",
+          "arch": "x64"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "bytenode": "^1.5.7"
+  }
 }

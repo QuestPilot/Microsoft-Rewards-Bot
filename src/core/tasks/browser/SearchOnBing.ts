@@ -52,7 +52,7 @@ export class SearchOnBing extends TaskBase {
 
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING', `Activating search task | offerId=${offerId}`)
 
-            const activated = await this.activateSearchTask(promotion)
+            const activated = await this.activateSearchTask(promotion, page)
             if (!activated) {
                 this.bot.logger.warn(
                     this.bot.isMobile,
@@ -107,7 +107,10 @@ export class SearchOnBing extends TaskBase {
                 const cvid = randomBytes(16).toString('hex')
                 const url = `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
 
-                await this.bot.mainMobilePage.goto(url)
+                // Navigate the page this task was actually given (desktop or mobile),
+                // not a hardcoded mobile page — otherwise a desktop SearchOnBing would
+                // drive the wrong tab and the search would never register.
+                await page.goto(url)
 
                 // Wait until page loaded
                 await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
@@ -184,7 +187,7 @@ export class SearchOnBing extends TaskBase {
     }
 
     // The task needs to be activated before being able to complete it
-    private async activateSearchTask(promotion: BasePromotion): Promise<boolean> {
+    private async activateSearchTask(promotion: BasePromotion, page: Page): Promise<boolean> {
         try {
             this.bot.logger.debug(
                 this.bot.isMobile,
@@ -194,7 +197,6 @@ export class SearchOnBing extends TaskBase {
 
             // New dashboard: use browser-based fetch (no RequestVerificationToken)
             if (!this.bot.requestToken) {
-                const page = this.bot.mainMobilePage
                 if (!page || page.isClosed()) {
                     this.bot.logger.warn(this.bot.isMobile, 'SEARCH-ON-BING-ACTIVATE', 'Browser page not available')
                     return false

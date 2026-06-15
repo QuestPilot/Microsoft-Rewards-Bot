@@ -120,6 +120,18 @@ export interface ConfigWebhook {
     webhookLogFilter: LogFilter
     runSummary?: WebhookRunSummaryConfig
     autoReport?: AutoReportConfig
+    errorReporting?: ErrorReportingConfig
+}
+
+/**
+ * Anonymous failure reporting to the bot maintainer's inbox (same relay as the
+ * in-app feedback/rating system — NOT a user Discord webhook). Enabled by
+ * default; set `enabled: false` to opt out. Only redacted diagnostics are sent
+ * (masked email, sanitized error text, bot/Core version, OS/Node) — never
+ * passwords, cookies, tokens, or license keys.
+ */
+export interface ErrorReportingConfig {
+    enabled?: boolean
 }
 
 export interface AutoReportConfig {

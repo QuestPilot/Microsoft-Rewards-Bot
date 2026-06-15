@@ -796,10 +796,57 @@ export class AuthManager {
         this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Login completed, session saved')
     }
 
-    async verifyBingSession(page: Page) {
+    /**
+     * Detect whether the Bing page (bing.com / www.bing.com) is authenticated.
+     *
+     * Searches are only credited when bing.com itself carries the signed-in
+     * session, which is independent from being logged into rewards.bing.com.
+     * We treat the page as signed in when an account-bound header element is
+     * present (rewards counter `#id_rc` or account name `#id_n`) AND the
+     * anonymous "Sign in" entry point (`#id_s`/`#id_l`) is absent.
+     */
+    async isBingSignedIn(page: Page): Promise<boolean> {
+        if (page.isClosed()) return false
+
+        const [hasRewardsCounter, hasAccountName, hasSignIn] = await Promise.all([
+            this.checkSelector(page, '#id_rc'),
+            this.checkSelector(page, this.selectors.bingProfile),
+            this.checkSelector(page, '#id_s, #id_l')
+        ])
+
+        return (hasRewardsCounter || hasAccountName) && !hasSignIn
+    }
+
+    /**
+     * Positively detect an anonymous Bing page (the "Sign in" entry point is shown).
+     *
+     * Used as a conservative gate: callers should only treat a search session as
+     * unusable when this returns `true`, so a drifted signed-in selector can never
+     * cause a working account's run to be skipped.
+     */
+    async isBingSignedOut(page: Page): Promise<boolean> {
+        if (page.isClosed()) return false
+
+        const [hasSignIn, hasRewardsCounter, hasAccountName] = await Promise.all([
+            this.checkSelector(page, '#id_s, #id_l'),
+            this.checkSelector(page, '#id_rc'),
+            this.checkSelector(page, this.selectors.bingProfile)
+        ])
+
+        return hasSignIn && !hasRewardsCounter && !hasAccountName
+    }
+
+    /**
+     * Bridge the live.com/rewards session into a Bing search session and verify it.
+     *
+     * Returns `true` once bing.com reports a signed-in account. When it cannot be
+     * confirmed the caller is told (via the return value) so it can retry before
+     * burning a full search run that Microsoft would credit to an anonymous user.
+     */
+    async verifyBingSession(page: Page): Promise<boolean> {
         const url =
             'https://www.bing.com/fd/auth/signin?action=interactive&provider=windows_live_id&return_url=https%3A%2F%2Fwww.bing.com%2F'
-        const loopMax = 5
+        const loopMax = 6
 
         this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Verifying Bing session')
 
@@ -811,46 +858,68 @@ export class AuthManager {
 
                 this.bot.logger.debug(this.bot.isMobile, 'LOGIN-BING', `Verification loop ${i + 1}/${loopMax}`)
 
+                // Microsoft can inject an interrupt (passkey/KMSI) into the federated
+                // sign-in redirect. Dismiss the common ones so the flow can complete
+                // instead of stalling on login.live.com and never reaching Bing.
                 const state = await this.detectCurrentState(page)
-                if (state === 'PASSKEY_ERROR') {
-                    this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Dismissing Passkey error state')
-                    await this.bot.browser.utils.ghostClick(page, this.selectors.secondaryButton)
+                if (state === 'PASSKEY_ERROR' || state === 'PASSKEY_VIDEO') {
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Dismissing Passkey prompt during verification')
+                    await this.bot.browser.utils.ghostClick(page, this.selectors.secondaryButton).catch(() => {})
+                    await this.bot.utils.wait(1000)
+                } else if (state === 'KMSI_PROMPT') {
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Accepting KMSI prompt during verification')
+                    await this.bot.browser.utils.ghostClick(page, this.selectors.primaryButton).catch(() => {})
+                    await this.bot.utils.wait(1000)
                 }
 
                 const u = new URL(page.url())
-                const atBingHome = u.hostname === 'www.bing.com' && u.pathname === '/'
+                const onBing = u.hostname === 'www.bing.com' || u.hostname === 'bing.com'
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'LOGIN-BING',
-                    `At Bing home: ${atBingHome} (${u.hostname}${u.pathname})`
+                    `On Bing: ${onBing} (${u.hostname}${u.pathname})`
                 )
 
-                if (atBingHome) {
+                if (onBing) {
                     await this.bot.browser.utils.tryDismissAllMessages(page).catch(() => {})
 
-                    const signedIn = await page
-                        .waitForSelector(this.selectors.bingProfile, { timeout: 3000 })
-                        .then(() => true)
-                        .catch(() => false)
+                    const signedIn = await this.isBingSignedIn(page)
+                    this.bot.logger.debug(this.bot.isMobile, 'LOGIN-BING', `Bing signed-in indicator: ${signedIn}`)
 
-                    this.bot.logger.debug(this.bot.isMobile, 'LOGIN-BING', `Profile element found: ${signedIn}`)
-
-                    if (signedIn || this.bot.isMobile) {
+                    if (signedIn) {
                         this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Bing session verified successfully')
-                        return
+                        return true
                     }
+                } else if (i >= 2) {
+                    // Still drifting on a login/interrupt host after a couple of loops —
+                    // re-trigger the federated sign-in to nudge it back toward Bing.
+                    this.bot.logger.debug(this.bot.isMobile, 'LOGIN-BING', 'Off Bing host, re-issuing federated sign-in')
+                    await page.goto(url, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => {})
                 }
 
                 await this.bot.utils.wait(1000)
             }
 
+            // Mobile search uses a separate token-based flow, so an unconfirmed Bing
+            // header here is not necessarily fatal for mobile.
+            if (this.bot.isMobile) {
+                this.bot.logger.info(
+                    this.bot.isMobile,
+                    'LOGIN-BING',
+                    'Bing header not confirmed (mobile) — continuing, mobile search uses access token'
+                )
+                return true
+            }
+
             this.bot.logger.warn(this.bot.isMobile, 'LOGIN-BING', 'Could not verify Bing session, continuing anyway')
+            return false
         } catch (error) {
             this.bot.logger.warn(
                 this.bot.isMobile,
                 'LOGIN-BING',
                 `Verification error: ${error instanceof Error ? error.message : String(error)}`
             )
+            return false
         }
     }
 
