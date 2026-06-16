@@ -3,6 +3,7 @@ import type { Page } from 'patchright'
 import type { Counters, DashboardData } from '../../../types/DashboardData'
 
 import { BING_SEARCH } from '../../../automation/DashboardSelectors'
+import { getCurrentContext } from '../../../context/ExecutionContext'
 import { recordSearchQuery } from '../../../helpers/StatsRecorder'
 import { QueryProvider } from '../../QueryProvider'
 import { TaskBase } from '../../TaskBase'
@@ -68,9 +69,10 @@ export class Search extends TaskBase {
 
             // Guard: Bing only credits searches when bing.com itself carries the
             // signed-in account. The rewards login can succeed while the Bing search
-            // session stays anonymous (common on fresh accounts), which silently
-            // burns the whole run for 0 points. Detect that here and re-establish the
-            // session once before committing to the search loop.
+            // session stays anonymous, which silently burns the whole run for 0
+            // points (observed in production on accounts with real point balances,
+            // not just fresh ones). Detect that here and re-establish the session
+            // once before committing to the search loop.
             if (!isMobile && (await this.bot['login'].isBingSignedOut(page))) {
                 this.bot.logger.warn(
                     isMobile,
@@ -78,7 +80,7 @@ export class Search extends TaskBase {
                     'Bing search session is signed out — re-establishing before searching (searches would otherwise earn 0 points)'
                 )
 
-                await this.bot['login'].verifyBingSession(page)
+                await this.bot['login'].verifyBingSession(page, getCurrentContext().account)
 
                 await page.goto(targetUrl).catch(() => {})
                 await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
@@ -157,6 +159,21 @@ export class Search extends TaskBase {
                         'All required search points earned, stopping main search loop'
                     )
                     break
+                }
+
+                // Circuit breaker: a few fruitless searches in a row can happen on a
+                // genuinely signed-in account (some queries just don't qualify), so we
+                // don't want to bail on the first miss. But if it keeps missing, re-check
+                // whether Bing is actually signed in — this catches sessions that went
+                // anonymous mid-run (or were never detected as anonymous by the selectors
+                // above) well before burning the full stagnantLoopMax search budget.
+                if (stagnantLoop === Math.ceil(stagnantLoopMax / 2) && (await this.checkMidLoopAnonymous(isMobile, page))) {
+                    this.bot.logger.error(
+                        isMobile,
+                        'SEARCH-BING',
+                        `Bing session is anonymous after ${stagnantLoop} fruitless searches — aborting early instead of burning the full search budget`
+                    )
+                    return totalGainedPoints
                 }
 
                 if (stagnantLoop > stagnantLoopMax) {
@@ -274,6 +291,18 @@ export class Search extends TaskBase {
                             break
                         }
 
+                        if (
+                            stagnantLoop === Math.ceil(stagnantLoopMax / 2) &&
+                            (await this.checkMidLoopAnonymous(isMobile, page))
+                        ) {
+                            this.bot.logger.error(
+                                isMobile,
+                                'SEARCH-BING-EXTRA',
+                                `Bing session is anonymous after ${stagnantLoop} fruitless extra searches — aborting early`
+                            )
+                            return totalGainedPoints
+                        }
+
                         if (stagnantLoop > stagnantLoopMax) {
                             this.bot.logger.warn(
                                 isMobile,
@@ -386,6 +415,15 @@ export class Search extends TaskBase {
                     `No points gained ${plateau}/${plateauLimit} | query="${query}" | search ${i + 1}/${maxSearches}`
                 )
 
+                if (plateau === Math.ceil(plateauLimit / 2) && (await this.checkMidLoopAnonymous(isMobile, page))) {
+                    this.bot.logger.error(
+                        isMobile,
+                        'SEARCH-BING',
+                        `Bing session is anonymous after ${plateau} fruitless searches — aborting early instead of running the full fallback budget`
+                    )
+                    break
+                }
+
                 if (plateau >= plateauLimit) {
                     this.bot.logger.info(
                         isMobile,
@@ -405,6 +443,23 @@ export class Search extends TaskBase {
         )
 
         return totalGainedPoints
+    }
+
+    /**
+     * Mid-loop circuit breaker: re-check whether Bing is signed in after a few
+     * consecutive fruitless searches. The upfront guard in doSearch() can miss an
+     * anonymous session (selector drift, or session going anonymous partway through
+     * a long run); this catches it without waiting for the full stagnant/plateau
+     * budget. Mobile search uses a token-based flow, not the Bing header, so it's
+     * skipped there. Never throws — a detection failure just lets the loop continue.
+     */
+    private async checkMidLoopAnonymous(isMobile: boolean, page: Page): Promise<boolean> {
+        if (isMobile) return false
+        try {
+            return await this.bot['login'].isBingSignedOut(page)
+        } catch {
+            return false
+        }
     }
 
     /** Read the current points balance, tolerating transient lookup failures. */

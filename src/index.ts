@@ -502,14 +502,12 @@ export class MicrosoftRewardsBot {
 
                 this.axios = new HttpClient(account.proxy)
 
+                let mainFlowError = ''
                 const result:
                     | { initialPoints: number; collectedPoints: number; coreStats: CoreRunStats; starBonus?: StarBonusInfo }
                     | undefined = await this.Main(account).catch(error => {
-                    void this.logger.error(
-                        true,
-                        'FLOW',
-                        `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`
-                    )
+                    mainFlowError = error instanceof Error ? error.message : String(error)
+                    void this.logger.error(true, 'FLOW', `Mobile flow failed for ${accountEmail}: ${mainFlowError}`)
                     return undefined
                 })
 
@@ -585,6 +583,7 @@ export class MicrosoftRewardsBot {
                         })
                     }
                 } else {
+                    const errorDetail = mainFlowError || 'Flow failed (no error detail captured)'
                     const failedResult = {
                         email: accountEmail,
                         initialPoints: 0,
@@ -592,7 +591,7 @@ export class MicrosoftRewardsBot {
                         collectedPoints: 0,
                         duration: parseFloat(durationSeconds),
                         success: false,
-                        error: 'Flow failed'
+                        error: errorDetail
                     }
                     accountStats.push({
                         ...failedResult
@@ -604,7 +603,7 @@ export class MicrosoftRewardsBot {
                         collectedPoints: 0,
                         durationSeconds: parseFloat(durationSeconds),
                         success: false,
-                        error: 'Flow failed'
+                        error: errorDetail
                     })
                     await this.pluginManager.notifyAccountEnd(accountEmail, failedResult)
 

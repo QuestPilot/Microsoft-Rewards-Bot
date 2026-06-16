@@ -201,7 +201,7 @@ export class AuthManager {
                 return
             }
 
-            await this.finalizeLogin(page, account.email)
+            await this.finalizeLogin(page, account)
         } catch (error) {
             this.bot.logger.error(
                 this.bot.isMobile,
@@ -770,7 +770,7 @@ export class AuthManager {
         }
     }
 
-    private async finalizeLogin(page: Page, email: string) {
+    private async finalizeLogin(page: Page, account: Account) {
         this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Finalizing login')
 
         await page.goto(this.bot.config.baseURL, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => {})
@@ -783,7 +783,7 @@ export class AuthManager {
         }
 
         this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Starting Bing session verification')
-        await this.verifyBingSession(page)
+        await this.verifyBingSession(page, account)
 
         this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Starting rewards session verification')
         await this.getRewardsSession(page)
@@ -791,7 +791,7 @@ export class AuthManager {
         const browser = page.context()
         const cookies = await browser.cookies()
         this.bot.logger.debug(this.bot.isMobile, 'LOGIN', `Retrieved ${cookies.length} cookies`)
-        await saveSessionData(this.bot.config.sessionPath, cookies, email, this.bot.isMobile)
+        await saveSessionData(this.bot.config.sessionPath, cookies, account.email, this.bot.isMobile)
 
         this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Login completed, session saved')
     }
@@ -842,11 +842,19 @@ export class AuthManager {
      * Returns `true` once bing.com reports a signed-in account. When it cannot be
      * confirmed the caller is told (via the return value) so it can retry before
      * burning a full search run that Microsoft would credit to an anonymous user.
+     *
+     * The federated `bing.com/fd/auth/signin` hop can occasionally demand a full
+     * re-authentication (expired live.com session, not just a passkey/KMSI nudge),
+     * landing on the real EMAIL_INPUT/PASSWORD_INPUT sign-in form. Without an
+     * `account` to fill it with, this loop used to just wait on that form every
+     * iteration until it timed out — visible in Rewards Desk as a run stuck on
+     * "Verifying Bing session" showing the live Microsoft sign-in page. When an
+     * account is supplied we now complete that re-login inline.
      */
-    async verifyBingSession(page: Page): Promise<boolean> {
+    async verifyBingSession(page: Page, account?: Account): Promise<boolean> {
         const url =
             'https://www.bing.com/fd/auth/signin?action=interactive&provider=windows_live_id&return_url=https%3A%2F%2Fwww.bing.com%2F'
-        const loopMax = 6
+        const loopMax = account?.password ? 12 : 6
 
         this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Verifying Bing session')
 
@@ -859,8 +867,9 @@ export class AuthManager {
                 this.bot.logger.debug(this.bot.isMobile, 'LOGIN-BING', `Verification loop ${i + 1}/${loopMax}`)
 
                 // Microsoft can inject an interrupt (passkey/KMSI) into the federated
-                // sign-in redirect. Dismiss the common ones so the flow can complete
-                // instead of stalling on login.live.com and never reaching Bing.
+                // sign-in redirect, or — less commonly — demand a full re-login.
+                // Handle the common ones so the flow can complete instead of
+                // stalling on login.live.com and never reaching Bing.
                 const state = await this.detectCurrentState(page)
                 if (state === 'PASSKEY_ERROR' || state === 'PASSKEY_VIDEO') {
                     this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Dismissing Passkey prompt during verification')
@@ -870,6 +879,30 @@ export class AuthManager {
                     this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Accepting KMSI prompt during verification')
                     await this.bot.browser.utils.ghostClick(page, this.selectors.primaryButton).catch(() => {})
                     await this.bot.utils.wait(1000)
+                } else if (state === 'EMAIL_INPUT' && account?.email) {
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'LOGIN-BING',
+                        'Federated sign-in demanded full re-login (email) during Bing verification — re-authenticating'
+                    )
+                    await this.emailStrategy.enterEmail(page, account.email)
+                    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                } else if (state === 'PASSWORD_INPUT' && account?.password) {
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'LOGIN-BING',
+                        'Federated sign-in demanded full re-login (password) during Bing verification — re-authenticating'
+                    )
+                    await this.emailStrategy.enterPassword(page, account.password)
+                    await page.keyboard.press('Escape').catch(() => {})
+                    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                } else if (state === '2FA_TOTP' && account?.totpSecret) {
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'LOGIN-BING',
+                        'Federated sign-in demanded 2FA during Bing verification — re-authenticating'
+                    )
+                    await this.totpStrategy.handle(page, account.totpSecret)
                 }
 
                 const u = new URL(page.url())
