@@ -100,7 +100,24 @@ export default class PageController {
             } as AxiosRequestConfig & { 'axios-retry'?: { retries: number } }
 
             const response = await this.bot.axios.request(request)
-            return this.parseDashboardHtml(String(response.data))
+
+            // If the raw HTTP fetch was bounced to sign-in or the welcome/onboarding
+            // page, the body has no dashboard data. Don't waste a parse on it (which
+            // would surface the misleading "Dashboard data not found"): fall through
+            // to the authenticated browser page instead.
+            const axiosFinalUrl =
+                ((response.request as { res?: { responseUrl?: string } } | undefined)?.res?.responseUrl) ??
+                this.bot.config.baseURL
+            const axiosBlocked = this.classifyUnreachableDashboard(axiosFinalUrl)
+            if (axiosBlocked) {
+                this.bot.logger.warn(
+                    this.bot.isMobile,
+                    'GET-DASHBOARD-DATA',
+                    `Axios dashboard fetch redirected away from the dashboard (${axiosBlocked}) — trying authenticated browser page`
+                )
+            } else {
+                return this.parseDashboardHtml(String(response.data))
+            }
         } catch {
             this.bot.logger.debug(
                 this.bot.isMobile,
@@ -112,12 +129,59 @@ export default class PageController {
         try {
             const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
             await page.goto(this.bot.config.baseURL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
+
+            // A logged-out / unenrolled account gets bounced to sign-in or /welcome.
+            // Throw an actionable error rather than the generic parse failure so the
+            // run log says WHY (re-login / enrollment) instead of "data not found".
+            const blocked = this.classifyUnreachableDashboard(page.url())
+            if (blocked) {
+                throw new Error(
+                    `Rewards dashboard unreachable: ${blocked} (final URL: ${page.url()}). ` +
+                        'The account is likely signed out or not enrolled in Microsoft Rewards — re-login or complete onboarding.'
+                )
+            }
+
             const html = await page.content()
             return this.parseDashboardHtml(html)
         } catch (fallbackError) {
-            this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data')
+            this.bot.logger.error(
+                this.bot.isMobile,
+                'GET-DASHBOARD-DATA',
+                `Failed to get dashboard data: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`
+            )
             throw fallbackError
         }
+    }
+
+    /**
+     * Recognise a non-dashboard landing page from its final URL (host/path only —
+     * never localized text, so it works in every locale). Returns a human-readable
+     * reason when the page is a sign-in or welcome/onboarding redirect, else null.
+     */
+    private classifyUnreachableDashboard(finalUrl: string): string | null {
+        let host = ''
+        let pathname = ''
+        try {
+            const parsed = new URL(finalUrl)
+            host = parsed.hostname.toLowerCase()
+            pathname = parsed.pathname.toLowerCase()
+        } catch {
+            return null
+        }
+
+        if (
+            host.includes('login.live.com') ||
+            host.includes('login.microsoftonline.com') ||
+            host.includes('account.live.com')
+        ) {
+            return 'redirected to Microsoft sign-in (session expired or not authenticated)'
+        }
+
+        if (pathname.includes('/welcome') || pathname.includes('/createuser')) {
+            return 'landed on the Rewards welcome/onboarding page (account not enrolled or session not established)'
+        }
+
+        return null
     }
 
     private parseDashboardHtml(html: string): DashboardData {
@@ -1048,7 +1112,10 @@ export default class PageController {
                                     if (typeof factory !== 'function') continue
                                     const src = factory.toString()
                                     if (!src.includes('reportActivity')) continue
-                                    const m = src.match(/createServerReference\)?\s*\(\s*"([a-f0-9]+)"/)
+                                    let m = src.match(/createServerReference\)?\s*\(\s*"([a-f0-9]{40,64})"[^)]*reportActivity/i)
+                                    if (!m) {
+                                        m = src.match(/reportActivity[\s\S]{0,300}?createServerReference\)?\s*\(\s*"([a-f0-9]{40,64})"/i)
+                                    }
                                     if (m?.[1]) return { actionId: m[1], moduleKey: key }
                                 }
                             }
@@ -1084,7 +1151,10 @@ export default class PageController {
                                 const resp = await fetch(el.src)
                                 const text = await resp.text()
                                 if (!text.includes('reportActivity')) continue
-                                const m = text.match(/createServerReference\)?\s*\(\s*"([a-f0-9]+)"/)
+                                let m = text.match(/createServerReference\)?\s*\(\s*"([a-f0-9]{40,64})"[^)]*reportActivity/i)
+                                if (!m) {
+                                    m = text.match(/reportActivity[\s\S]{0,300}?createServerReference\)?\s*\(\s*"([a-f0-9]{40,64})"/i)
+                                }
                                 if (m?.[1]) return m[1]
                             } catch {
                                 continue

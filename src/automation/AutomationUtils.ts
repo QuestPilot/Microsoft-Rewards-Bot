@@ -55,21 +55,19 @@ export default class AutomationUtils {
                 .filter(Boolean)
 
             if (visibleButtons.length > 0) {
-                await Promise.allSettled(
-                    visibleButtons.map(async b => {
-                        if (b) {
-                            const clicked = await this.ghostClick(page, b.selector)
-                            if (clicked) {
-                                this.bot.logger.debug(
-                                    this.bot.isMobile,
-                                    'DISMISS-ALL-MESSAGES',
-                                    `Dismissed: ${b.label}`
-                                )
-                            }
+                for (const b of visibleButtons) {
+                    if (b) {
+                        const clicked = await this.ghostClick(page, b.selector)
+                        if (clicked) {
+                            this.bot.logger.debug(
+                                this.bot.isMobile,
+                                'DISMISS-ALL-MESSAGES',
+                                `Dismissed: ${b.label}`
+                            )
+                            await this.bot.utils.wait(300)
                         }
-                    })
-                )
-                await this.bot.utils.wait(300)
+                    }
+                }
             }
 
             // --- Legacy Bing overlay (still present on bing.com search pages) ---

@@ -854,12 +854,22 @@ export class AuthManager {
     async verifyBingSession(page: Page, account?: Account): Promise<boolean> {
         const url =
             'https://www.bing.com/fd/auth/signin?action=interactive&provider=windows_live_id&return_url=https%3A%2F%2Fwww.bing.com%2F'
-        const loopMax = account?.password ? 12 : 6
+        // Mobile search authenticates via the OAuth access token, not the Bing
+        // browser cookie session — an unconfirmed Bing header is already treated as
+        // non-fatal below. The full multi-iteration loop (with networkidle gotos)
+        // otherwise stalls the run ~60s on www.bing.com for no benefit, so mobile
+        // does a single lightweight pass.
+        const loopMax = this.bot.isMobile ? 1 : account?.password ? 12 : 6
 
         this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Verifying Bing session')
 
         try {
-            await page.goto(url, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => {})
+            await page
+                .goto(url, {
+                    waitUntil: this.bot.isMobile ? 'domcontentloaded' : 'networkidle',
+                    timeout: this.bot.isMobile ? 5000 : 10000
+                })
+                .catch(() => {})
 
             for (let i = 0; i < loopMax; i++) {
                 if (page.isClosed()) break
