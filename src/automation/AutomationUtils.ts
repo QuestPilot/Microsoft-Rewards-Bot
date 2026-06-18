@@ -325,11 +325,34 @@ export default class AutomationUtils {
                 `Trying to click selector: ${selector}, options: ${JSON.stringify(options)}`
             )
 
-            // Wait for selector to exist before clicking
-            await page.waitForSelector(selector, { timeout: 1000 }).catch(() => {})
+            const locator = page.locator(selector).first()
 
-            const cursor = createCursor(page as any)
-            await cursor.click(selector, options)
+            await locator.waitFor({ state: 'attached', timeout: 5000 })
+            await locator.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {})
+            await this.moveMagicCursorTo(page, selector)
+
+            try {
+                const cursor = createCursor(page as any)
+                await cursor.click(selector, options)
+                return true
+            } catch (ghostError) {
+                this.bot.logger.debug(
+                    this.bot.isMobile,
+                    'GHOST-CLICK',
+                    `Ghost cursor failed for ${selector}, trying locator click: ${
+                        ghostError instanceof Error ? ghostError.message : String(ghostError)
+                    }`
+                )
+            }
+
+            const fallbackOptions = {
+                timeout: 5000,
+                button: options?.button,
+                clickCount: options?.clickCount,
+                delay: options?.waitForClick
+            }
+
+            await locator.click(fallbackOptions)
 
             return true
         } catch (error) {
@@ -339,6 +362,42 @@ export default class AutomationUtils {
                 `Failed for ${selector}: ${error instanceof Error ? error.message : String(error)}`
             )
             return false
+        }
+    }
+
+    /**
+     * Glide the bot's magic cursor (see MagicCursor.ts) onto a target element,
+     * then play the click effect. Purely cosmetic — it follows the bot, not the
+     * user's real mouse. Errors here never block the real click.
+     */
+    async moveMagicCursorTo(page: Page, selector: string): Promise<void> {
+        try {
+            const box = await page
+                .locator(selector)
+                .first()
+                .boundingBox({ timeout: 1000 })
+                .catch(() => null)
+            if (!box || (box.width === 0 && box.height === 0)) return
+
+            const ok = await page.evaluate(({ x, y }: { x: number; y: number }) => {
+                const move = (window as unknown as {
+                    __mgcMoveTo?: (x: number, y: number, click?: boolean) => void
+                }).__mgcMoveTo
+                if (typeof move !== 'function') return false
+                move(x, y, true)
+                return true
+            }, {
+                x: box.x + box.width / 2,
+                y: box.y + box.height / 2
+            })
+
+            if (ok) {
+                // Let the cursor orient, glide to the target (~0.5s) and land
+                // before the real click fires.
+                await this.bot.utils.wait(540)
+            }
+        } catch {
+            // Cosmetic only — ignore.
         }
     }
 

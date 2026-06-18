@@ -28,13 +28,21 @@ function maskEmail(email: string, mask: boolean): string {
 }
 
 function sanitize(value: string): string {
-    // Strip any attempt to include @everyone / @here / role/user pings inside field content.
-    // The webhook already sends `allowed_mentions: { parse: [] }` which prevents Discord
-    // from resolving them, but we clean the raw text too for extra clarity.
     return value
+        // Discord ping protection
         .replace(/@everyone/gi, '@ everyone')
         .replace(/@here/gi, '@ here')
         .replace(/<@[!&]?\d+>/g, '[mention]')
+        // Redact IPv4 addresses (could be a user's home IP or proxy IP)
+        .replace(/\b(\d{1,3}\.){3}\d{1,3}\b/g, '[ip]')
+        // Redact IPv6 addresses
+        .replace(/([0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{0,4}/g, '[ip]')
+        // Redact URLs that could contain credentials or proxy addresses
+        .replace(/https?:\/\/[^\s"')]+/gi, '[url]')
+        // Redact Windows/Unix absolute paths that could expose usernames
+        .replace(/[A-Za-z]:\\[^\s"']+/g, '[path]')
+        .replace(/\/home\/[^\s"']+/g, '[path]')
+        .replace(/\/Users\/[^\s"']+/g, '[path]')
 }
 
 function formatDuration(seconds: number): string {
@@ -148,6 +156,12 @@ export async function sendAutoReportRunSummary(
     const hasFailures = failed.length > 0
     const color = hasFailures ? COLOR_WARNING : COLOR_SUCCESS
 
+    const avgCollected = successful.length > 0 ? Math.round(totalCollected / successful.length) : 0
+    const bestEarner = successful.reduce<AutoReportAccountStats | null>(
+        (best, a) => (best === null || a.collectedPoints > best.collectedPoints ? a : best),
+        null
+    )
+
     const fields: Array<{ name: string; value: string; inline?: boolean }> = [
         {
             name: 'Results',
@@ -157,6 +171,11 @@ export async function sendAutoReportRunSummary(
         {
             name: 'Points Collected',
             value: `+${totalCollected.toLocaleString()}`,
+            inline: true
+        },
+        {
+            name: 'Avg / Account',
+            value: `+${avgCollected.toLocaleString()}`,
             inline: true
         },
         {
@@ -176,14 +195,31 @@ export async function sendAutoReportRunSummary(
         }
     ]
 
-    if (failed.length > 0) {
-        const failedList = failed
-            .slice(0, 5)
-            .map(a => `• ${sanitize(maskEmail(a.email, config.maskEmails !== false))}: ${sanitize(String(a.error || 'Unknown').slice(0, 100))}`)
-            .join('\n')
+    if (bestEarner && bestEarner.collectedPoints > 0) {
         fields.push({
-            name: `Failed Accounts (${failed.length})`,
-            value: failedList.slice(0, 1024),
+            name: 'Top Account',
+            value: `${sanitize(maskEmail(bestEarner.email, config.maskEmails !== false))} (+${bestEarner.collectedPoints.toLocaleString()})`,
+            inline: false
+        })
+    }
+
+    // Per-account breakdown — successes AND failures, so healthy accounts are
+    // visible too (not just errors). Capped to fit Discord's 1024-char field.
+    if (accounts.length > 0) {
+        const lines: string[] = []
+        const maxLines = 15
+        for (const a of accounts.slice(0, maxLines)) {
+            const name = sanitize(maskEmail(a.email, config.maskEmails !== false))
+            lines.push(
+                a.success
+                    ? `✅ ${name}: +${a.collectedPoints.toLocaleString()} • ${formatDuration(a.duration)}`
+                    : `❌ ${name}: ${sanitize(String(a.error || 'Unknown').slice(0, 60))}`
+            )
+        }
+        if (accounts.length > maxLines) lines.push(`…and ${accounts.length - maxLines} more`)
+        fields.push({
+            name: `Per-Account (${accounts.length})`,
+            value: lines.join('\n').slice(0, 1024),
             inline: false
         })
     }

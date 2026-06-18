@@ -83,3 +83,19 @@ test('dashboard parser extracts minimal data from Rewards Next.js RSC models whe
     assert.equal(child2.pointProgressMax, 10)
     assert.equal(child2.complete, true)
 })
+
+test('dashboard parser falls back to Rewards DOM shell when RSC data is absent', () => {
+    const fixtureDir = path.join(root, 'Page')
+    const fixture = fs
+        .readdirSync(fixtureDir)
+        .find(file => file.startsWith('Dashboard') && file.endsWith('.html'))
+
+    if (!fixture) return
+
+    const controller = createController()
+    const parsed = controller.parseDashboardHtml(fs.readFileSync(path.join(fixtureDir, fixture), 'utf8'))
+
+    assert.equal(parsed.userStatus.availablePoints, 1423)
+    assert.equal(parsed.userStatus.levelInfo.bingStarMonthlyBonusMaximum, 0)
+    assert.deepEqual(parsed.userStatus.counters.pcSearch, [])
+})

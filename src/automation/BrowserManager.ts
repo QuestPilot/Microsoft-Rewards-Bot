@@ -8,6 +8,7 @@ import type { MicrosoftRewardsBot } from '../index'
 import { DESKTOP_BROWSER_VIEWPORT, DESKTOP_BROWSER_WINDOW_ARG } from './BrowserViewport'
 import { CORE_PROMO_BANNER_RUNTIME_CONFIG, installCorePromoBanner } from './CorePromoBanner'
 import { FingerprintManager } from './FingerprintManager'
+import { installMagicCursor } from './MagicCursor'
 
 import type { Account, AccountProxy } from '../types/Account'
 
@@ -57,7 +58,11 @@ class BrowserManager {
         '--webrtc-ip-handling-policy=disable_non_proxied_udp',
         '--disable-webrtc-hw-encoding',
         '--disable-webrtc-hw-decoding',
-        '--start-maximized',
+        // NOTE: no `--start-maximized`. The context uses a fixed viewport that
+        // matches the injected fingerprint's screen (see DESKTOP_BROWSER_VIEWPORT),
+        // so the OS window must be sized to that same viewport. Maximizing the
+        // window while the page stays at a smaller fixed viewport creates a
+        // window/viewport geometry mismatch that is an easy bot tell.
         DESKTOP_BROWSER_WINDOW_ARG
     ] as const
 
@@ -161,6 +166,11 @@ class BrowserManager {
             })
 
             await context.addInitScript(installCorePromoBanner, CORE_PROMO_BANNER_RUNTIME_CONFIG)
+
+            // Persistent magic cursor overlay — visible from the moment any page
+            // loads, follows the real pointer the bot drives, and survives every
+            // navigation. Purely cosmetic.
+            await context.addInitScript(installMagicCursor)
 
             context.setDefaultTimeout(this.bot.utils.stringToNumber(this.bot.config?.globalTimeout ?? 30000))
 

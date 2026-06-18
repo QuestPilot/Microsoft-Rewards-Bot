@@ -971,7 +971,7 @@ export class MicrosoftRewardsBot {
 
                 // Capture STAR Bonus and monthly tier bonus from the new dashboard
                 const li = data.userStatus.levelInfo
-                if ((li.bingStarMonthlyBonusMaximum ?? 0) > 0 || (li.monthlyLevelBonusMaximum ?? 0) > 0) {
+                if (li && ((li.bingStarMonthlyBonusMaximum ?? 0) > 0 || (li.monthlyLevelBonusMaximum ?? 0) > 0)) {
                     this.userData.starBonus = {
                         activeLevelName: li.activeLevelName ?? '',
                         monthlyProgress: li.bingStarMonthlyBonusProgress ?? 0,

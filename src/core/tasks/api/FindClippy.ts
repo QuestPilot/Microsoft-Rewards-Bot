@@ -141,7 +141,7 @@ export class FindClippy extends TaskBase {
         )
 
         try {
-            const page = this.bot.mainMobilePage
+            const page = this.getActiveTaskPage()
             if (!page || page.isClosed()) {
                 this.bot.logger.warn(this.bot.isMobile, 'FIND-CLIPPY', 'Browser page not available, skipping')
                 return

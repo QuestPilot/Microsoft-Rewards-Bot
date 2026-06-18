@@ -1,4 +1,5 @@
 import type { AxiosRequestConfig } from 'axios'
+import { load } from 'cheerio'
 import type { BrowserContext, Cookie, Page } from 'patchright'
 
 import type { StorageOrigin } from '../helpers/ConfigLoader'
@@ -161,7 +162,17 @@ export default class PageController {
             return rewardsNextData
         }
 
-        throw new Error('Dashboard data not found in HTML (tried legacy embed + Next.js chunks)')
+        const rewardsDomData = this.buildDashboardDataFromRewardsDomHtml(html)
+        if (rewardsDomData) {
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'GET-DASHBOARD-DATA',
+                'Extracted minimal dashboard data from Rewards DOM shell'
+            )
+            return rewardsDomData
+        }
+
+        throw new Error('Dashboard data not found in HTML (tried legacy embed + Next.js chunks + Rewards DOM shell)')
     }
 
     private extractNextData(html: string): string | null {
@@ -247,6 +258,7 @@ export default class PageController {
         return {
             userStatus: {
                 availablePoints,
+                levelInfo: this.createEmptyLevelInfo(),
                 counters: {
                     pcSearch: [],
                     mobileSearch: [],
@@ -264,6 +276,118 @@ export default class PageController {
                 }
             }
         } as unknown as DashboardData
+    }
+
+    private buildDashboardDataFromRewardsDomHtml(html: string): DashboardData | null {
+        if (
+            !/<section[^>]+id=(?:"|')?(?:dailyset|moreactivities|quests|snapshot|offers|levelup)(?:"|'|\s|>)/i.test(
+                html
+            )
+        ) {
+            return null
+        }
+
+        const $ = load(html)
+        const bodyText = $('body').text().replace(/\s+/g, ' ').trim()
+        const availablePoints = this.readAvailablePointsFromRewardsDom(bodyText) ?? 0
+
+        return {
+            userStatus: {
+                availablePoints,
+                levelInfo: this.createEmptyLevelInfo(),
+                counters: {
+                    pcSearch: [],
+                    mobileSearch: [],
+                    activityAndQuiz: [],
+                    dailyPoint: []
+                }
+            },
+            dailySetPromotions: {},
+            morePromotions: [],
+            morePromotionsWithoutPromotionalItems: [],
+            promotionalItems: [],
+            userProfile: {
+                attributes: {
+                    country: 'us'
+                }
+            }
+        } as unknown as DashboardData
+    }
+
+    private readAvailablePointsFromRewardsDom(text: string): number | null {
+        const match = text.match(/available points\s*([0-9][0-9,.\s]*)/i)
+        if (!match?.[1]) return null
+
+        return this.parseRewardsPointNumber(match[1])
+    }
+
+    private parseRewardsPointNumber(value: string): number | null {
+        const normalized = value.replace(/\s+/g, '').replace(/[,.](?=\d{3}(?:\D|$))/g, '')
+        const digits = normalized.replace(/[^\d]/g, '')
+        if (!digits) return null
+
+        const parsed = Number.parseInt(digits, 10)
+        return Number.isFinite(parsed) ? parsed : null
+    }
+
+    private createEmptyLevelInfo(): DashboardData['userStatus']['levelInfo'] {
+        return {
+            isNewLevelsFeatureAvailable: false,
+            lastMonthLevel: '',
+            activeLevel: '',
+            activeLevelName: '',
+            progress: 0,
+            progressMax: 0,
+            levels: [],
+            benefitsPromotion: {} as DashboardData['userStatus']['levelInfo']['benefitsPromotion'],
+            levelUpActivitiesProgress: 0,
+            levelUpActivitiesMax: 0,
+            levelUpActivityDefaultSearchEngineDays: 0,
+            levelUpActivityDefaultSearchEngineCompletedAmount: 0,
+            levelUpActivityDailySetStreakDays: 0,
+            levelUpActivityDailySetCompletedAmount: 0,
+            levelUpActivityDailyStreaksCompletedAmount: 0,
+            levelUpActivityXboxGamePassCompleted: false,
+            bingStarMonthlyBonusProgress: 0,
+            bingStarMonthlyBonusMaximum: 0,
+            bingStarBonusWeeklyProgress: 0,
+            bingStarBonusWeeklyState: '',
+            defaultSearchEngineMonthlyBonusProgress: 0,
+            defaultSearchEngineMonthlyBonusMaximum: 0,
+            defaultSearchEngineMonthlyBonusState: '',
+            monthlyLevelBonusProgress: 0,
+            monthlyLevelBonusMaximum: 0,
+            monthlyLevelBonusState: '',
+            monthlyDistributionChartSrc: '',
+            bingSearchDailyPoints: 0,
+            pointsPerSearch: 0,
+            hvaLevelUpActivityDailySetCompletedAmount_V2: '0',
+            hvaLevelUpActivityDailySetCompletedMax_V2: '0',
+            hvaLevelUpActivityDailySetDays_V2: '0',
+            hvaLevelUpActivityDailySetDaysMax_V2: '0',
+            hvaLevelUpActivityDailySetProgress_V2: false,
+            hvaLevelUpActivityDailySetDisplay_V2: false,
+            hvaLevelUpActivityDailyStreaksBingCompletedAmount_V2: '0',
+            hvaLevelUpActivityDailyStreaksBingCompletedMax_V2: '0',
+            hvaLevelUpActivityDailyStreaksBingProgress_V2: false,
+            hvaLevelUpActivityDailyStreaksBingDisplay_V2: false,
+            hvaLevelUpActivityDailyStreaksMobileCompletedAmount_V2: '0',
+            hvaLevelUpActivityDailyStreaksMobileCompletedMax_V2: '0',
+            hvaLevelUpActivityDailyStreaksMobileProgress_V2: false,
+            hvaLevelUpActivityDailyStreaksMobileDisplay_V2: false,
+            hvaLevelUpDefaultSearchEngineCompletedAmount_V2: '0',
+            hvaLevelUpActivityDefaultSearchEngineCompletedMax_V2: '0',
+            hvaLevelUpActivityDefaultSearchEngineDays_V2: '0',
+            hvaLevelUpActivityDefaultSearchEngineDaysMax_V2: '0',
+            hvaLevelUpActivityDefaultSearchEngineProgress_V2: false,
+            hvaLevelUpActivityDefaultSearchEngineDisplay_V2: false,
+            hvaLevelUpActivityXboxGamePassCompletedAmount_V2: '0',
+            hvaLevelUpActivityXboxGamePassCompletedMax_V2: '0',
+            hvaLevelUpActivityXboxGamePassProgress_V2: false,
+            hvaLevelUpActivityXboxGamePassDisplay_V2: false,
+            programRestructureWave2HvaFlight: '',
+            programRestructureHvaSevenDayLink: ''
+        } as DashboardData['userStatus']['levelInfo']
     }
 
     private extractRewardsNextDailySetPromotions(text: string): DashboardData['dailySetPromotions'] {

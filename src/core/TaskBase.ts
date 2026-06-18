@@ -16,6 +16,18 @@ export class TaskBase {
         this.bot = bot
     }
 
+    protected getActiveTaskPage(): Page | null {
+        const primary = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
+        const fallback = this.bot.isMobile ? this.bot.mainDesktopPage : this.bot.mainMobilePage
+        const pages: Array<Page | undefined> = [primary, fallback]
+
+        for (const page of pages) {
+            if (page && !page.isClosed()) return page
+        }
+
+        return null
+    }
+
     public async doDailySet(data: DashboardData, page: Page) {
         const todayKey = this.bot.utils.getFormattedDate()
         const todayData = data.dailySetPromotions[todayKey]
@@ -188,7 +200,6 @@ export class TaskBase {
         for (const activity of activities) {
             try {
                 const type = activity.promotionType?.toLowerCase() ?? ''
-                const name = activity.name?.toLowerCase() ?? ''
                 const offerId = (activity as BasePromotion).offerId
                 const destinationUrl = activity.destinationUrl?.toLowerCase() ?? ''
 
@@ -234,8 +245,8 @@ export class TaskBase {
                         case 'urlreward': {
                             const basePromotion = activity as BasePromotion
 
-                            // Search on Bing are subtypes of "urlreward"
-                            if (name.includes('exploreonbing')) {
+                            // Search-on-Bing activities are urlreward subtypes on the new dashboard.
+                            if (this.isSearchOnBingPromotion(activity)) {
                                 this.bot.logger.info(
                                     this.bot.isMobile,
                                     'ACTIVITY',
@@ -300,5 +311,46 @@ export class TaskBase {
                 )
             }
         }
+    }
+
+    private isSearchOnBingPromotion(activity: BasePromotion): boolean {
+        const destinationUrl = activity.destinationUrl ?? ''
+        const fields = [
+            activity.name,
+            activity.offerId,
+            activity.promotionSubtype,
+            activity.title,
+            activity.description,
+            activity.linkText,
+            destinationUrl
+        ]
+            .filter((value): value is string => typeof value === 'string')
+            .join(' ')
+            .toLowerCase()
+
+        if (fields.includes('exploreonbing') || fields.includes('searchonbing')) return true
+
+        try {
+            const destination = new URL(destinationUrl)
+            const hostname = destination.hostname.toLowerCase()
+            if (hostname !== 'bing.com' && !hostname.endsWith('.bing.com')) return false
+
+            const pathname = destination.pathname.toLowerCase()
+            const isBingLanding = pathname === '' || pathname === '/'
+            const isBingSearch = pathname === '/search'
+            if (!isBingLanding && !isBingSearch) return false
+
+            const params = destination.searchParams
+            const features = params.get('features')?.toLowerCase() ?? ''
+            const form = params.get('form')?.toLowerCase() ?? ''
+            const ocid = params.get('ocid')?.toLowerCase() ?? ''
+
+            if (features.includes('vstooltip')) return true
+            if ((form.startsWith('ml2x') || ocid.startsWith('ml2x')) && !params.has('filters')) return true
+        } catch {
+            return false
+        }
+
+        return false
     }
 }

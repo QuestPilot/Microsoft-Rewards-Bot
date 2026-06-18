@@ -32,7 +32,7 @@ export class RewardsSidePanelController {
 
             return {
                 panelCount: panels.length,
-                switchCount: document.querySelectorAll('input[role="switch"]').length,
+                switchCount: document.querySelectorAll('input[role="switch"], button[role="switch"]').length,
                 expandedDisclosureCount: document.querySelectorAll('button[aria-expanded="true"]').length,
                 progressBarCount: document.querySelectorAll('[role="progressbar"]').length,
                 buttonCount: panels.reduce((count, panel) => count + panel.querySelectorAll('button').length, 0)
@@ -55,15 +55,43 @@ export class RewardsSidePanelController {
         const clicked = await this.page.evaluate(
             ({ token, scope }) => {
                 const root = document.querySelector(scope) ?? document.body
-                const images = Array.from(root.querySelectorAll('img[src], img[srcset]'))
-                const image = images.find(img => {
-                    const src = img.getAttribute('src') ?? ''
-                    const srcset = img.getAttribute('srcset') ?? ''
-                    return src.includes(token) || srcset.includes(token)
-                })
-                const trigger = image?.closest('button[aria-expanded], button[data-rac], a[data-rac]') as
-                    | HTMLElement
-                    | null
+                const isVisibleElement = (el: Element): boolean => {
+                    const rect = el.getBoundingClientRect()
+                    const style = window.getComputedStyle(el)
+                    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
+                }
+                const tokenLower = token.toLowerCase()
+                const matchesToken = (el: Element): boolean =>
+                    [
+                        el.getAttribute('src'),
+                        el.getAttribute('srcset'),
+                        el.getAttribute('alt'),
+                        el.getAttribute('aria-label'),
+                        el.getAttribute('title'),
+                        el.textContent
+                    ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase()
+                        .includes(tokenLower)
+                const findTrigger = (el: Element | undefined): HTMLElement | null =>
+                    (el?.closest('button[aria-expanded], button[data-rac], a[data-rac]') as HTMLElement | null) ?? null
+
+                const images = Array.from(root.querySelectorAll('img[src], img[srcset], img[alt]'))
+                let trigger = findTrigger(images.find(matchesToken))
+
+                if (!trigger) {
+                    const candidates = Array.from(
+                        root.querySelectorAll<HTMLElement>(
+                            'button[aria-expanded]:not([slot="trigger"]), button[data-rac]:not([slot="trigger"]), a[data-rac]'
+                        )
+                    ).filter(isVisibleElement)
+                    trigger =
+                        candidates.find(matchesToken) ??
+                        candidates.find(el => el.matches('button[aria-expanded="false"]')) ??
+                        null
+                }
+
                 if (!trigger) return false
                 trigger.click()
                 return true
@@ -88,13 +116,26 @@ export class RewardsSidePanelController {
         return this.page.evaluate(
             ({ token, scope }) => {
                 const root = document.querySelector(scope) ?? document.body
-                const images = Array.from(root.querySelectorAll('img[src], img[srcset]'))
-                const image = images.find(img => {
-                    const src = img.getAttribute('src') ?? ''
-                    const srcset = img.getAttribute('srcset') ?? ''
-                    return src.includes(token) || srcset.includes(token)
-                })
-                const trigger = image?.closest('button[aria-expanded="true"]') as HTMLElement | null
+                const tokenLower = token.toLowerCase()
+                const matchesToken = (el: Element): boolean =>
+                    [
+                        el.getAttribute('src'),
+                        el.getAttribute('srcset'),
+                        el.getAttribute('alt'),
+                        el.getAttribute('aria-label'),
+                        el.getAttribute('title'),
+                        el.textContent
+                    ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase()
+                        .includes(tokenLower)
+
+                const images = Array.from(root.querySelectorAll('img[src], img[srcset], img[alt]'))
+                const image = images.find(matchesToken)
+                const trigger =
+                    (image?.closest('button[aria-expanded="true"]') as HTMLElement | null) ??
+                    root.querySelector<HTMLElement>('button[aria-expanded="true"]:not([slot="trigger"])')
                 if (!trigger) return false
                 trigger.click()
                 return true
@@ -121,7 +162,25 @@ export class RewardsSidePanelController {
             })
 
             if (!input) {
-                return { found: false, disabled: false, before: null, after: null, changed: false }
+                const buttonSwitches = Array.from(document.querySelectorAll<HTMLButtonElement>('button[role="switch"]'))
+                const button = buttonSwitches.find(isVisibleElement)
+                if (!button) {
+                    return { found: false, disabled: false, before: null, after: null, changed: false }
+                }
+
+                const before = button.getAttribute('aria-checked') === 'true'
+                const disabled =
+                    button.disabled ||
+                    button.getAttribute('aria-disabled') === 'true' ||
+                    button.closest('[data-disabled="true"]') !== null
+                if (disabled || before === targetChecked) {
+                    return { found: true, disabled, before, after: before, changed: false }
+                }
+
+                button.click()
+
+                const after = button.getAttribute('aria-checked') === 'true'
+                return { found: true, disabled: false, before, after, changed: after !== before }
             }
 
             const before = input.checked

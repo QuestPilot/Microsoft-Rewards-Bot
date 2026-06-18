@@ -4089,8 +4089,8 @@ function html() {
         return true;
       }
       function openModal() {
-        if (modalOpen || !eligible()) return;
-        if (G('fb-modal').classList.contains('open')) return;
+        if (modalOpen || !eligible()) return false;
+        if (G('fb-modal').classList.contains('open')) return false;
         modalOpen = true;
         selectedRating = 0;
         G('fb-btn-submit').disabled = true;
@@ -4100,6 +4100,7 @@ function html() {
         st.lastAskAt = Date.now(); // starts the >= 1 month cooldown
         save(st);
         G('fb-modal').classList.add('open');
+        return true;
       }
 
       // Bind the modal controls ONCE.
@@ -4150,9 +4151,12 @@ function html() {
           save(st);
           if (ok && pts > 0) { openModal(); return; }
         }
+        // Fallback ask once eligible. Only "burn" the session fallback when the
+        // modal actually opened — otherwise (premium license still loading, not
+        // enough runs yet, cooldown active) keep checking so it can still appear
+        // later this session instead of being permanently skipped.
         if (!fallbackDone && (Date.now() - sessionStart) > STARTUP_DELAY_MS && !(d && d.isRunning)) {
-          fallbackDone = true;
-          openModal();
+          if (openModal()) fallbackDone = true;
         }
       }, 2000);
     })();
@@ -4359,7 +4363,11 @@ const server = http.createServer((req, res) => {
                 display: 'standalone',
                 background_color: '#040912',
                 theme_color: '#071425',
-                icons: [{ src: '/app-icon.png', sizes: '512x512', type: 'image/png' }]
+                icons: [
+                    { src: '/app-icon.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+                    { src: '/app-icon.png', sizes: '256x256', type: 'image/png', purpose: 'any' },
+                    { src: '/app-icon.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+                ]
             })
         )
         return
@@ -4714,60 +4722,102 @@ server.listen(PORT, '127.0.0.1', () => {
     setInterval(() => void refreshAgentState(), 900)
 })
 
+// Prepare the app browser profile for a clean launch.
+//
+// Chrome stores a "SingletonLock" (and related files) in the root of the
+// user-data-dir. If the machine is shut down or rebooted while the desk is
+// open, those files are left behind. On next boot Chrome reads the stale lock,
+// tries to contact the process that is gone, and exits WITHOUT opening a window
+// — forcing the user to launch twice.
+//
+// Fix: delete ALL regular files in the profile root before spawning Chrome.
+// Sub-directories (Default/, Safe Browsing/, …) hold real profile data and are
+// left untouched, so preferences, extensions, and cached state survive. Only
+// the root-level files (all lock variants, Local State, etc.) are cleared.
+// Chrome re-creates whatever it needs on startup, cleanly, every time.
+//
+// We also create the directory proactively — if %TEMP% was wiped (e.g. on
+// Windows "Storage Sense" cleanup), Chrome would try to build the profile from
+// scratch; giving it a pre-made dir shaves off noticeable startup latency.
+function prepareBrowserProfile(profileDir) {
+    try {
+        fs.mkdirSync(profileDir, { recursive: true })
+    } catch {
+        // ignore
+    }
+    try {
+        for (const entry of fs.readdirSync(profileDir, { withFileTypes: true })) {
+            if (!entry.isDirectory()) {
+                fs.rmSync(path.join(profileDir, entry.name), { force: true })
+            }
+        }
+    } catch {
+        // Best-effort — never block the launch on a cleanup error.
+    }
+}
+
 function openAppWindow(url) {
     const browser = resolveAppBrowser()
-    if (browser) {
-        const profileDir = path.join(os.tmpdir(), 'microsoft-rewards-bot-app')
-        childProcess
-            .spawn(
-                browser.command,
-                [
-                    ...browser.args,
-                    `--app=${url}`,
-                    `--window-size=${APP_WINDOW_WIDTH},${APP_WINDOW_HEIGHT}`,
-                    '--start-maximized',
-                    '--no-first-run',
-                    '--disable-extensions',
-                    `--user-data-dir=${profileDir}`,
-                    process.platform === 'linux' ? '--class=RewardsBot' : ''
-                ].filter(Boolean),
-                {
-                    detached: true,
-                    stdio: 'ignore',
-                    windowsHide: true
-                }
-            )
-            .unref()
+    if (!browser) {
+        // No Chromium-based browser available at all — last-resort only.
+        pushLog('warn', 'Desk window: bundled Chromium unavailable, opening in the default browser.')
+        openDefaultBrowser(url)
         return
     }
 
-    openDefaultBrowser(url)
+    // Diagnostic so the desk console shows exactly which browser is used —
+    // confirms it's our bundled Chromium and not a system Edge/Chrome.
+    pushLog('info', `Desk window: launching ${path.basename(browser.command)} (${browser.command})`)
+
+    const profileDir = path.join(os.tmpdir(), 'microsoft-rewards-bot-app')
+
+    // Clear stale singleton locks first so the very first launch after a reboot
+    // opens reliably (see clearBrowserSingletonLocks). Then launch ONCE — on
+    // Windows the launcher process returns immediately while the real browser
+    // runs detached, so we must NOT treat a fast exit as a failure (doing so
+    // previously caused duplicate windows + the default browser opening too).
+    prepareBrowserProfile(profileDir)
+    childProcess
+        .spawn(
+            browser.command,
+            [
+                ...browser.args,
+                `--app=${url}`,
+                `--window-size=${APP_WINDOW_WIDTH},${APP_WINDOW_HEIGHT}`,
+                '--no-first-run',
+                '--no-default-browser-check',
+                '--disable-extensions',
+                '--disable-sync',
+                '--disable-default-apps',
+                '--disable-background-networking',
+                '--metrics-recording-only',
+                // Suppress the "Chrome for Testing — only for automated testing"
+                // banner. --disable-infobars was removed in Chrome 109 so it does
+                // nothing; --test-type=webdriver is the flag Patchright/Playwright
+                // uses internally and is the only reliable way to kill this banner
+                // in Chrome for Testing builds.
+                '--test-type=webdriver',
+                `--user-data-dir=${profileDir}`,
+                process.platform === 'linux' ? '--class=RewardsBot' : ''
+            ].filter(Boolean),
+            {
+                detached: true,
+                stdio: 'ignore',
+                windowsHide: true
+            }
+        )
+        .unref()
 }
 
 function resolveAppBrowser() {
+    // Escape hatch for power users / debugging only.
     if (process.env.MSRB_APP_BROWSER) return { command: process.env.MSRB_APP_BROWSER, args: [] }
 
-    const candidates =
-        process.platform === 'win32'
-            ? [
-                  path.join(process.env.ProgramFiles || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-                  path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-                  path.join(process.env.ProgramFiles || '', 'Chromium', 'Application', 'chrome.exe'),
-                  path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-                  path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe')
-              ]
-            : process.platform === 'darwin'
-              ? [
-                    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-                    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-                    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
-                ]
-              : ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge']
-
-    for (const candidate of candidates) {
-        if (path.isAbsolute(candidate) && fs.existsSync(candidate)) return { command: candidate, args: [] }
-        if (!path.isAbsolute(candidate) && commandExists(candidate)) return { command: candidate, args: [] }
-    }
+    // ALWAYS use the Chromium we install via npm (Patchright). One identical
+    // browser for every user and every OS → consistent behaviour, fewer
+    // environment-specific bugs, and we never touch the user's system browsers
+    // (no Edge, no Firefox, no Chrome). start.js guarantees it is installed via
+    // ensurePatchrightChromium() before the desk window is opened.
     return resolveBundledChromium()
 }
 

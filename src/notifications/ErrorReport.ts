@@ -33,9 +33,20 @@ function maskEmail(email: string): string {
  */
 function redact(text: string): string {
     return text
+        // Mask any email address
         .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, m => maskEmail(m))
+        // Mask Core license keys
         .replace(/MSRB-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/gi, 'MSRB-****-****-****-****')
-        .replace(/(token|password|secret|cookie|authorization|bearer)\s*[=:]\s*\S+/gi, '$1=[redacted]')
+        // Mask key=value / key:value credential pairs
+        .replace(/(token|password|secret|cookie|authorization|bearer|passwd|pwd)\s*[=:]\s*\S+/gi, '$1=[redacted]')
+        // Mask IPv4 addresses (could be proxy or home IP)
+        .replace(/\b(\d{1,3}\.){3}\d{1,3}\b/g, '[ip]')
+        // Mask URLs (could contain credentials or proxy addresses)
+        .replace(/https?:\/\/[^\s"')]+/gi, '[url]')
+        // Mask absolute file paths that expose the OS username
+        .replace(/[A-Za-z]:\\[^\s"']+/g, '[path]')
+        .replace(/\/home\/[^\s"']+/g, '[path]')
+        .replace(/\/Users\/[^\s"']+/g, '[path]')
         .slice(0, 800)
 }
 
