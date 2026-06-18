@@ -10,7 +10,7 @@ test('app window runs as a desktop-style launcher instead of the old browser pag
     assert.match(source, /--app=\$\{url\}/)
     assert.match(source, /APP_WINDOW_WIDTH = 1500/)
     assert.match(source, /APP_WINDOW_HEIGHT = 900/)
-    assert.match(source, /--start-maximized/)
+    assert.match(source, /--window-size=/)
     assert.match(source, /windowsHide:\s*true/)
     assert.match(source, /assets', 'logo\.png'/)
     assert.match(source, /rel="icon"/)
