@@ -430,6 +430,7 @@ export default class PageController {
             const hash = this.stringValue(parsed.hash)
             const destination = this.stringValue(parsed.destination)
             if (!offerId || !hash || !destination) continue
+            if (/^Global_DailySet_/i.test(offerId) || this.stringValue(parsed.date)) continue
 
             promotions.set(offerId, this.createRewardsNextPromotion(parsed))
         }

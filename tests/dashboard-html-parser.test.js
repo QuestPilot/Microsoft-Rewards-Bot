@@ -84,6 +84,40 @@ test('dashboard parser extracts minimal data from Rewards Next.js RSC models whe
     assert.equal(child2.complete, true)
 })
 
+test('dashboard parser does not classify daily set entries as more promotions', () => {
+    const controller = createController()
+    const futureDailySet = {
+        offerId: 'Global_DailySet_20260619_Child1',
+        hash: 'daily-hash',
+        date: '06/19/2026',
+        destination: 'https://www.bing.com/search?q=future',
+        title: 'Future daily set',
+        points: 10,
+        isCompleted: false
+    }
+    const morePromotion = {
+        offerId: 'Rewards_MorePromotion_1',
+        hash: 'more-hash',
+        destination: 'https://www.bing.com/search?q=offer&features=vstooltip&form=ML2XYA',
+        title: 'More promotion',
+        points: 10,
+        isCompleted: false
+    }
+    const model = {
+        balance: 1423,
+        country: 'fr',
+        dailySetItems: [futureDailySet],
+        offers: [futureDailySet, morePromotion]
+    }
+    const html = `<script>self.__next_f.push([1,${JSON.stringify(`1:${JSON.stringify(model)}`)}])</script>`
+
+    const parsed = controller.parseDashboardHtml(html)
+
+    assert.equal(parsed.dailySetPromotions['06/19/2026'].length, 1)
+    assert.equal(parsed.morePromotions.some(item => item.offerId.startsWith('Global_DailySet_')), false)
+    assert.equal(parsed.morePromotions.some(item => item.offerId === 'Rewards_MorePromotion_1'), true)
+})
+
 test('dashboard parser falls back to Rewards DOM shell when RSC data is absent', () => {
     const fixtureDir = path.join(root, 'Page')
     const fixture = fs
