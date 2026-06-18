@@ -258,6 +258,33 @@ export function installMagicCursor(): void {
 
         setInterval(idleTick, 2200)
 
+        // ── Show click ripple for every real bot click ────────────────────────
+        // When Playwright fires any click (ghostClick, locator.click, btn.click…)
+        // a mousedown fires in the page. We play the ripple at the exact click
+        // site and the press-scale on the cursor — wherever it currently is.
+        // We do NOT move the cursor here: ghostClick's __mgcMoveTo() already
+        // glided it to the target 650 ms earlier. Moving on mousedown would cause
+        // a jarring jump. We also do NOT listen to mousemove: this cursor is the
+        // bot's cursor only, not the user's physical mouse.
+        document.addEventListener(
+            'mousedown',
+            (ev: MouseEvent) => {
+                try {
+                    w.__mgcLastActive = Date.now()
+                    const i = inner()
+                    if (i) i.classList.add('__mgc_press__')
+                    clickRipple(ev.clientX, ev.clientY)
+                    setTimeout(() => {
+                        const j = inner()
+                        if (j) j.classList.remove('__mgc_press__')
+                    }, 150)
+                } catch {
+                    /* cosmetic only */
+                }
+            },
+            true
+        )
+
         w.__mgcInstalled = true
     } catch {
         // Cosmetic only — never let the cursor break a real run.

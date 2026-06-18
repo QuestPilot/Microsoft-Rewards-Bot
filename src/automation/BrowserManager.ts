@@ -167,10 +167,11 @@ class BrowserManager {
 
             await context.addInitScript(installCorePromoBanner, CORE_PROMO_BANNER_RUNTIME_CONFIG)
 
-            // Persistent magic cursor overlay — visible from the moment any page
-            // loads, follows the real pointer the bot drives, and survives every
-            // navigation. Purely cosmetic.
-            await context.addInitScript(installMagicCursor)
+            // Persistent magic cursor overlay — skipped in headless mode (no
+            // window to see it, and the extra init script wastes time).
+            if (!this.bot.config.headless) {
+                await context.addInitScript(installMagicCursor)
+            }
 
             context.setDefaultTimeout(this.bot.utils.stringToNumber(this.bot.config?.globalTimeout ?? 30000))
 

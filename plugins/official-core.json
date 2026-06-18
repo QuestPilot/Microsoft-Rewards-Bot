@@ -3,7 +3,7 @@
   "version": "2.0.1.3",
   "targets": {
     "win32-x64-node-24.15.0": {
-      "indexSha256": "7c39fe94889f6d06bf9c36ea71230a704036c40403e72bf9286353d482049430",
+      "indexSha256": "5fa1c81e6a825c6721e596102a4a1303abd02ea6e7c74e1382224e7839022d6f",
       "bytecodeTarget": {
         "node": "24.15.0",
         "platform": "win32",

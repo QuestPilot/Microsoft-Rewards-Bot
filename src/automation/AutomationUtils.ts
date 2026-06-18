@@ -391,8 +391,8 @@ export default class AutomationUtils {
 
             if (ok) {
                 // Let the cursor orient, glide to the target (~0.5s) and land
-                // before the real click fires.
-                await this.bot.utils.wait(540)
+                // with a comfortable margin before the real click fires.
+                await this.bot.utils.wait(650)
             }
         } catch {
             // Cosmetic only — ignore.
