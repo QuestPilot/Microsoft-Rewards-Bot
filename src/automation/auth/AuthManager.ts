@@ -30,6 +30,7 @@ type LoginState =
     | 'OTP_CODE_ENTRY'
     | 'UNKNOWN'
     | 'CHROMEWEBDATA_ERROR'
+    | 'UNEXPECTED_NOTICE'
 
 export class AuthManager {
     emailStrategy: EmailStrategy
@@ -125,7 +126,12 @@ export class AuthManager {
                     this.bot.logger.info(this.bot.isMobile, 'LOGIN', `State transition: ${previousState} → ${state}`)
                 }
 
-                if (state === previousState && state !== 'LOGGED_IN' && state !== 'UNKNOWN') {
+                // UNKNOWN is intentionally INCLUDED here: a page that stays UNKNOWN
+                // (e.g. a Microsoft dead-end/interstitial we have no selector for)
+                // used to spin every iteration doing nothing until the whole login
+                // hit maxIterations and failed. Counting it lets the reload recovery
+                // below kick in and unstick the run.
+                if (state === previousState && state !== 'LOGGED_IN') {
                     sameStateCount++
                     this.bot.logger.debug(
                         this.bot.isMobile,
@@ -288,6 +294,15 @@ export class AuthManager {
         let foundStates = results.filter((s): s is LoginState => s !== null)
 
         if (foundStates.length === 0) {
+            // Before giving up as UNKNOWN, check for Microsoft's "dead-end" notice
+            // page ("You have reached a page that is not normally shown / Microsoft
+            // will never ask you to copy or share this URL"). It carries none of the
+            // known form selectors, so it used to fall through to UNKNOWN and spin
+            // the login loop until it timed out.
+            if (await this.pageHasUnexpectedNotice(page)) {
+                this.bot.logger.warn(this.bot.isMobile, 'DETECT-STATE', 'Microsoft "page not normally shown" notice detected')
+                return 'UNEXPECTED_NOTICE'
+            }
             this.bot.logger.debug(this.bot.isMobile, 'DETECT-STATE', 'No matching states found')
             return 'UNKNOWN'
         }
@@ -339,6 +354,28 @@ export class AuthManager {
             .waitForSelector(selector, { state: 'visible', timeout: 200 })
             .then(() => true)
             .catch(() => false)
+    }
+
+    /**
+     * Detect Microsoft's generic "this page is not normally shown" dead-end notice.
+     * Matched by visible text rather than a selector, because the page carries no
+     * stable testid. Only consulted when no real login form selector matched, so
+     * the extra innerText read does not run on every state check.
+     */
+    private async pageHasUnexpectedNotice(page: Page): Promise<boolean> {
+        try {
+            const text = await page
+                .evaluate(() => (document.body && document.body.innerText ? document.body.innerText : ''))
+                .catch(() => '')
+            const t = text.toLowerCase()
+            return (
+                t.includes('not normally shown') ||
+                t.includes('copy or share this url') ||
+                t.includes('never ask you to copy')
+            )
+        } catch {
+            return false
+        }
     }
 
     private async clickUsePasswordOption(page: Page): Promise<boolean> {
@@ -639,6 +676,35 @@ export class AuthManager {
                     this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Fallback navigation successful')
                     return true
                 }
+            }
+
+            case 'UNEXPECTED_NOTICE': {
+                this.bot.logger.warn(
+                    this.bot.isMobile,
+                    'LOGIN',
+                    'On Microsoft "page not normally shown" notice — attempting recovery'
+                )
+
+                // 1) Many variants of this page carry a Continue / primary button.
+                //    Try it first so we resume the flow without losing progress.
+                const continued = await this.bot.browser.utils
+                    .ghostClick(page, `${this.selectors.primaryButton}, a[href*="account.microsoft.com"]`)
+                    .catch(() => false)
+                if (continued) {
+                    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+                    await this.bot.utils.wait(1500)
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Notice page: clicked continue, re-evaluating')
+                    return true
+                }
+
+                // 2) Otherwise it is a true dead-end. Re-navigate to the dashboard to
+                //    restart the sign-in flow from a known-good entry point.
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Notice page: no continue button, re-navigating to dashboard')
+                await page
+                    .goto('https://rewards.bing.com/dashboard', { waitUntil: 'domcontentloaded', timeout: 10000 })
+                    .catch(() => {})
+                await this.bot.utils.wait(2500)
+                return true
             }
 
             case '2FA_TOTP': {

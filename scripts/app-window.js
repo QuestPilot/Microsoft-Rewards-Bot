@@ -30,6 +30,46 @@ function readVersion() {
 }
 const APP_VERSION = readVersion()
 
+// ─── TEMPORARY: announcement notice (disposable) ──────────────────────────
+// A one-time notice shown once in the Desk, then never again. The dismissal is
+// persisted server-side (NOTICE_STORE) on purpose: the Desk window now uses a
+// fresh per-process Chrome profile, so browser localStorage does NOT survive a
+// relaunch — only a file on disk can remember "already seen".
+//
+// To RETIRE it: set ACTIVE_NOTICE = null (optionally delete this block, the two
+// `/api/notice` routes, the `#notice-modal` markup, and the `initDeskNotice`
+// client block). To show a DIFFERENT notice later: change `id` + the copy and
+// everyone sees the new one exactly once.
+let ACTIVE_NOTICE = {
+    id: 'netsky-response-2026-06',
+    title: 'Important announcement',
+    body: 'False claims about this project have been going around — pushed by alt accounts, even inside our own server. We wrote down the full story, with the facts straight from the code. Takes two minutes, worth the read.',
+    cta: 'Read the announcement',
+    // Served from Core-API (public/announcement.html, rewritten at /announcement).
+    url: 'https://bot.lgtw.tf/announcement'
+}
+const NOTICE_STORE = path.join(ROOT, '.desk-notices.json')
+
+function readSeenNotices() {
+    try {
+        return JSON.parse(fs.readFileSync(NOTICE_STORE, 'utf8')) || {}
+    } catch {
+        return {}
+    }
+}
+
+function markNoticeSeen(id) {
+    if (!id) return
+    try {
+        const seen = readSeenNotices()
+        seen[id] = new Date().toISOString()
+        fs.writeFileSync(NOTICE_STORE, JSON.stringify(seen, null, 2), 'utf8')
+    } catch (error) {
+        pushLog('warn', 'Could not save announcement state: ' + error.message)
+    }
+}
+// ──────────────────────────────────────────────────────────────────────────
+
 const state = {
     status: 'Preparing',
     detail: 'Rewards Desk is loading local services',
@@ -1089,6 +1129,16 @@ function html() {
       backdrop-filter:blur(10px);
     }
     .modal-icon svg{width:24px;height:24px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    /* Temporary announcement notice (disposable — see initDeskNotice) */
+    .notice-modal{width:min(470px,100%);text-align:left}
+    .notice-modal h2{font-size:21px}
+    .notice-modal p{color:var(--muted);font-size:14px;line-height:1.66;margin-bottom:0}
+    .notice-modal-icon{
+      background:linear-gradient(145deg,rgba(255,176,32,.22),rgba(255,92,92,.18));
+      border-color:rgba(255,176,32,.42);
+      box-shadow:0 10px 28px rgba(255,140,30,.28);
+    }
+    .notice-modal-icon svg{stroke:#ffd27a}
     .modal h2{font-size:24px;font-weight:800;margin-bottom:8px;background:linear-gradient(to right,#fff,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
     .modal p{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:24px}
     .modal-input{
@@ -1802,6 +1852,10 @@ function html() {
         <svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>
         Run now
       </button>
+      <button class="btn-action-run" id="btn-show-browser" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        Show browser
+      </button>
       <button class="btn-action-stop" id="btn-stop">
         <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
         Stop safely
@@ -2427,6 +2481,21 @@ function html() {
       </div>
     </div>
 
+    <!-- Temporary announcement notice (disposable — see initDeskNotice / ACTIVE_NOTICE) -->
+    <div class="modal-bg" id="notice-modal">
+      <div class="modal notice-modal">
+        <div class="modal-icon notice-modal-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 11l14-6v14L3 13z"></path><path d="M17 7a4 4 0 0 1 0 8"></path><path d="M6 13v4a2 2 0 0 0 4 0v-2"></path></svg>
+        </div>
+        <h2 id="notice-title">Important announcement</h2>
+        <p id="notice-body"></p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="notice-dismiss">Dismiss</button>
+          <button class="btn btn-primary" id="notice-read">Read more</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Core activation overlay -->
   <div class="lic-overlay" id="lic-overlay">
     <div class="lic-card">
@@ -2849,7 +2918,15 @@ function html() {
       mc.style.color = coreOk ? 'var(--green)' : 'var(--muted)';
       G('mini-coupons').textContent = m.coupons || (running ? '...' : '—');
 
+      // When the bot is running in headless (hidden-window) mode, the browser is
+      // off-screen — so swap the disabled Run button for a "Show browser" button
+      // that reveals it on demand. Reverts to Run as soon as the bot stops.
+      var hl = G('tog-headless');
+      var headlessRun = running && hl && hl.checked;
+      var sbBtn = G('btn-show-browser');
+      G('btn-run').style.display = headlessRun ? 'none' : '';
       G('btn-run').disabled = running;
+      if (sbBtn) sbBtn.style.display = headlessRun ? '' : 'none';
       G('btn-stop').disabled = !running;
       G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady);
 
@@ -3391,6 +3468,10 @@ function html() {
       licOpenOverlay('welcome');
     });
     G('btn-stop').addEventListener('click', function() { fetch('/api/stop',{method:'POST'}).then(refresh); });
+    (function() {
+      var sb = G('btn-show-browser');
+      if (sb) sb.addEventListener('click', function() { fetch('/api/show-browser', { method: 'POST' }); });
+    })();
     G('btn-open-acc').addEventListener('click', function() { setView('accounts'); });
     G('btn-add-acc').addEventListener('click', openAccAdd);
     G('btn-test-proxies').addEventListener('click', function() { runProxyTest(); });
@@ -4047,6 +4128,39 @@ function html() {
     setInterval(refresh, 900);
     refresh();
 
+    // ── TEMPORARY: one-time announcement notice (disposable) ────────────
+    // The server (GET /api/notice) decides whether to show it and remembers
+    // the dismissal (POST /api/notice/seen). Remove this block to retire it.
+    (function initDeskNotice() {
+      var shown = false;
+      function dismiss() {
+        var m = G('notice-modal');
+        if (m) m.classList.remove('open');
+        fetch('/api/notice/seen', { method: 'POST' }).catch(function(){});
+      }
+      function show(notice) {
+        if (shown || !G('notice-modal')) return;
+        shown = true;
+        if (notice.title) G('notice-title').textContent = notice.title;
+        if (notice.body) G('notice-body').textContent = notice.body;
+        var readBtn = G('notice-read');
+        if (notice.cta && readBtn) readBtn.textContent = notice.cta;
+        if (readBtn) readBtn.onclick = function() {
+          if (notice.url) window.open(notice.url);
+          dismiss();
+        };
+        var dismissBtn = G('notice-dismiss');
+        if (dismissBtn) dismissBtn.onclick = dismiss;
+        G('notice-modal').classList.add('open');
+      }
+      // Slight delay so it lands after the boot overlay clears, not during load.
+      setTimeout(function() {
+        fetch('/api/notice').then(function(r){ return r.json(); }).then(function(d){
+          if (d && d.show && d.notice) show(d.notice);
+        }).catch(function(){});
+      }, 2200);
+    })();
+
     // ── Feedback / review prompt (Core users only) ──────────────────────
     // Smart timing so we never nag:
     //  - only Core (premium) users are ever asked;
@@ -4330,6 +4444,11 @@ async function testProxy(proxy) {
     }
 }
 
+// Cross-process control file: the desk touches it to ask the running bot to
+// bring its off-screen ("headless" on desktop) browser window on-screen. The
+// bot child watches the same path (see BrowserManager.SHOW_BROWSER_SIGNAL).
+const SHOW_BROWSER_SIGNAL = path.join(os.tmpdir(), 'msrb-show-browser.signal')
+
 const server = http.createServer((req, res) => {
     const requestPath = new URL(req.url, 'http://127.0.0.1').pathname
     if (requestPath.startsWith('/api/') && !authorizeApiRequest(req, res)) return
@@ -4460,8 +4579,34 @@ const server = http.createServer((req, res) => {
         })
         return
     }
+    if (req.method === 'POST' && req.url === '/api/show-browser') {
+        // Signal the running bot to reveal its off-screen browser window. The
+        // signal is harmless if the run is truly headless (Docker) — nothing to
+        // reveal — so we always answer 204.
+        try {
+            fs.writeFileSync(SHOW_BROWSER_SIGNAL, String(Date.now()))
+        } catch (error) {
+            pushLog('warn', `Could not signal Show browser: ${error.message}`)
+        }
+        res.writeHead(204)
+        res.end()
+        return
+    }
     if (req.method === 'POST' && req.url === '/api/close') {
         scheduleShutdown()
+        res.writeHead(204)
+        res.end()
+        return
+    }
+    // TEMPORARY: announcement notice (disposable — see ACTIVE_NOTICE).
+    if (req.method === 'GET' && req.url === '/api/notice') {
+        const seen = readSeenNotices()
+        const show = !!ACTIVE_NOTICE && !seen[ACTIVE_NOTICE.id]
+        jsonResponse(res, 200, { show, notice: show ? ACTIVE_NOTICE : null })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/notice/seen') {
+        if (ACTIVE_NOTICE) markNoticeSeen(ACTIVE_NOTICE.id)
         res.writeHead(204)
         res.end()
         return
@@ -4739,6 +4884,32 @@ server.listen(PORT, '127.0.0.1', () => {
 // We also create the directory proactively — if %TEMP% was wiped (e.g. on
 // Windows "Storage Sense" cleanup), Chrome would try to build the profile from
 // scratch; giving it a pre-made dir shaves off noticeable startup latency.
+// Remove leftover per-process desk profiles from previous/crashed sessions so
+// tmp does not accumulate them. CRITICAL: only delete profiles that are clearly
+// STALE (not touched in the last hour). A profile in use by a concurrent or
+// still-open desk has a fresh mtime and is left untouched — otherwise a second
+// launch (which users do habitually) would yank the first window's profile out
+// from under it and no window would ever appear.
+function cleanupStaleAppProfiles(currentDir) {
+    try {
+        const base = path.dirname(currentDir)
+        const current = path.basename(currentDir)
+        const staleBefore = Date.now() - 60 * 60 * 1000 // 1 hour
+        for (const name of fs.readdirSync(base)) {
+            if (name === current || !name.startsWith('microsoft-rewards-bot-app')) continue
+            const full = path.join(base, name)
+            try {
+                if (fs.statSync(full).mtimeMs > staleBefore) continue // active/recent — leave alone
+                fs.rmSync(full, { recursive: true, force: true })
+            } catch {
+                // dir in use or already gone — skip
+            }
+        }
+    } catch {
+        // ignore
+    }
+}
+
 function prepareBrowserProfile(profileDir) {
     try {
         fs.mkdirSync(profileDir, { recursive: true })
@@ -4769,13 +4940,19 @@ function openAppWindow(url) {
     // confirms it's our bundled Chromium and not a system Edge/Chrome.
     pushLog('info', `Desk window: launching ${path.basename(browser.command)} (${browser.command})`)
 
-    const profileDir = path.join(os.tmpdir(), 'microsoft-rewards-bot-app')
+    // Use a profile dir that is UNIQUE to this desk process. A shared fixed dir
+    // could still carry a stale Chrome "SingletonLock" from a previous/crashed
+    // session, and Chrome would then exit WITHOUT opening a window — forcing the
+    // user to launch the shortcut twice. A per-process dir can never have a stale
+    // lock, so the very FIRST launch always opens. We clean up leftover sibling
+    // profiles best-effort so tmp does not grow unbounded.
+    const profileDir = path.join(os.tmpdir(), `microsoft-rewards-bot-app-${process.pid}`)
+    cleanupStaleAppProfiles(profileDir)
 
-    // Clear stale singleton locks first so the very first launch after a reboot
-    // opens reliably (see clearBrowserSingletonLocks). Then launch ONCE — on
-    // Windows the launcher process returns immediately while the real browser
-    // runs detached, so we must NOT treat a fast exit as a failure (doing so
-    // previously caused duplicate windows + the default browser opening too).
+    // Then launch ONCE — on Windows the launcher process returns immediately while
+    // the real browser runs detached, so we must NOT treat a fast exit as a
+    // failure (doing so previously caused duplicate windows + the default browser
+    // opening too).
     prepareBrowserProfile(profileDir)
     childProcess
         .spawn(
@@ -4783,6 +4960,17 @@ function openAppWindow(url) {
             [
                 ...browser.args,
                 `--app=${url}`,
+                // Disable the Chromium sandbox, exactly like the bot's own
+                // BrowserManager does. The bundled Chromium lives under
+                // %LOCALAPPDATA%\ms-playwright; with the sandbox ON, the helper
+                // process fails with "Sandbox cannot access executable …
+                // Access is denied (0x5)", the network/renderer service crashes,
+                // and the app window never paints — so the Desk shows the CMD
+                // window but no page (and a relaunch only sometimes worked).
+                // Patchright/Playwright launch with the sandbox off by default;
+                // this manual spawn must pass the flag itself.
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
                 `--window-size=${APP_WINDOW_WIDTH},${APP_WINDOW_HEIGHT}`,
                 '--no-first-run',
                 '--no-default-browser-check',
@@ -4792,10 +4980,14 @@ function openAppWindow(url) {
                 '--disable-background-networking',
                 '--metrics-recording-only',
                 // Suppress the "Chrome for Testing — only for automated testing"
-                // banner. --disable-infobars was removed in Chrome 109 so it does
-                // nothing; --test-type=webdriver is the flag Patchright/Playwright
-                // uses internally and is the only reliable way to kill this banner
-                // in Chrome for Testing builds.
+                // infobar. The reliable flag is --disable-infobars: Chrome for
+                // Testing builds re-purpose it specifically to hide THIS banner
+                // (it is NOT the no-op it became on stable Chrome ≥109). This is
+                // exactly what Patchright/Playwright passes by default to kill the
+                // banner — but the desk window is spawned manually, so it does not
+                // inherit those defaults and must pass the flag itself. We keep
+                // --test-type as a belt-and-suspenders fallback.
+                '--disable-infobars',
                 '--test-type=webdriver',
                 `--user-data-dir=${profileDir}`,
                 process.platform === 'linux' ? '--class=RewardsBot' : ''
@@ -4803,7 +4995,13 @@ function openAppWindow(url) {
             {
                 detached: true,
                 stdio: 'ignore',
-                windowsHide: true
+                // Do NOT set windowsHide: true here. windowsHide maps to SW_HIDE
+                // in the STARTUPINFO passed to CreateProcess, which tells the child
+                // to hide its first window. For a GUI app like Chromium this can
+                // cause the app window to be created but never made visible. The
+                // flag is appropriate for console helper processes (Node, etc.) but
+                // must NOT be used when we want an actual window on screen.
+                windowsHide: false
             }
         )
         .unref()

@@ -1,6 +1,8 @@
 import { BrowserFingerprintWithHeaders, FingerprintGenerator } from 'fingerprint-generator'
 import { newInjectedContext } from 'fingerprint-injector'
 import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import rebrowser, { BrowserContext } from 'patchright'
 
 import { loadSessionData, saveFingerprintData } from '../helpers/ConfigLoader'
@@ -30,6 +32,14 @@ type BrowserChannel = 'chrome' | 'msedge'
 class BrowserManager {
     private readonly bot: MicrosoftRewardsBot
     private readonly activeBrowsers = new Set<rebrowser.Browser>()
+    // True when "headless" was requested from the Desk on a real desktop: the
+    // window is launched off-screen (hidden) instead of truly headless, so the
+    // user can reveal it on demand via the "Show browser" button.
+    private hiddenWindowMode = false
+    private showBrowserWatcher: ReturnType<typeof setInterval> | null = null
+    // Cross-process control file the Desk touches to ask for the window to be
+    // shown. Kept in tmp so both the Desk and this child agree on the path.
+    private static readonly SHOW_BROWSER_SIGNAL = path.join(os.tmpdir(), 'msrb-show-browser.signal')
     private static readonly BROWSER_ARGS = [
         '--no-sandbox',
         '--mute-audio',
@@ -106,12 +116,26 @@ class BrowserManager {
                 'Using browser channel: chromium (Patchright bundled)'
             )
 
+            // On a real desktop (Desk), "headless" really means "keep the window
+            // out of the way", not "no window at all" — the user can still reveal
+            // it on demand. Docker / headless servers and plain CLI runs keep TRUE
+            // headless (there may be no display at all, e.g. a VPS).
+            const wantsHeadless = !!this.bot.config.headless
+            const isUiChild = process.env.MSRB_UI_CHILD === '1' || process.argv.includes('--ui-child')
+            this.hiddenWindowMode = wantsHeadless && isUiChild && !BrowserManager.isDocker()
+
             browser = await rebrowser.chromium.launch({
-                headless: this.bot.config.headless,
+                headless: wantsHeadless && !this.hiddenWindowMode,
                 ...(proxyConfig && { proxy: proxyConfig }),
-                args: [...BrowserManager.BROWSER_ARGS]
+                args: [
+                    ...BrowserManager.BROWSER_ARGS,
+                    // Launch far off-screen so the window is effectively hidden
+                    // until the user clicks "Show browser" (see revealWindows).
+                    ...(this.hiddenWindowMode ? ['--window-position=-32000,-32000'] : [])
+                ]
             })
             this.activeBrowsers.add(browser)
+            if (this.hiddenWindowMode) this.startShowBrowserWatcher()
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
             this.bot.logger.error(this.bot.isMobile, 'BROWSER', `Launch failed: ${errorMessage}`)
@@ -220,9 +244,92 @@ class BrowserManager {
     }
 
     async closeAll(): Promise<void> {
+        if (this.showBrowserWatcher) {
+            clearInterval(this.showBrowserWatcher)
+            this.showBrowserWatcher = null
+        }
         const browsers = [...this.activeBrowsers]
         this.activeBrowsers.clear()
         await Promise.allSettled(browsers.map(browser => browser.close()))
+    }
+
+    private static isDocker(): boolean {
+        try {
+            if (fs.existsSync('/.dockerenv')) return true
+            return fs.readFileSync('/proc/1/cgroup', 'utf8').includes('docker')
+        } catch {
+            return false
+        }
+    }
+
+    /**
+     * Watch the cross-process control file the Desk writes when the user clicks
+     * "Show browser". Started only in hidden-window mode. Purely a convenience
+     * channel — any failure is swallowed so it can never break a run.
+     */
+    private startShowBrowserWatcher(): void {
+        if (this.showBrowserWatcher) return
+        try {
+            fs.rmSync(BrowserManager.SHOW_BROWSER_SIGNAL, { force: true })
+        } catch {
+            /* ignore stale-signal cleanup errors */
+        }
+        this.showBrowserWatcher = setInterval(() => {
+            try {
+                if (!fs.existsSync(BrowserManager.SHOW_BROWSER_SIGNAL)) return
+                fs.rmSync(BrowserManager.SHOW_BROWSER_SIGNAL, { force: true })
+                void this.revealWindows()
+            } catch {
+                /* cosmetic control channel — never break the run */
+            }
+        }, 1000)
+        // Don't keep the process alive just for this watcher.
+        this.showBrowserWatcher.unref?.()
+    }
+
+    /**
+     * Bring every active (off-screen) browser window back on-screen via CDP.
+     * Best-effort: a browser that is mid-close or a CDP call that fails is just
+     * skipped — the run is unaffected either way.
+     */
+    async revealWindows(): Promise<void> {
+        for (const browser of [...this.activeBrowsers]) {
+            try {
+                for (const context of browser.contexts()) {
+                    const page = context.pages()[0]
+                    if (!page) continue
+                    const rawSession = await context.newCDPSession(page).catch(() => null)
+                    if (!rawSession) continue
+                    const session = rawSession as unknown as {
+                        send: (method: string, params?: unknown) => Promise<unknown>
+                        detach: () => Promise<void>
+                    }
+                    const target = (await session.send('Browser.getWindowForTarget').catch(() => null)) as {
+                        windowId?: number
+                    } | null
+                    if (typeof target?.windowId !== 'number') continue
+                    await session
+                        .send('Browser.setWindowBounds', {
+                            windowId: target.windowId,
+                            // Restore to the same geometry the window normally uses
+                            // (OS window sized to the injected viewport) so revealing
+                            // never creates a window/viewport mismatch tell.
+                            bounds: {
+                                windowState: 'normal',
+                                left: 60,
+                                top: 60,
+                                width: DESKTOP_BROWSER_VIEWPORT.width,
+                                height: DESKTOP_BROWSER_VIEWPORT.height
+                            }
+                        })
+                        .catch(() => {})
+                    await session.detach().catch(() => {})
+                }
+                this.bot.logger.info(this.bot.isMobile, 'BROWSER', 'Browser window revealed on request (Show browser)')
+            } catch {
+                /* a browser may be mid-close — ignore */
+            }
+        }
     }
 
     private formatProxyServer(proxy: AccountProxy): string {

@@ -32,3 +32,4 @@ core-source/
 *.jsc.map
 license-admin.config.local.js
 plugins/core/license-admin.config.local.js
+.desk-notices.json

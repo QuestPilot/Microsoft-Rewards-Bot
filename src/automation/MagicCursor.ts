@@ -194,27 +194,64 @@ export function installMagicCursor(): void {
         }
 
         // ── Public API the bot calls before each click ───────────────────────
-        w.__mgcMoveTo = (x: number, y: number, click?: boolean): void => {
+        // Glide+orient toward a target. The press/ripple is intentionally NOT
+        // played here: it is driven by the real click event (see pressAt) so the
+        // visual click is ALWAYS perfectly in sync with the bot's real click —
+        // never early, never missing, even when the click is fired some hundreds
+        // of ms later by ghost-cursor.
+        w.__mgcMoveTo = (x: number, y: number, _click?: boolean): void => {
             w.__mgcLastActive = Date.now()
             const fromX = w.__mgcX ?? x
             const fromY = w.__mgcY ?? y
 
-            // Orient toward the target, glide there, then straighten + click.
             setLean(leanFor(fromX, fromY, x, y))
             setPos(x, y)
+            // Straighten back to the default arrow as it lands on the target.
+            setTimeout(() => setLean(0), 470)
+        }
 
+        // Snappy glide used at click time: if the cursor is not already sitting on
+        // the click point (e.g. a click that did not go through __mgcMoveTo, or a
+        // target whose bounding box could not be measured), zip it onto the point
+        // with a short, decisive transition. This is a quick glide — NOT an instant
+        // teleport — so the cursor visibly "arrives and presses" the element.
+        function quickGlideTo(x: number, y: number): void {
+            const e = el()
+            if (!e) {
+                setPos(x, y)
+                return
+            }
+            setLean(leanFor(w.__mgcX ?? x, w.__mgcY ?? y, x, y))
+            e.style.transition = 'transform 0.14s cubic-bezier(0.4, 0, 0.2, 1)'
+            setPos(x, y)
             setTimeout(() => {
-                setLean(0) // back to the default up-left arrow as it lands
-                if (click) {
-                    const i = inner()
-                    if (i) i.classList.add('__mgc_press__')
-                    clickRipple(x, y)
-                    setTimeout(() => {
-                        const j = inner()
-                        if (j) j.classList.remove('__mgc_press__')
-                    }, 150)
-                }
-            }, 470)
+                e.style.transition = '' // back to the default 0.5s glide
+                setLean(0)
+            }, 170)
+        }
+
+        // Authoritative click visual: land on the click point, scale-press the
+        // cursor and play the ripple — all at the exact spot the bot clicked.
+        let lastPressAt = 0
+        function pressAt(x: number, y: number): void {
+            const now = Date.now()
+            // mousedown + click both fire for a real click — dedupe the pair so we
+            // play one press, not two.
+            if (now - lastPressAt < 180) return
+            lastPressAt = now
+            w.__mgcLastActive = now
+
+            const curX = w.__mgcX ?? x
+            const curY = w.__mgcY ?? y
+            if (Math.hypot(curX - x, curY - y) > 6) quickGlideTo(x, y)
+
+            const i = inner()
+            if (i) i.classList.add('__mgc_press__')
+            clickRipple(x, y)
+            setTimeout(() => {
+                const j = inner()
+                if (j) j.classList.remove('__mgc_press__')
+            }, 150)
         }
 
         // ── Idle life: stunts when the bot is busy navigating without clicking ─
@@ -239,10 +276,12 @@ export function installMagicCursor(): void {
                 return
             }
             const idleFor = Date.now() - (w.__mgcLastActive || 0)
-            if (idleFor < 4500) return
+            if (idleFor < 3000) return
             const roll = Math.random()
-            if (roll < 0.34) playOnce('__mgc_loop__')
-            else if (roll < 0.6) playOnce('__mgc_wiggle__')
+            // Bias toward movement (wander) so the cursor feels alive and curious
+            // rather than parked in place.
+            if (roll < 0.28) playOnce('__mgc_loop__')
+            else if (roll < 0.48) playOnce('__mgc_wiggle__')
             else wander()
             // Space stunts out: require another full idle gap before the next one.
             w.__mgcLastActive = Date.now()
@@ -258,26 +297,47 @@ export function installMagicCursor(): void {
 
         setInterval(idleTick, 2200)
 
-        // ── Show click ripple for every real bot click ────────────────────────
-        // When Playwright fires any click (ghostClick, locator.click, btn.click…)
-        // a mousedown fires in the page. We play the ripple at the exact click
-        // site and the press-scale on the cursor — wherever it currently is.
-        // We do NOT move the cursor here: ghostClick's __mgcMoveTo() already
-        // glided it to the target 650 ms earlier. Moving on mousedown would cause
-        // a jarring jump. We also do NOT listen to mousemove: this cursor is the
-        // bot's cursor only, not the user's physical mouse.
+        // ── Play the press on every real bot click ─────────────────────────────
+        // We listen to BOTH mousedown and click (capture):
+        //   - ghost-cursor / locator.click fire a real mousedown → press lands on
+        //     the cursor that __mgcMoveTo already glided there.
+        //   - element.click() (used by some JS-fallback clicks) fires ONLY a click
+        //     event, no mousedown — so without this the cursor would never react.
+        // pressAt() dedupes the pair and lands the cursor on the exact click point.
+        // We never listen to mousemove: this is the bot's cursor, not the user's.
+        const onClickLike = (ev: MouseEvent) => {
+            try {
+                pressAt(ev.clientX, ev.clientY)
+            } catch {
+                /* cosmetic only */
+            }
+        }
+        document.addEventListener('mousedown', onClickLike, true)
+        document.addEventListener('click', onClickLike, true)
+
+        // ── Follow focus so the cursor is never timid ──────────────────────────
+        // When the bot focuses a field to type, or a control to act on, glide the
+        // cursor onto it. This keeps the cursor lively and "knowing what it does"
+        // even between clicks (e.g. while filling the email / password fields),
+        // instead of sitting still off in a corner.
         document.addEventListener(
-            'mousedown',
-            (ev: MouseEvent) => {
+            'focusin',
+            (ev: Event) => {
                 try {
-                    w.__mgcLastActive = Date.now()
-                    const i = inner()
-                    if (i) i.classList.add('__mgc_press__')
-                    clickRipple(ev.clientX, ev.clientY)
-                    setTimeout(() => {
-                        const j = inner()
-                        if (j) j.classList.remove('__mgc_press__')
-                    }, 150)
+                    const t = ev.target as HTMLElement | null
+                    if (!t || !(t instanceof HTMLElement)) return
+                    const tag = t.tagName
+                    if (tag === 'BODY' || tag === 'HTML') return
+                    const r = t.getBoundingClientRect()
+                    if (r.width === 0 && r.height === 0) return
+                    const vw = window.innerWidth || 800
+                    const vh = window.innerHeight || 600
+                    // Aim a little inside the field (left third for wide inputs) so it
+                    // reads like the cursor is about to type, not covering the centre.
+                    const x = clamp(r.left + Math.min(r.width / 2, 64), 4, vw - 4)
+                    const y = clamp(r.top + r.height / 2, 4, vh - 4)
+                    const move = w.__mgcMoveTo
+                    if (typeof move === 'function') move(x, y, false)
                 } catch {
                     /* cosmetic only */
                 }
