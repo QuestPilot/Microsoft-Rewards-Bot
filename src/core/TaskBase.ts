@@ -245,8 +245,20 @@ export class TaskBase {
                         case 'urlreward': {
                             const basePromotion = activity as BasePromotion
 
-                            // Search-on-Bing activities are urlreward subtypes on the new dashboard.
-                            if (this.isSearchOnBingPromotion(activity)) {
+                            // Some daily-set quiz activities arrive typed as urlreward but are
+                            // only credited through the quiz flow — the report-activity server
+                            // action returns actionResult=false and a bare URL visit earns
+                            // nothing (e.g. "Westeros Intrigue?", form=dsetqu / IsConversation).
+                            // Route those to the quiz handler instead of doUrlReward.
+                            if (/form=dsetqu|pollscenarioid|filters=isconversation/.test(destinationUrl)) {
+                                this.bot.logger.info(
+                                    this.bot.isMobile,
+                                    'ACTIVITY',
+                                    `Found activity type "Quiz" (daily-set quiz routed from urlreward) | title="${activity.title}" | offerId=${offerId}`
+                                )
+
+                                await this.bot.activities.doQuiz(basePromotion)
+                            } else if (this.isSearchOnBingPromotion(activity)) {
                                 this.bot.logger.info(
                                     this.bot.isMobile,
                                     'ACTIVITY',

@@ -874,13 +874,22 @@ export class AuthManager {
     async isBingSignedIn(page: Page): Promise<boolean> {
         if (page.isClosed()) return false
 
-        const [hasRewardsCounter, hasAccountName, hasSignIn] = await Promise.all([
+        const [hasRewardsCounter, hasAccountName, hasAccountMenu, hasRewardsBadge] = await Promise.all([
             this.checkSelector(page, '#id_rc'),
             this.checkSelector(page, this.selectors.bingProfile),
-            this.checkSelector(page, '#id_s, #id_l')
+            this.checkSelector(page, '[aria-label="Account Rewards and Preferences"]'),
+            this.checkSelector(page, '#id_rh_w, [aria-label^="Microsoft Rewards"]')
         ])
 
-        return (hasRewardsCounter || hasAccountName) && !hasSignIn
+        // A positive signal from EITHER the legacy header (#id_rc / #id_n) or the
+        // current Bing header (the "Account Rewards and Preferences" flyout, id #id_h,
+        // and the "Microsoft Rewards - <tier> Member" badge, #id_rh_w) means an
+        // account is bound to this page. We intentionally NO LONGER require the
+        // "Sign in" entry point to be absent: the modern header keeps a hidden
+        // sign-in affordance inside the account flyout even when signed in, which
+        // made the old `&& !hasSignIn` gate always fail and sent verification into
+        // its 12-loop timeout (Microsoft removed #id_n/#id_rc/#id_s/#id_l).
+        return hasRewardsCounter || hasAccountName || hasAccountMenu || hasRewardsBadge
     }
 
     /**
@@ -893,13 +902,18 @@ export class AuthManager {
     async isBingSignedOut(page: Page): Promise<boolean> {
         if (page.isClosed()) return false
 
-        const [hasSignIn, hasRewardsCounter, hasAccountName] = await Promise.all([
-            this.checkSelector(page, '#id_s, #id_l'),
+        const [hasSignIn, hasRewardsCounter, hasAccountName, hasAccountMenu, hasRewardsBadge] = await Promise.all([
+            this.checkSelector(page, '#id_s, #id_l, #id_h a[aria-label="Sign in"]'),
             this.checkSelector(page, '#id_rc'),
-            this.checkSelector(page, this.selectors.bingProfile)
+            this.checkSelector(page, this.selectors.bingProfile),
+            this.checkSelector(page, '[aria-label="Account Rewards and Preferences"]'),
+            this.checkSelector(page, '#id_rh_w, [aria-label^="Microsoft Rewards"]')
         ])
 
-        return hasSignIn && !hasRewardsCounter && !hasAccountName
+        // Only declare "signed out" when a sign-in CTA is present AND none of the
+        // signed-in markers (legacy or current header) are — stays conservative so
+        // a drifted selector can never skip a working account's run.
+        return hasSignIn && !hasRewardsCounter && !hasAccountName && !hasAccountMenu && !hasRewardsBadge
     }
 
     /**

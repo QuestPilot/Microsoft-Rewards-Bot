@@ -534,7 +534,19 @@ export default class PageController {
     private inferRewardsNextPromotionType(destination?: string, title?: string): string {
         const value = `${destination ?? ''} ${title ?? ''}`.toLowerCase()
         if (value.includes('findclippy')) return 'findclippy'
-        if (value.includes('pollscenarioid')) return 'quiz'
+        // Quiz / poll daily-set activities are credited ONLY through the quiz flow.
+        // As a plain urlreward the "report activity" server action returns
+        // actionResult=false and a bare URL visit earns nothing. Known markers:
+        //   pollscenarioid          → poll
+        //   form=dsetqu             → daily-set quiz (e.g. "Westeros Intrigue?")
+        //   filters=isconversation  → conversational / Copilot quiz
+        if (
+            value.includes('pollscenarioid') ||
+            value.includes('form=dsetqu') ||
+            value.includes('filters=isconversation')
+        ) {
+            return 'quiz'
+        }
         return 'urlreward'
     }
 
