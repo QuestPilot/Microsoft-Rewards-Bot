@@ -87,6 +87,8 @@ Core only sends sanitized data to the dashboard: masked account emails, run stat
 
 Account edits from the dashboard are encrypted in your browser before being sent. Only your local bot can decrypt and apply them.
 
+Automatic error reports and feedback go to your own configured webhook by default, and only travel through the project's relay if you opt in by setting `MSRB_AUTOREPORT_RELAY=1`.
+
 ---
 
 ## Get Core

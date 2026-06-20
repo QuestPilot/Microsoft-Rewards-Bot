@@ -31,6 +31,7 @@ New here? Run `npm start`, let **Rewards Desk** open, and read the two pages bel
 - [Node.js version](./node-version.md)
 - [Built-in scheduler](./scheduler.md)
 - [Licensing and allowed use](./licensing.md)
+- [Safety advisory](./safety-advisory.md)
 - [Troubleshooting](./troubleshooting.md)
 
 ## Core (premium)
@@ -45,14 +46,6 @@ New here? Run `npm start`, let **Rewards Desk** open, and read the two pages bel
 - [Create a plugin](./create-plugin.md)
 - [Plugin API reference](./plugin-api.md)
 - [Publishing a plugin](./plugin-marketplace.md)
-
-## Maintainers
-
-- [Auto-update release checklist](./auto-update-release.md)
-- [Core release integrity](./core-release-security.md)
-- [Dashboard testing](./dashboard-testing.md)
-- [Safety advisory](./safety-advisory.md)
-- [Selectors reference](./selectors-reference.md)
 
 ---
 

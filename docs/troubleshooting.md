@@ -131,9 +131,14 @@ Run the page analyzer against saved Microsoft Rewards captures:
 npm run analyze:pages
 ```
 
-If it reports missing RSC data, missing `reportActivity`, or unknown activity models, Microsoft likely changed the dashboard payload or server action wiring.
+If it reports missing RSC data, missing `reportActivity`, or unknown activity models, Microsoft likely changed the dashboard payload. This is normally fixed in a bot update, so make sure you are on the latest version.
 
-For dashboard-specific checks, use [Dashboard testing](./dashboard-testing.md). Start with `npm run analyze:pages`, then run `npm run test:dashboard:mock` if side panels or streak protection changed.
+## Advanced Environment Variables
+
+Most people never need these. They are optional and off by default.
+
+- `MSRB_AUTOREPORT_RELAY=1` — opt in to sending anonymous error and feedback reports through the project's relay instead of directly to your own webhook. Default: off (reports go directly to your own configured webhook).
+- `MSRB_CORE_TARGET` — auto-detected for your system. You normally never set this yourself.
 
 ## Related Pages
 

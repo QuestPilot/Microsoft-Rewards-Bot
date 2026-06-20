@@ -30,26 +30,47 @@ function truncate(text: string) {
     return text.length <= DISCORD_LIMIT ? text : text.slice(0, DISCORD_LIMIT - 14) + ' …(truncated)'
 }
 
-export async function sendDiscord(discordUrl: string, content: string, level: LogLevel): Promise<void> {
-    if (!discordUrl) return
+// By default the payload is POSTed straight to the user's own Discord webhook.
+// Setting MSRB_AUTOREPORT_RELAY=1 opts in to routing through the bot.lgtw.tf relay
+// (which wraps the payload as { type: 'auto_report', webhookUrl, payload }).
+function useAutoReportRelay(): boolean {
+    return process.env.MSRB_AUTOREPORT_RELAY === '1'
+}
 
-    await enqueueDiscordRequest(
-        {
+function buildDiscordRequest(discordUrl: string, payload: Record<string, unknown>): AxiosRequestConfig {
+    if (useAutoReportRelay()) {
+        return {
             method: 'POST',
             url: 'https://bot.lgtw.tf/api/bot/inbox',
             headers: { 'Content-Type': 'application/json' },
             data: {
                 type: 'auto_report',
                 webhookUrl: discordUrl,
-                payload: {
-                    content: truncate(content),
-                    username: BOT_USERNAME,
-                    avatar_url: BOT_AVATAR_URL,
-                    allowed_mentions: { parse: [] }
-                }
+                payload
             },
             timeout: 10000
-        },
+        }
+    }
+
+    return {
+        method: 'POST',
+        url: discordUrl,
+        headers: { 'Content-Type': 'application/json' },
+        data: payload,
+        timeout: 10000
+    }
+}
+
+export async function sendDiscord(discordUrl: string, content: string, level: LogLevel): Promise<void> {
+    if (!discordUrl) return
+
+    await enqueueDiscordRequest(
+        buildDiscordRequest(discordUrl, {
+            content: truncate(content),
+            username: BOT_USERNAME,
+            avatar_url: BOT_AVATAR_URL,
+            allowed_mentions: { parse: [] }
+        }),
         'log'
     )
 }
@@ -57,22 +78,12 @@ export async function sendDiscord(discordUrl: string, content: string, level: Lo
 export async function sendDiscordEmbed(discordUrl: string, embed: DiscordEmbed): Promise<void> {
     if (!discordUrl) return
     await enqueueDiscordRequest(
-        {
-            method: 'POST',
-            url: 'https://bot.lgtw.tf/api/bot/inbox',
-            headers: { 'Content-Type': 'application/json' },
-            data: {
-                type: 'auto_report',
-                webhookUrl: discordUrl,
-                payload: {
-                    embeds: [embed],
-                    username: BOT_USERNAME,
-                    avatar_url: BOT_AVATAR_URL,
-                    allowed_mentions: { parse: [] }
-                }
-            },
-            timeout: 10000
-        },
+        buildDiscordRequest(discordUrl, {
+            embeds: [embed],
+            username: BOT_USERNAME,
+            avatar_url: BOT_AVATAR_URL,
+            allowed_mentions: { parse: [] }
+        }),
         'embed'
     )
 }
@@ -112,35 +123,35 @@ export async function sendBotErrorReport(report: BotErrorReport): Promise<void> 
     )
 }
 
-// Track relay outages so a single unreachable-relay episode warns once instead of
-// once per queued report, but the user still gets clear feedback that nothing was sent.
-let relayOffline = false
+// Track delivery outages so a single unreachable-endpoint episode warns once instead
+// of once per queued report, but the user still gets clear feedback that nothing was sent.
+let deliveryOffline = false
 
 async function enqueueDiscordRequest(request: AxiosRequestConfig, kind: string): Promise<void> {
     await discordQueue.add(async () => {
         try {
             await axios(request)
-            if (relayOffline) {
-                relayOffline = false
+            if (deliveryOffline) {
+                deliveryOffline = false
                 // eslint-disable-next-line no-console
-                console.log('[INFO ] [SYSTEM ] [AUTO-REPORT] Report relay reachable again, delivery resumed')
+                console.log('[INFO ] [SYSTEM ] [AUTO-REPORT] Report delivery reachable again, delivery resumed')
             }
         } catch (err: any) {
             const status = err?.response?.status
             // 429 = rate limited; the queue already paces requests, so retry silently.
             if (status === 429) return
 
-            // Previously EVERY non-429 failure was swallowed, so a down relay
-            // (bot.lgtw.tf) or an invalid webhook produced "nothing sent" with zero
+            // Previously EVERY non-429 failure was swallowed, so an unreachable
+            // endpoint or an invalid webhook produced "nothing sent" with zero
             // feedback. Surface the reason once per outage. We use console directly
             // (not the bot logger) to avoid recursing back through the webhook log filter.
             const detail = status ? `HTTP ${status}` : err?.message || String(err)
-            if (!relayOffline) {
-                relayOffline = true
+            if (!deliveryOffline) {
+                deliveryOffline = true
                 // eslint-disable-next-line no-console
                 console.warn(
-                    `[WARN ] [SYSTEM ] [AUTO-REPORT] Could not deliver ${kind} report via relay (bot.lgtw.tf): ${detail}. ` +
-                        'Check webhook.autoReport.discordUrl and that the relay is reachable. Suppressing further notices until it recovers.'
+                    `[WARN ] [SYSTEM ] [AUTO-REPORT] Could not deliver ${kind} report: ${detail}. ` +
+                        'Check webhook.autoReport.discordUrl and that the delivery endpoint is reachable. Suppressing further notices until it recovers.'
                 )
             }
         }

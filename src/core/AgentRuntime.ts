@@ -52,7 +52,7 @@ export class AgentRuntime {
     async start(): Promise<void> {
         if (this.server) return
 
-        await fs.promises.mkdir(agentStateDir(), { recursive: true })
+        await fs.promises.mkdir(agentStateDir(), { recursive: true, mode: 0o700 })
         const token = crypto.randomBytes(24).toString('hex')
         const server = net.createServer(socket => this.handleSocket(socket, token))
 
@@ -80,7 +80,7 @@ export class AgentRuntime {
             cwd: process.cwd()
         }
 
-        await writeJsonAtomic(agentStatePath(), this.state)
+        await writeJsonAtomic(agentStatePath(), this.state, 2, 0o600)
     }
 
     async stop(): Promise<void> {
@@ -127,7 +127,7 @@ export class AgentRuntime {
                 }
 
                 if (!authed) {
-                    if (message.token !== token) {
+                    if (typeof message.token !== 'string' || !tokenEquals(message.token, token)) {
                         socket.end()
                         return
                     }
@@ -437,6 +437,14 @@ function parseJson<T>(value: string): T | null {
     } catch {
         return null
     }
+}
+
+function tokenEquals(a: unknown, b: unknown): boolean {
+    if (typeof a !== 'string' || typeof b !== 'string') return false
+    const bufferA = Buffer.from(a)
+    const bufferB = Buffer.from(b)
+    if (bufferA.length !== bufferB.length) return false
+    return crypto.timingSafeEqual(bufferA, bufferB)
 }
 
 export function isInteractiveTerminal(): boolean {

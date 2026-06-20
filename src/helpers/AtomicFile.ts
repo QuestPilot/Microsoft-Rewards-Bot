@@ -11,11 +11,12 @@ function tempPathFor(filePath: string): string {
 export async function writeFileAtomic(
     filePath: string,
     data: string | Buffer,
-    encoding: BufferEncoding = 'utf8'
+    encoding: BufferEncoding = 'utf8',
+    mode = 0o600
 ): Promise<void> {
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
     const tempPath = tempPathFor(filePath)
-    const handle = await fs.promises.open(tempPath, 'w')
+    const handle = await fs.promises.open(tempPath, 'w', mode)
 
     try {
         if (Buffer.isBuffer(data)) {
@@ -36,6 +37,6 @@ export async function writeFileAtomic(
     }
 }
 
-export async function writeJsonAtomic(filePath: string, value: unknown, spaces = 2): Promise<void> {
-    await writeFileAtomic(filePath, `${JSON.stringify(value, null, spaces)}\n`)
+export async function writeJsonAtomic(filePath: string, value: unknown, spaces = 2, mode = 0o600): Promise<void> {
+    await writeFileAtomic(filePath, `${JSON.stringify(value, null, spaces)}\n`, 'utf8', mode)
 }

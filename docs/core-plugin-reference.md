@@ -13,10 +13,8 @@ This page documents how the official Core plugin behaves, what it covers, and ho
 The public bot repository is source-available, but the official Core plugin is proprietary and requires a paid license.
 
 Core is preinstalled in `plugins/core` and shipped as a compiled official artifact. The
-bot trusts it only when the Ed25519 signature of `plugins/official-core.json` is valid and
-the selected runtime bytecode checksum matches the signed manifest.
-
-See [Core release integrity](./core-release-security.md) for public anti-leak and checksum rules.
+bot verifies that this artifact is authentic before Core is granted any privileged access.
+If that verification does not pass, premium Core features simply stay off.
 
 ## Coverage Model
 
@@ -89,11 +87,11 @@ Users sign in on the official dashboard domain with:
 
 The dashboard shows masked account status, run state, recent filtered logs, point summaries, version/update state, auto-start status, diagnostics, and allowlisted actions such as starting a run when the bot is idle.
 
-Dashboard commands are queued and acknowledged asynchronously, so a short delay after an action is expected. Live state is Redis-first: heartbeats, snapshots, logs, and command state stay in Redis with TTLs to protect Turso quota. Turso is used for license/auth state and durable audit records for mutations.
+Dashboard commands are queued and acknowledged asynchronously, so a short delay after an action is expected. Live state such as heartbeats, snapshots, logs, and command state is kept by the official backend service for fast updates, while license/auth state and durable audit records for mutations are stored separately by that same service.
 
 Devices remain visible after going offline so users can inspect the last known state. Deleting a device from the dashboard removes live dashboard state only and does not revoke the license activation.
 
-Sensitive account/config mutations use encrypted command payloads. The dashboard encrypts for the selected device, Redis transports the encrypted payload, and the local bot decrypts and validates before writing local files.
+Sensitive account/config changes are sent as commands that are signed and verified before they run. The dashboard protects the command for the selected device, the official backend simply relays it, and your local bot verifies it before writing any local files.
 
 Maintainers can override the service URL for custom deployments:
 
@@ -109,9 +107,7 @@ Maintainers can override the service URL for custom deployments:
 
 ## License Validation
 
-Core validates licenses against the official backend. The release build contains the private runtime configuration required for the official service; users do not need to configure database access locally.
-
-The public repository includes only examples for local maintainer tooling. Real private configuration must never be committed.
+Core validates licenses against the official backend service. Everything it needs to talk to that service is already built into the official release, so you never have to configure any backend access yourself — just activate your license and Core does the rest.
 
 ## Security Boundary
 
@@ -119,21 +115,10 @@ The public plugin API cannot grant official Core entitlement and cannot register
 
 Because the source-available repository is modifiable, a local copy can remove local limits from its own files. The license does not permit public redistribution of changes that bypass, unlock, replace, emulate, or reproduce Core. Core remains a paid proprietary plugin.
 
-Compiled local artifacts are not secret storage. Backend authority must remain in Core-API.
+Anything that really matters for security — license checks, entitlements, and audit records — is decided by the official backend service, not by files on your machine. That keeps the system trustworthy even though the rest of the bot is open.
 
-Official Core artifacts are runtime-targeted. Windows, Linux, Docker, and ARM64 support require matching official target artifacts.
+The official Core build is provided per platform. Core support on Windows, Linux, Docker, and ARM64 depends on having the matching official build installed (see [Node.js version](./node-version.md)).
 
-## Release Checklist
+## Authenticity And Integrity
 
-Before copying a new Core build into the public repo:
-
-- verify that no database token, API token, private key, or local `.env` value is committed;
-- revoke any token that was ever shipped in bytecode or source;
-- run `npx tsc --noEmit` and `npm audit --audit-level=moderate` in both repositories;
-- rebuild Core using Node.js `24.15.0`;
-- copy only bytecode, package, and license artifacts;
-- update the Core API `required_core_version` to the published Core version, and keep `minimum_core_version` aligned unless a deliberate compatibility window is being run;
-- verify that `plugins/official-core.json` matches every shipped Core target artifact;
-- verify that `plugins/official-core.sig` validates with the pinned Core public key;
-- verify that no `.ts`, `.map`, source `dist/**/*.js`, `.env`, or private secret was copied into the public repository;
-- run the checks in [Dashboard testing](./dashboard-testing.md).
+You do not have to do anything special to keep Core trustworthy — the bot handles it for you. Each official Core build is verified as authentic before it is allowed any privileged access, and only an official build can unlock premium Core features. If a build is missing, modified, or does not match what the bot expects, Core simply stays inactive and the bot keeps running in free, open-source mode.

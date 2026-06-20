@@ -38,7 +38,7 @@ The dashboard service receives only sanitized runtime data:
 
 Core must never send Microsoft account passwords, cookies, access tokens, proxy credentials, webhook URLs, or the full local configuration to the dashboard service.
 
-Account and config mutations are sent as encrypted commands to the local Core bot. Redis and the dashboard API transport the payload but do not store readable Microsoft account passwords, TOTP secrets, proxy credentials, cookies, or tokens.
+Account and config mutations are sent as signed, verified commands to the local Core bot. The official backend only relays these commands and never stores readable Microsoft account passwords, TOTP secrets, proxy credentials, cookies, or tokens.
 
 ## Live Updates
 
@@ -88,5 +88,4 @@ If a second `npm start` is launched while an agent is already running, the bot r
 
 - [Official Core plugin](./core-plugin.md) for purchase and enablement.
 - [Core technical reference](./core-plugin-reference.md) for coverage and security boundaries.
-- [Dashboard testing](./dashboard-testing.md) for maintainer diagnostics.
 - [Troubleshooting](./troubleshooting.md) if a machine does not appear.
