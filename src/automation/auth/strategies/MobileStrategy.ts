@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto'
-import type { Page } from 'patchright'
+import type { Frame, Page, Request } from 'patchright'
 import { URLSearchParams } from 'url'
 
 import type { MicrosoftRewardsBot } from '../../../index'
@@ -146,51 +146,80 @@ export class MobileStrategy {
 
             this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', 'Navigating to OAuth authorize URL')
 
-            await this.page.goto(authorizeUrl.href).catch(err => {
-                this.bot.logger.debug(
-                    this.bot.isMobile,
-                    'LOGIN-APP',
-                    `page.goto() failed: ${err instanceof Error ? err.message : String(err)}`
-                )
-            })
-
-            this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Waiting for mobile OAuth code...')
-
-            const start = Date.now()
+            // Capture the authorization code the instant the browser hits
+            // oauth20_desktop.srf?code=..., BEFORE Microsoft's anti-phishing script
+            // rewrites the visible URL to "?removed=true" and shows the "page not
+            // normally shown / never ask you to copy this URL" notice. The 1s poll
+            // below routinely misses that transient code URL, which left many users
+            // stuck on the notice page until the 7-minute timeout. Navigation and
+            // request events fire synchronously with the redirect, so they catch the
+            // code even when the URL bar is scrubbed milliseconds later.
             let code = ''
-            let lastUrl = ''
-
-            while (Date.now() - start < this.maxTimeout) {
-                const currentUrl = this.page.url()
-
-                // Log only when URL changes (high signal, no spam)
-                if (currentUrl !== lastUrl) {
-                    this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `OAuth poll URL changed → ${currentUrl}`)
-                    lastUrl = currentUrl
-                }
-
+            const tryCaptureCode = (rawUrl: string): void => {
+                if (code) return
                 try {
-                    const url = new URL(currentUrl)
-
-                    if (url.hostname === 'login.live.com' && url.pathname === '/oauth20_desktop.srf') {
-                        code = url.searchParams.get('code') || ''
-
-                        if (code) {
-                            this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', 'OAuth code detected in redirect URL')
-                            break
+                    const u = new URL(rawUrl)
+                    if (u.hostname === 'login.live.com' && u.pathname === '/oauth20_desktop.srf') {
+                        const c = u.searchParams.get('code')
+                        if (c) {
+                            code = c
+                            this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', 'OAuth code captured from navigation event')
                         }
                     }
+                } catch {
+                    // Non-URL navigation target — ignore.
+                }
+            }
+            const onFrameNavigated = (frame: Frame): void => {
+                if (frame === this.page.mainFrame()) tryCaptureCode(frame.url())
+            }
+            const onRequest = (request: Request): void => tryCaptureCode(request.url())
+            this.page.on('framenavigated', onFrameNavigated)
+            this.page.on('request', onRequest)
 
-                    await this.handleInteractivePrompt(account)
-                } catch (err) {
+            const start = Date.now()
+            try {
+                await this.page.goto(authorizeUrl.href).catch(err => {
                     this.bot.logger.debug(
                         this.bot.isMobile,
                         'LOGIN-APP',
-                        `Invalid URL while polling: ${String(currentUrl)}`
+                        `page.goto() failed: ${err instanceof Error ? err.message : String(err)}`
                     )
-                }
+                })
 
-                await this.bot.utils.wait(1000)
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-APP', 'Waiting for mobile OAuth code...')
+
+                let lastUrl = ''
+
+                while (!code && Date.now() - start < this.maxTimeout) {
+                    const currentUrl = this.page.url()
+
+                    // Log only when URL changes (high signal, no spam)
+                    if (currentUrl !== lastUrl) {
+                        this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `OAuth poll URL changed → ${currentUrl}`)
+                        lastUrl = currentUrl
+                    }
+
+                    try {
+                        // Fallback: the visible URL may still carry the code on flows
+                        // where the anti-phishing rewrite did not run.
+                        tryCaptureCode(currentUrl)
+                        if (code) break
+
+                        await this.handleInteractivePrompt(account)
+                    } catch (err) {
+                        this.bot.logger.debug(
+                            this.bot.isMobile,
+                            'LOGIN-APP',
+                            `Invalid URL while polling: ${String(currentUrl)}`
+                        )
+                    }
+
+                    await this.bot.utils.wait(1000)
+                }
+            } finally {
+                this.page.off('framenavigated', onFrameNavigated)
+                this.page.off('request', onRequest)
             }
 
             if (!code) {
