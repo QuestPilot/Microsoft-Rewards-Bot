@@ -315,6 +315,9 @@ export class PluginManager {
         filePath: string,
         pluginConfig: Record<string, unknown>
     ): Promise<void> {
+        // Verify the official Core plugin BEFORE loading its bytecode
+        const isOfficialCore = this.isVerifiedOfficialCore(entryName, filePath)
+
         if (filePath.endsWith('.jsc') || this.isOfficialCoreLoader(entryName, filePath)) {
             this.assertBytecodeTarget(entryName, filePath)
             require('bytenode')
@@ -353,7 +356,6 @@ export class PluginManager {
             throw new Error(`Plugin name "${plugin.name}" must match configured entry "${entryName}"`)
         }
 
-        const isOfficialCore = this.isVerifiedOfficialCore(entryName, filePath)
         const context = isOfficialCore
             ? this.createOfficialCoreContext(pluginConfig)
             : this.createPublicPluginContext(pluginConfig)

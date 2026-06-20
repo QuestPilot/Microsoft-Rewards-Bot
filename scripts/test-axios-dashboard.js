@@ -65,7 +65,7 @@ async function testAxiosDashboard(email) {
 
 async function main() {
     await testAxiosDashboard('email_1');
-    await testAxiosDashboard('nguyenthithungan28033@gmail.com');
+    await testAxiosDashboard('test@example.com');
 }
 
 main();
