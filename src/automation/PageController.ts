@@ -240,10 +240,10 @@ export default class PageController {
 
         const rewardsDomData = this.buildDashboardDataFromRewardsDomHtml(html)
         if (rewardsDomData) {
-            this.bot.logger.debug(
+            this.bot.logger.warn(
                 this.bot.isMobile,
                 'GET-DASHBOARD-DATA',
-                'Extracted minimal dashboard data from Rewards DOM shell'
+                'Next.js flight/RSC data could not be parsed — falling back to the DOM shell, which yields NO activities (the run will appear to "do nothing"). This usually means Microsoft renamed the RSC flight keys (e.g. dailySetItems/offerId/hash) or the data was not streamed. Capture the live /earn page source WITH scripts to update the parser.'
             )
             return rewardsDomData
         }

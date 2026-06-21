@@ -1178,33 +1178,18 @@ export class AuthManager {
                     `iter ${i + 1}/${loopMax} | url=${url} | token=${!!token} | varDashboard=${hasLegacyEmbed} | getuserinfo=${probe.status}(dashboard=${probe.legacy}) | section#dailyset=${hasDailySetSection} | __next_f=${hasNextFlight}`
                 )
 
-                // ── Authoritative LEGACY signals win first ──
-                if (override === 'legacy' || token || hasLegacyEmbed || probe.legacy) {
-                    await this.commitDashboardVariant('legacy')
-                    if (token) this.bot.requestToken = token
-                    else {
-                        const captured = await this.captureRequestToken(page)
-                        if (captured) this.bot.requestToken = captured
-                    }
-                    this.bot.logger.info(
-                        this.bot.isMobile,
-                        'GET-REWARD-SESSION',
-                        `variant=LEGACY (token=${!!this.bot.requestToken}, embed=${hasLegacyEmbed}, api=${probe.legacy})`
-                    )
-                    return
-                }
-
-                // ── NEXT signals ──
-                // `section#dailyset` is authoritative but only appears after the SPA
-                // hydrates. The `self.__next_f` / webpack flight markers are in the
-                // server-rendered HTML immediately, so a slow-hydrating Next dashboard
-                // is not misdetected as legacy and defaulted onto legacy endpoints.
-                // Guard the flight marker against `/welcome`, which is itself a Next
-                // page but NOT the dashboard — a legacy account transiently bounced
-                // there must not be classified as next. Legacy signals are checked
-                // first (above), so this only runs when no legacy signal is present.
                 const onWelcome = new URL(url).pathname.startsWith('/welcome')
-                if (hasDailySetSection || (hasNextFlight && !onWelcome)) {
+
+                // ── NEXT wins first ──
+                // The Next.js flight markers (self.__next_f / webpackChunk_N_E, present in
+                // the server-rendered HTML immediately) and the #dailyset section appear
+                // ONLY on the new dashboard. Decide on these FIRST. CRITICAL: the
+                // getuserinfo API now returns 200 with a `dashboard` object on BOTH
+                // dashboards, so it can NOT tell them apart — only these Next-only markers
+                // (and, below, the ASP-only token/embed) are decisive. `probe` is kept for
+                // logging only. Guard against /welcome, itself a Next page but not the
+                // dashboard.
+                if (!onWelcome && (hasDailySetSection || hasNextFlight)) {
                     await this.commitDashboardVariant('next')
                     this.bot.logger.info(
                         this.bot.isMobile,
@@ -1214,18 +1199,37 @@ export class AuthManager {
                     return
                 }
 
+                // ── LEGACY: ASP-only markers — the CSRF token or the `var dashboard=`
+                // embed. getuserinfo is intentionally NOT consulted here (it answers on
+                // both dashboards and would misclassify a Next account as legacy). ──
+                if (override === 'legacy' || token || hasLegacyEmbed) {
+                    await this.commitDashboardVariant('legacy')
+                    if (token) this.bot.requestToken = token
+                    else {
+                        const captured = await this.captureRequestToken(page)
+                        if (captured) this.bot.requestToken = captured
+                    }
+                    this.bot.logger.info(
+                        this.bot.isMobile,
+                        'GET-REWARD-SESSION',
+                        `variant=LEGACY (token=${!!this.bot.requestToken}, embed=${hasLegacyEmbed})`
+                    )
+                    return
+                }
+
                 await this.bot.utils.wait(1500)
             }
 
-            // Nothing decisive (often a transient /welcome). Default LEGACY like the
-            // reference bot; for a real new-dashboard account set dashboardMode:"next".
-            await this.commitDashboardVariant('legacy')
-            const captured = await this.captureRequestToken(page)
-            if (captured) this.bot.requestToken = captured
+            // Nothing decisive after all retries. The legacy ASP markers (CSRF token /
+            // `var dashboard=` embed) are ALWAYS present in the legacy HTML, so their
+            // absence means this is almost certainly the new dashboard — default NEXT
+            // (which also has browser-based fallbacks that degrade more gracefully than
+            // legacy API calls failing). Force dashboardMode:"legacy" if ever needed.
+            await this.commitDashboardVariant('next')
             this.bot.logger.warn(
                 this.bot.isMobile,
                 'GET-REWARD-SESSION',
-                `No decisive dashboard marker after ${loopMax} tries — defaulting to LEGACY (token=${!!this.bot.requestToken}). If this account is on the NEW dashboard, set dashboardMode:"next".`
+                `No decisive dashboard marker after ${loopMax} tries — defaulting to NEXT. If this account is on the classic (ASP) dashboard, set dashboardMode:"legacy".`
             )
         } catch (error) {
             throw this.bot.logger.error(

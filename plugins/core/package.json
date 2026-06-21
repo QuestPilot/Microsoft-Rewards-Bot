@@ -14,7 +14,7 @@
     "releaseShape": "single-entry-bytecode",
     "targets": {
       "win32-x64-node-24.15.0": {
-        "indexSha256": "3a3845dd3f89bb06d1c944c05b3dc19f6e25373e4c1cc35c9d50b005c97aeb90",
+        "indexSha256": "ec1f59a208689785b8d971ce90f5dd9a0a09d4e3703c8f86026bcefaed845978",
         "bytecodeTarget": {
           "node": "24.15.0",
           "platform": "win32",
