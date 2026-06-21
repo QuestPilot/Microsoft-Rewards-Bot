@@ -5,6 +5,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent'
 import { SocksProxyAgent } from 'socks-proxy-agent'
 import { URL } from 'url'
 import type { AccountProxy } from '../types/Account'
+import { bracketIPv6IfNeeded } from './ProxyUtils'
 
 class HttpClient {
     private instance: AxiosInstance
@@ -47,7 +48,8 @@ class HttpClient {
             urlObj = new URL(baseUrl)
         } catch (e) {
             try {
-                urlObj = new URL(`http://${baseUrl}`)
+                // Bare host without a scheme — bracket IPv6 first so the URL parses.
+                urlObj = new URL(`http://${bracketIPv6IfNeeded(baseUrl)}`)
             } catch (error) {
                 throw new Error(`Invalid proxy URL format: ${baseUrl}`)
             }
@@ -62,7 +64,8 @@ class HttpClient {
             urlObj.port = port.toString()
             proxyUrl = urlObj.toString()
         } else {
-            proxyUrl = `${protocol}//${urlObj.hostname}:${port}`
+            // urlObj.hostname can drop IPv6 brackets — re-bracket before adding the port.
+            proxyUrl = `${protocol}//${bracketIPv6IfNeeded(urlObj.hostname)}:${port}`
         }
 
         switch (protocol) {

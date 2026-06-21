@@ -7,6 +7,7 @@
         "recoveryEmail": "",
         "geoLocale": "auto",
         "langCode": "en",
+        "dashboardMode": "auto",
         "proxy": {
             "proxyAxios": false,
             "url": "",

@@ -113,7 +113,8 @@ export const ConfigSchema = z.object({
         doDailyStreak: z.boolean(),
         doDashboardInfo: z.boolean(),
         doClaimPoints: z.boolean(),
-        doApplyCoupons: z.boolean().default(true)
+        doApplyCoupons: z.boolean().default(true),
+        doPunchCards: z.boolean().default(true)
     }),
     searchOnBingLocalQueries: z.boolean(),
     globalTimeout: NumberOrString,
@@ -171,7 +172,9 @@ export const AccountSchema = z.object({
     saveFingerprint: z.object({
         mobile: z.boolean(),
         desktop: z.boolean()
-    })
+    }),
+    // Optional per-account dashboard variant override (legacy support — removable).
+    dashboardMode: z.enum(['auto', 'next', 'legacy']).optional()
 })
 
 export function validateConfig(data: unknown): Config {

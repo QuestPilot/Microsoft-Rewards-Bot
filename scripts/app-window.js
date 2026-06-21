@@ -497,6 +497,34 @@ function writeConfigPatch(patch) {
     if (fs.existsSync(CONFIG_DIST)) atomicWriteText(CONFIG_DIST, json)
 }
 
+// ── Auto-detected dashboard variant (cosmetic badge hint) ────────────────────
+// The bot writes sessions/<email>/dashboard-variant.json after detecting which
+// Microsoft dashboard (legacy ASP vs new Next.js) each account was served. We read
+// it here purely to badge 'auto' accounts in the editor. It is a transient hint,
+// never persisted back into the account store (see /api/accounts-save).
+function readDetectedVariant(email) {
+    try {
+        if (!email) return null;
+        var cfg = readConfigRaw();
+        var sessionPath = (cfg && cfg.sessionPath) ? cfg.sessionPath : 'sessions';
+        var file = path.join(ROOT, sessionPath, email, 'dashboard-variant.json');
+        if (!fs.existsSync(file)) return null;
+        var data = JSON.parse(fs.readFileSync(file, 'utf8'));
+        // Prefer desktop (its served dashboard rarely differs from mobile); fall back.
+        var v = (data && (data.desktop || data.mobile)) || null;
+        return (v === 'next' || v === 'legacy') ? v : null;
+    } catch (e) { return null; }
+}
+
+function enrichAccountsWithVariant(accounts) {
+    if (!Array.isArray(accounts)) return accounts;
+    return accounts.map(function (a) {
+        if (!a || !a.email) return a;
+        var v = readDetectedVariant(a.email);
+        return v ? Object.assign({}, a, { lastDetectedVariant: v }) : a;
+    });
+}
+
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 const PLUGINS_JSONC = path.join(ROOT, 'plugins', 'plugins.jsonc')
 
@@ -1600,6 +1628,13 @@ function html() {
       background:rgba(167,139,250,.16);color:#c4b5fd;border:1px solid rgba(167,139,250,.35);
       text-transform:uppercase;
     }
+    /* "Next only" badge — feature runs on the new (Next.js) dashboard only */
+    .next-badge{
+      display:inline-block;margin-left:6px;font-size:8.5px;font-weight:800;
+      letter-spacing:.07em;padding:1px 5px;border-radius:4px;vertical-align:middle;
+      background:rgba(46,232,255,.14);color:var(--cyan);border:1px solid rgba(46,232,255,.32);
+      text-transform:uppercase;
+    }
     /* Section header tag (FREE / CORE) */
     .sect-tag{
       font-size:9px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:5px;
@@ -1634,6 +1669,14 @@ function html() {
     .storage-tools>summary::-webkit-details-marker{display:none}
     .storage-tools[open]>summary{color:var(--cyan)}
     .storage-tools .advanced-actions{margin-top:11px;justify-content:flex-start}
+    /* Advanced settings — single collapsible wrapper */
+    .adv-collapse>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .adv-collapse>summary::-webkit-details-marker{display:none}
+    .adv-collapse>summary:hover,.adv-collapse[open]>summary{color:var(--cyan)}
+    .adv-collapse[open]>summary{margin-bottom:13px}
+    .adv-collapse .adv-chevron{margin-left:auto;width:13px;height:13px;flex-shrink:0;transition:transform .2s ease}
+    .adv-collapse[open] .adv-chevron{transform:rotate(180deg)}
+    .adv-collapse .adv-group + .adv-group{margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
     .term-row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
     .term-row .toggle-wrap-left{flex:1;min-width:200px}
     @media (prefers-reduced-motion:reduce){
@@ -1993,7 +2036,7 @@ function html() {
         <button class="btn btn-secondary btn-sm" id="settings-back">← Back</button>
       </div>
       <div class="settings-section">
-        <h3>Search &amp; Tasks <span class="sect-tag sect-tag-free">Open-source · Free</span></h3>
+        <h3>Search &amp; Tasks</h3>
         <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">These tasks ship with the free open-source bot and always run. Premium tasks with the same names live in the <b>Core Premium</b> section below — those only run with a valid Core license.</div>
         <div class="toggle-grid">
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily Set</div><div class="toggle-sub">Complete the daily activity set</div></div><label class="toggle"><input type="checkbox" id="tog-doDailySet"><span class="toggle-slider"></span></label></div>
@@ -2002,6 +2045,13 @@ function html() {
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Special Promotions</div><div class="toggle-sub">Sponsored bonus offers</div></div><label class="toggle"><input type="checkbox" id="tog-doSpecialPromotions"><span class="toggle-slider"></span></label></div>
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">More Promotions</div><div class="toggle-sub">Additional bonus tasks</div></div><label class="toggle"><input type="checkbox" id="tog-doMorePromotions"><span class="toggle-slider"></span></label></div>
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App Promotions</div><div class="toggle-sub">Mobile app promotional tasks</div></div><label class="toggle"><input type="checkbox" id="tog-doAppPromotions"><span class="toggle-slider"></span></label></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Options</h3>
+        <div class="toggle-grid">
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Headless mode</div><div class="toggle-sub">Run browser in background</div></div><label class="toggle"><input type="checkbox" id="tog-headless"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Run on zero points</div><div class="toggle-sub">Run even if no points left</div></div><label class="toggle"><input type="checkbox" id="tog-runOnZero"><span class="toggle-slider"></span></label></div>
         </div>
       </div>
       <div class="settings-section">
@@ -2023,57 +2073,6 @@ function html() {
             <button class="btn-cfg" data-cfg="runSummary">Configure</button>
             <label class="toggle"><input type="checkbox" id="tog-wh-runSummary"><span class="toggle-slider"></span></label>
           </div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>Options</h3>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Headless mode</div><div class="toggle-sub">Run browser in background</div></div><label class="toggle"><input type="checkbox" id="tog-headless"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Run on zero points</div><div class="toggle-sub">Run even if no points left</div></div><label class="toggle"><input type="checkbox" id="tog-runOnZero"><span class="toggle-slider"></span></label></div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>Start with your computer</h3>
-        <div class="startup-grid">
-          <div class="startup-card">
-            <div class="startup-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
-            <div class="startup-copy">
-              <div class="toggle-label">Open Rewards Desk</div>
-              <div class="toggle-sub">Show this interface automatically when you sign in.</div>
-              <div class="startup-method" id="startup-desk-method"></div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="tog-startup-desk"><span class="toggle-slider"></span></label>
-          </div>
-          <div class="startup-card core-only">
-            <div class="startup-icon"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v3a4 4 0 0 0 4 4h1"/><path d="M12 3a6 6 0 0 1 6 6v3a4 4 0 0 1-4 4h-1"/><path d="M9 20h6"/></svg></div>
-            <div class="startup-copy">
-              <div class="toggle-label">Core remote access <span class="startup-badge">Core</span></div>
-              <div class="toggle-sub">Keep a hidden agent online so you can launch and monitor runs remotely.</div>
-              <div class="startup-method" id="startup-agent-method"></div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="tog-startup-agent"><span class="toggle-slider"></span></label>
-          </div>
-        </div>
-      </div>
-      <div class="settings-section settings-section-core" id="settings-core-premium">
-        <h3>
-          <svg viewBox="0 0 24 24" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;fill:var(--gold);stroke:none;margin-right:5px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          Core Premium
-          <span class="core-section-badge" id="core-license-badge">No license</span>
-        </h3>
-        <div class="settings-section-note" id="core-section-note" style="display:none">Activate a Core license to unlock these features. Each one only runs — and only counts — when your license is valid and the feature is enabled here.</div>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Claim points</div><div class="toggle-sub">Auto-claim ready-to-claim dashboard point cards</div></div><label class="toggle"><input type="checkbox" id="tog-core-claimPoints"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Apply coupons</div><div class="toggle-sub">Detect &amp; apply dashboard coupons automatically</div></div><label class="toggle"><input type="checkbox" id="tog-core-applyCoupons"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Double search points</div><div class="toggle-sub">Activate eligible double-search promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-doubleSearchPoints"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App rewards</div><div class="toggle-sub">Mobile app-only reward promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-appReward"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Read to Earn<span class="beta-badge">Beta</span></div><div class="toggle-sub">MSN app-only reading rewards</div></div><label class="toggle"><input type="checkbox" id="tog-core-readToEarn"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily check-in</div><div class="toggle-sub">App-only daily check-in bonus</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyCheckIn"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily streak</div><div class="toggle-sub">Read streak details from the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyStreak"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Streak protection</div><div class="toggle-sub">Keep streak protection enabled on the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-streakProtection"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Temporary punchcards<span class="beta-badge">Beta</span></div><div class="toggle-sub">Complete limited-time punchcard offers</div></div><label class="toggle"><input type="checkbox" id="tog-core-temporaryPunchcards"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Dashboard data</div><div class="toggle-sub">Rich dashboard snapshots, ready-to-claim &amp; streak info</div></div><label class="toggle"><input type="checkbox" id="tog-core-collectDashboardInfo"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Set Rewards goal</div><div class="toggle-sub">Auto-pick an eligible gift card as your Rewards goal</div></div><label class="toggle"><input type="checkbox" id="tog-core-setGoal"><span class="toggle-slider"></span></label></div>
         </div>
       </div>
       <div class="settings-section">
@@ -2125,7 +2124,72 @@ function html() {
           </div>
         </div>
       </div>
-      <div class="settings-section settings-section-advanced">
+      <div class="settings-section">
+        <h3>Start with your computer</h3>
+        <div class="startup-grid">
+          <div class="startup-card">
+            <div class="startup-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+            <div class="startup-copy">
+              <div class="toggle-label">Open Rewards Desk</div>
+              <div class="toggle-sub">Show this interface automatically when you sign in.</div>
+              <div class="startup-method" id="startup-desk-method"></div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="tog-startup-desk"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="startup-card core-only">
+            <div class="startup-icon"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v3a4 4 0 0 0 4 4h1"/><path d="M12 3a6 6 0 0 1 6 6v3a4 4 0 0 1-4 4h-1"/><path d="M9 20h6"/></svg></div>
+            <div class="startup-copy">
+              <div class="toggle-label">Core remote access <span class="startup-badge">Core</span></div>
+              <div class="toggle-sub">Keep a hidden agent online so you can launch and monitor runs remotely.</div>
+              <div class="startup-method" id="startup-agent-method"></div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="tog-startup-agent"><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section settings-section-core" id="settings-core-premium">
+        <h3>
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;fill:var(--gold);stroke:none;margin-right:5px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Core Premium
+          <span class="core-section-badge" id="core-license-badge">No license</span>
+        </h3>
+        <div class="settings-section-note" id="core-section-note" style="display:none">Activate a Core license to unlock these features. Each one only runs — and only counts — when your license is valid and the feature is enabled here.</div>
+        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Some features only run on one Microsoft Rewards dashboard. Badges show which.</div>
+        <div class="toggle-grid">
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Claim points</div><div class="toggle-sub">Auto-claim ready-to-claim dashboard point cards</div></div><label class="toggle"><input type="checkbox" id="tog-core-claimPoints"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Apply coupons<span class="next-badge">Next only</span></div><div class="toggle-sub">Detect &amp; apply dashboard coupons automatically</div></div><label class="toggle"><input type="checkbox" id="tog-core-applyCoupons"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Double search points</div><div class="toggle-sub">Activate eligible double-search promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-doubleSearchPoints"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App rewards</div><div class="toggle-sub">Mobile app-only reward promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-appReward"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Read to Earn<span class="beta-badge">Beta</span></div><div class="toggle-sub">MSN app-only reading rewards</div></div><label class="toggle"><input type="checkbox" id="tog-core-readToEarn"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily check-in</div><div class="toggle-sub">App-only daily check-in bonus</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyCheckIn"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily streak</div><div class="toggle-sub">Read streak details from the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyStreak"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Streak protection</div><div class="toggle-sub">Keep streak protection enabled on the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-streakProtection"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Temporary punchcards<span class="beta-badge">Beta</span><span class="next-badge">Next only</span></div><div class="toggle-sub">New-dashboard limited-time punchcards (distinct from classic punch cards)</div></div><label class="toggle"><input type="checkbox" id="tog-core-temporaryPunchcards"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Dashboard data</div><div class="toggle-sub">Rich dashboard snapshots, ready-to-claim &amp; streak info</div></div><label class="toggle"><input type="checkbox" id="tog-core-collectDashboardInfo"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Set Rewards goal<span class="next-badge">Next only</span></div><div class="toggle-sub">Auto-pick an eligible gift card as your Rewards goal</div></div><label class="toggle"><input type="checkbox" id="tog-core-setGoal"><span class="toggle-slider"></span></label></div>
+        </div>
+      </div>
+      <details class="settings-section settings-section-advanced adv-collapse" id="settings-advanced">
+        <summary>Advanced settings<svg class="adv-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg></summary>
+        <div class="advanced-caption">Rarely-needed options — defaults are fine for most setups. Only change these if you know what you are doing.</div>
+        <div class="adv-group">
+        <h3>Search tuning</h3>
+        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Fine-tune search behaviour and timing. The defaults are sensible — only change these if you know what you are doing. Delays accept values like <b>3min</b> or <b>8sec</b>.</div>
+        <div class="toggle-grid">
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Parallel searching</div><div class="toggle-sub">Run desktop &amp; mobile searches together (faster)</div></div><label class="toggle"><input type="checkbox" id="tog-parallelSearching"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Scroll results</div><div class="toggle-sub">Scroll result pages like a human</div></div><label class="toggle"><input type="checkbox" id="tog-scrollRandomResults"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Click results</div><div class="toggle-sub">Occasionally open a result link</div></div><label class="toggle"><input type="checkbox" id="tog-clickRandomResults"><span class="toggle-slider"></span></label></div>
+        </div>
+        <div class="acc-grid-2" style="margin-top:12px">
+          <div class="modal-field"><label>Result visit time</label><input class="modal-input" id="set-visitTime" autocomplete="off" placeholder="8sec"></div>
+          <div class="modal-field"><label>Global timeout</label><input class="modal-input" id="set-globalTimeout" autocomplete="off" placeholder="30sec"></div>
+          <div class="modal-field"><label>Search delay min</label><input class="modal-input" id="set-searchDelayMin" autocomplete="off" placeholder="3min"></div>
+          <div class="modal-field"><label>Search delay max</label><input class="modal-input" id="set-searchDelayMax" autocomplete="off" placeholder="5min"></div>
+          <div class="modal-field"><label>Read delay min</label><input class="modal-input" id="set-readDelayMin" autocomplete="off" placeholder="3sec"></div>
+          <div class="modal-field"><label>Read delay max</label><input class="modal-input" id="set-readDelayMax" autocomplete="off" placeholder="5sec"></div>
+        </div>
+        </div>
+        <div class="adv-group">
         <h3>Advanced</h3>
         <div class="advanced-block">
           <div class="storage-panel">
@@ -2163,7 +2227,8 @@ function html() {
           </div>
           <button class="btn btn-secondary btn-sm" id="desktop-uninstall" style="flex-shrink:0">Uninstall shortcuts</button>
         </div>
-      </div>
+        </div>
+      </details>
     </div>
 
     <!-- Core view -->
@@ -2389,6 +2454,14 @@ function html() {
             <label>Language</label>
             <input class="modal-input" id="acc-lang" autocomplete="off" placeholder="en">
           </div>
+        </div>
+        <div class="modal-field">
+          <label>Dashboard <span class="lbl-opt">(auto-detected)</span></label>
+          <select class="modal-input" id="acc-dashboard-mode">
+            <option value="auto">Auto-detect (recommended)</option>
+            <option value="next">Force new dashboard</option>
+            <option value="legacy">Force classic (ASP)</option>
+          </select>
         </div>
         <div class="acc-sub-head">Proxy <span class="lbl-opt">(optional)</span></div>
         <div class="modal-field">
@@ -2682,6 +2755,10 @@ function html() {
       claimPoints:'doClaimPoints', applyCoupons:'doApplyCoupons', readToEarn:'doReadToEarn',
       dailyCheckIn:'doDailyCheckIn', dailyStreak:'doDailyStreak', collectDashboardInfo:'doDashboardInfo'
     };
+    // Core features that only exist on the new (Next.js) dashboard. They silently
+    // no-op on classic (ASP) accounts, so the UI badges them and never credits
+    // their estimated points to accounts forced onto the legacy dashboard.
+    var CORE_NEXT_ONLY = { applyCoupons:true, temporaryPunchcards:true, setGoal:true };
 
     // ── Config popup forms (essentials on top, advanced expander) ──
     var CFG_FORMS = {
@@ -2790,6 +2867,17 @@ function html() {
         else if (f.type === 'number') v = el.value === '' ? 0 : Number(el.value);
         else if (f.type === 'csv') v = el.value.split(',').map(function(x){return x.trim();}).filter(Boolean);
         else v = el.value;
+        // Validate webhook URLs before saving (must be http/https).
+        if (typeof v === 'string' && f.path.toLowerCase().slice(-3) === 'url' && v) {
+          var okUrl = v.indexOf('http://') === 0 || v.indexOf('https://') === 0;
+          if (!okUrl) {
+            el.style.borderColor = '#ff4b6e';
+            el.title = 'Enter a valid http(s) URL';
+            return;
+          }
+          el.style.borderColor = '';
+          el.title = '';
+        }
         saveSetting(f.path, v);
       };
       el.addEventListener(ev, save);
@@ -2924,6 +3012,14 @@ function html() {
       var hl = G('tog-headless');
       var headlessRun = running && hl && hl.checked;
       var sbBtn = G('btn-show-browser');
+      // Lock the headless toggle while a run is active: the browser's hidden-window
+      // mode is frozen at launch, so flipping headless mid-run would desync the
+      // "Show browser" button from the actually-running browser.
+      if (hl) {
+        hl.disabled = running;
+        var hlTog = hl.closest('.toggle');
+        if (hlTog) { hlTog.style.opacity = running ? '.45' : ''; hlTog.style.cursor = running ? 'not-allowed' : ''; }
+      }
       G('btn-run').style.display = headlessRun ? 'none' : '';
       G('btn-run').disabled = running;
       if (sbBtn) sbBtn.style.display = headlessRun ? '' : 'none';
@@ -3153,6 +3249,18 @@ function html() {
             '</div>';
           }
 
+          var metaInfo = '';
+          if (a.dashboardMode && a.dashboardMode !== 'auto') {
+            metaInfo += '<span title="Dashboard override (forced)" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(96,165,250,.15);color:#93c5fd">' + (a.dashboardMode === 'legacy' ? 'ASP' : 'NEW') + '</span>';
+          } else if (a.lastDetectedVariant) {
+            // 'auto' account: show what the bot detected at the last run, muted to
+            // visually distinguish it from a forced override (blue) above.
+            metaInfo += '<span title="Auto-detected (last run)" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.07);color:#9aa3b2">' + (a.lastDetectedVariant === 'legacy' ? 'ASP' : 'NEW') + '</span>';
+          }
+          if (a.geoLocale && String(a.geoLocale).toLowerCase() !== 'auto') {
+            metaInfo += '<span title="Geo locale" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.07);color:#9aa3b2">' + esc(String(a.geoLocale).toUpperCase()) + '</span>';
+          }
+
           return '<div class="' + rowClass + '" data-email="' + esc(a.email||'') + '">' +
             '<div class="acc-avatar">' + esc(ini) + '</div>' +
             '<div class="acc-info" style="flex:1;min-width:0">' +
@@ -3160,6 +3268,7 @@ function html() {
               '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
                 '<div class="' + statusClass + '">' + esc(statusText) + '</div>' +
                 proxyInfo +
+                metaInfo +
               '</div>' +
             '</div>' +
             '<div class="acc-actions-cell">' +
@@ -3227,8 +3336,10 @@ function html() {
           throw new Error(result.error || 'Could not save accounts');
         }
         _accountsLoaded = true;
+        return true;
       } catch(e) {
         showToast(e.message, true);
+        return false;
       }
     }
 
@@ -3334,6 +3445,7 @@ function html() {
       G('acc-proxy-axios').checked = !!p.proxyAxios;
       G('acc-fp-desktop').checked = !!fp.desktop;
       G('acc-fp-mobile').checked = !!fp.mobile;
+      G('acc-dashboard-mode').value = a.dashboardMode || 'auto';
       var av = G('acc-modal-avatar');
       var ini = String(a.email || '').split('@')[0].slice(0,2).toUpperCase();
       av.textContent = ini || '+';
@@ -3353,7 +3465,7 @@ function html() {
       _accFill(_raw[i]);
       G('acc-modal').classList.add('open'); G('acc-email').focus();
     }
-    function saveAccModal() {
+    async function saveAccModal() {
       var email = G('acc-email').value.trim();
       if (!email) { G('acc-modal-msg').textContent = 'Email is required.'; return; }
       var totpSecret = G('acc-totp').value
@@ -3379,6 +3491,12 @@ function html() {
         }
       };
       if (totpSecret) acc.totpSecret = totpSecret;
+      // Per-account dashboard override (auto = omit, let the bot detect at login).
+      var dm = G('acc-dashboard-mode').value;
+      if (dm && dm !== 'auto') acc.dashboardMode = dm;
+
+      var btn = G('acc-modal-save');
+      var prevItem = accEditIdx === -1 ? null : _raw[accEditIdx];
       if (accEditIdx === -1) {
         acc.enabled = true;
         _raw.push(acc);
@@ -3386,7 +3504,20 @@ function html() {
         acc.enabled = _raw[accEditIdx].enabled !== false;
         _raw[accEditIdx] = acc;
       }
-      saveRaw(); G('acc-modal').classList.remove('open'); renderAccEditor();
+
+      setButtonBusy(btn, true, 'Saving…');
+      G('acc-modal-msg').textContent = '';
+      var ok = await saveRaw();
+      setButtonBusy(btn, false);
+
+      if (ok === false) {
+        // Roll back the optimistic change so a retry does not duplicate or lose data.
+        if (accEditIdx === -1) _raw.pop(); else _raw[accEditIdx] = prevItem;
+        G('acc-modal-msg').textContent = 'Could not save — check your connection and try again.';
+        return;
+      }
+
+      G('acc-modal').classList.remove('open'); renderAccEditor();
     }
 
     // ── Settings ──────────────────────────────
@@ -3404,6 +3535,18 @@ function html() {
       var elWr = G('tog-wh-runSummary'); if (elWr) elWr.checked = !!(wh.runSummary && wh.runSummary.enabled);
       var h = G('tog-headless'); if (h) h.checked = s.headless === true;
       var rz = G('tog-runOnZero'); if (rz) rz.checked = s.runOnZeroPoints === true;
+      // Search tuning (advanced)
+      var ss = s.searchSettings || {};
+      if (G('tog-parallelSearching')) G('tog-parallelSearching').checked = ss.parallelSearching === true;
+      if (G('tog-scrollRandomResults')) G('tog-scrollRandomResults').checked = ss.scrollRandomResults !== false;
+      if (G('tog-clickRandomResults')) G('tog-clickRandomResults').checked = ss.clickRandomResults !== false;
+      if (G('set-visitTime')) G('set-visitTime').value = ss.searchResultVisitTime != null ? ss.searchResultVisitTime : '';
+      if (G('set-globalTimeout')) G('set-globalTimeout').value = s.globalTimeout != null ? s.globalTimeout : '';
+      var sd = ss.searchDelay || {}, rdl = ss.readDelay || {};
+      if (G('set-searchDelayMin')) G('set-searchDelayMin').value = sd.min != null ? sd.min : '';
+      if (G('set-searchDelayMax')) G('set-searchDelayMax').value = sd.max != null ? sd.max : '';
+      if (G('set-readDelayMin')) G('set-readDelayMin').value = rdl.min != null ? rdl.min : '';
+      if (G('set-readDelayMax')) G('set-readDelayMax').value = rdl.max != null ? rdl.max : '';
       var sc = s.scheduler || {};
       _schedCache = sc; updateNextRun();
       var schTog = G('tog-scheduler');
@@ -3427,8 +3570,19 @@ function html() {
         var el = G('tog-core-' + k);
         if (!el) return;
         var v = core[k];
-        el.checked = v !== false; // default on
         el.disabled = !hasCore;
+        // Without a Core license the toggle is locked; show it OFF instead of the
+        // stored "default on" so it doesn't look already-enabled. Stored value
+        // (core.<k>) is left untouched — only the visual checkbox state changes.
+        el.checked = hasCore && (v !== false);
+        var row = el.closest('.toggle-wrap') || el.closest('.cfg-wrap');
+        if (row) {
+          var t = !hasCore ? 'Requires an active Core license' : '';
+          if (CORE_NEXT_ONLY[k]) {
+            t = (t ? t + ' — ' : '') + 'Only runs on the new (Next.js) dashboard — skipped on classic (ASP) accounts.';
+          }
+          row.title = t;
+        }
       });
       // Startup
       fetch('/api/startup').then(function(r){return r.json();}).then(function(st){
@@ -3564,11 +3718,33 @@ function html() {
       'tog-doDailySet':'workers.doDailySet','tog-doSpecialPromotions':'workers.doSpecialPromotions',
       'tog-doMorePromotions':'workers.doMorePromotions','tog-doDesktopSearch':'workers.doDesktopSearch',
       'tog-doMobileSearch':'workers.doMobileSearch','tog-doAppPromotions':'workers.doAppPromotions',
-      'tog-headless':'headless','tog-runOnZero':'runOnZeroPoints'
+      'tog-headless':'headless','tog-runOnZero':'runOnZeroPoints',
+      'tog-parallelSearching':'searchSettings.parallelSearching',
+      'tog-scrollRandomResults':'searchSettings.scrollRandomResults',
+      'tog-clickRandomResults':'searchSettings.clickRandomResults'
     };
     Object.keys(TOGGLE_MAP).forEach(function(id) {
       var el = G(id); if (!el) return;
       el.addEventListener('change', function() { saveSetting(TOGGLE_MAP[id], el.checked); });
+    });
+    // Free-text search-tuning fields (debounced save on change; brief saved pulse).
+    var TEXT_MAP = {
+      'set-visitTime':'searchSettings.searchResultVisitTime',
+      'set-globalTimeout':'globalTimeout',
+      'set-searchDelayMin':'searchSettings.searchDelay.min',
+      'set-searchDelayMax':'searchSettings.searchDelay.max',
+      'set-readDelayMin':'searchSettings.readDelay.min',
+      'set-readDelayMax':'searchSettings.readDelay.max'
+    };
+    Object.keys(TEXT_MAP).forEach(function(id) {
+      var el = G(id); if (!el) return;
+      el.addEventListener('change', function() {
+        var v = el.value.trim();
+        if (v === '') return; // keep the existing value rather than writing an invalid empty
+        saveSetting(TEXT_MAP[id], v);
+        el.style.borderColor = 'rgba(47,210,125,.6)';
+        setTimeout(function(){ el.style.borderColor = ''; }, 800);
+      });
     });
     // Nav: Plugins & Docs
     G('nav-plugins').addEventListener('click', function() { setView('plugins'); });
@@ -3832,9 +4008,9 @@ function html() {
       if (mk) mk.style.display = active ? 'none' : 'flex';
       if (ac) ac.style.display = active ? 'flex' : 'none';
       if (!active) return;
-      var settings = {}, accounts = 1;
+      var settings = {}, accounts = 1, acctList = [];
       try { settings = await fetch('/api/settings').then(function(r){return r.json();}); } catch(e) {}
-      try { var st = await fetch('/api/state').then(function(r){return r.json();}); accounts = Math.max(1, (st.accounts||[]).filter(function(a){return a.enabled!==false;}).length || 1); } catch(e) {}
+      try { var st = await fetch('/api/state').then(function(r){return r.json();}); acctList = (st.accounts||[]).filter(function(a){return a.enabled!==false;}); accounts = Math.max(1, acctList.length || 1); } catch(e) {}
       var core = settings.core || {};
       var rows = '', totalPerAcct = 0;
       Object.keys(CORE_EST).forEach(function(k) {
@@ -3847,6 +4023,18 @@ function html() {
                 '<div class="core-bd-pts">+~'+f.pts.toLocaleString()+' pts / mo</div></div></div>';
       });
       var total = totalPerAcct * accounts;
+      // Accounts forced onto the classic (ASP) dashboard earn nothing from the
+      // Next-only features (applyCoupons / setGoal / temporaryPunchcards), so drop
+      // their estimated points for those accounts. NOTE: auto-detected legacy is
+      // NOT skipped here — only an explicit dashboardMode==='legacy' override —
+      // because the detected dashboard variant isn't plumbed to the renderer.
+      var legacyForced = acctList.filter(function(a){ return a.dashboardMode === 'legacy'; }).length;
+      if (legacyForced) {
+        Object.keys(CORE_NEXT_ONLY).forEach(function(k) {
+          if (core[k] !== false && CORE_EST[k]) total -= CORE_EST[k].pts * legacyForced;
+        });
+        if (total < 0) total = 0;
+      }
       G('core-est-value').textContent = '+' + total.toLocaleString();
       G('core-est-accounts').textContent = String(accounts);
       G('core-compare-pts').textContent = total.toLocaleString();
@@ -4618,13 +4806,13 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/accounts-raw') {
         if (Array.isArray(accountCache)) {
-            jsonResponse(res, 200, accountCache)
+            jsonResponse(res, 200, enrichAccountsWithVariant(accountCache))
             return
         }
         accountStorageRequest('read')
             .then(result => {
                 accountCache = Array.isArray(result.accounts) ? result.accounts : []
-                jsonResponse(res, 200, accountCache)
+                jsonResponse(res, 200, enrichAccountsWithVariant(accountCache))
             })
             .catch(error => jsonResponse(res, 500, { error: error.message }))
         return
@@ -4633,6 +4821,8 @@ const server = http.createServer((req, res) => {
         readApiBody(req, res, async body => {
             const accounts = parseJson(body, null)
             if (!Array.isArray(accounts)) { res.writeHead(400); res.end('Invalid'); return }
+            // Strip the transient Desk-only enrichment so it never lands in the store.
+            accounts.forEach(a => { if (a && typeof a === 'object') delete a.lastDetectedVariant })
             try {
                 const result = await accountStorageRequest('write', { accounts })
                 state.accounts = Array.isArray(result.masked) ? result.masked : []

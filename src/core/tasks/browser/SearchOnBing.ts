@@ -1,10 +1,9 @@
-import type { AxiosRequestConfig } from 'axios'
 import { randomBytes } from 'crypto'
 import * as fs from 'fs'
 import type { Page } from 'patchright'
 import path from 'path'
 
-import { BING_SEARCH, URLS } from '../../../automation/DashboardSelectors'
+import { BING_SEARCH } from '../../../automation/DashboardSelectors'
 import { QueryProvider } from '../../QueryProvider'
 import { TaskBase } from '../../TaskBase'
 
@@ -12,10 +11,6 @@ import type { BasePromotion } from '../../../types/DashboardData'
 
 export class SearchOnBing extends TaskBase {
     private bingHome = 'https://bing.com'
-
-    private cookieHeader: string = ''
-
-    private fingerprintHeader: { [x: string]: string } = {}
 
     private gainedPoints: number = 0
 
@@ -34,22 +29,6 @@ export class SearchOnBing extends TaskBase {
         )
 
         try {
-            this.cookieHeader = this.bot.browser.func.buildCookieHeader(
-                this.bot.isMobile ? this.bot.cookies.mobile : this.bot.cookies.desktop,
-                ['bing.com', 'live.com', 'microsoftonline.com']
-            )
-
-            const fingerprintHeaders = { ...this.bot.fingerprint.headers }
-            delete fingerprintHeaders['Cookie']
-            delete fingerprintHeaders['cookie']
-            this.fingerprintHeader = fingerprintHeaders
-
-            this.bot.logger.debug(
-                this.bot.isMobile,
-                'SEARCH-ON-BING',
-                `Prepared headers for SearchOnBing | offerId=${offerId} | cookieLength=${this.cookieHeader.length} | fingerprintHeaderKeys=${Object.keys(this.fingerprintHeader).length}`
-            )
-
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING', `Activating search task | offerId=${offerId}`)
 
             const activated = await this.activateSearchTask(promotion, page)
@@ -173,9 +152,14 @@ export class SearchOnBing extends TaskBase {
                 )
             } finally {
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 15000))
-                // Return to /earn (contains RSC data for all activities) instead of
-                // baseURL (/dashboard) to avoid an extra navigation for the next activity.
-                await page.goto('https://rewards.bing.com/earn', { timeout: 5000 }).catch(() => {})
+                // Return to the rewards page. Legacy (ASP) has NO /earn route — go to the
+                // root home (matches the reference bot); next returns to /earn which carries
+                // the RSC data for all activities.
+                const returnUrl =
+                    this.bot.dashboardVariant === 'legacy'
+                        ? 'https://rewards.bing.com/'
+                        : 'https://rewards.bing.com/earn'
+                await page.goto(returnUrl, { timeout: 5000 }).catch(() => {})
             }
         }
 
@@ -186,83 +170,31 @@ export class SearchOnBing extends TaskBase {
         )
     }
 
-    // The task needs to be activated before being able to complete it
+    // The task needs to be activated before being able to complete it.
+    // Activation = report the offer once; the variant-specific mechanism (legacy
+    // axios POST vs Next Server Action) lives behind the `bot.dashboard` seam.
     private async activateSearchTask(promotion: BasePromotion, page: Page): Promise<boolean> {
-        try {
-            this.bot.logger.debug(
-                this.bot.isMobile,
-                'SEARCH-ON-BING-ACTIVATE',
-                `Preparing activation request | offerId=${promotion.offerId} | hash=${promotion.hash}`
-            )
+        const ok = await this.bot.dashboard.reportActivity(page, {
+            offerId: promotion.offerId,
+            hash: promotion.hash,
+            destinationUrl: promotion.destinationUrl
+        })
 
-            // New dashboard: use browser-based fetch (no RequestVerificationToken)
-            if (!this.bot.requestToken) {
-                if (!page || page.isClosed()) {
-                    this.bot.logger.warn(this.bot.isMobile, 'SEARCH-ON-BING-ACTIVATE', 'Browser page not available')
-                    return false
-                }
-
-                if (!page.url().includes('rewards.bing.com/earn')) {
-                    await page.goto('https://rewards.bing.com/earn', { waitUntil: 'domcontentloaded' }).catch(() => {})
-                    await this.bot.utils.wait(2000)
-                }
-
-                const ok = await this.bot.browser.func.reportActivityViaBrowser(page, {
-                    offerId: promotion.offerId,
-                    hash: promotion.hash,
-                    destinationUrl: promotion.destinationUrl
-                })
-
-                if (ok) {
-                    this.bot.logger.info(
-                        this.bot.isMobile,
-                        'SEARCH-ON-BING-ACTIVATE',
-                        `Activated activity (browser mode) | offerId=${promotion.offerId}`
-                    )
-                }
-
-                return ok
-            }
-
-            // Legacy dashboard: use axios with RequestVerificationToken
-            const formData = new URLSearchParams({
-                id: promotion.offerId,
-                hash: promotion.hash,
-                timeZone: '60',
-                activityAmount: '1',
-                dbs: '0',
-                form: '',
-                type: '',
-                __RequestVerificationToken: this.bot.requestToken
-            })
-
-            const request: AxiosRequestConfig = {
-                url: URLS.reportActivity,
-                method: 'POST',
-                headers: {
-                    ...(this.bot.fingerprint?.headers ?? {}),
-                    Cookie: this.cookieHeader,
-                    Referer: 'https://rewards.bing.com/',
-                    Origin: 'https://rewards.bing.com'
-                },
-                data: formData
-            }
-
-            const response = await this.bot.axios.request(request)
+        if (ok) {
             this.bot.logger.info(
                 this.bot.isMobile,
                 'SEARCH-ON-BING-ACTIVATE',
-                `Successfully activated activity | status=${response.status} | offerId=${promotion.offerId}`
+                `Activated activity | variant=${this.bot.dashboardVariant} | offerId=${promotion.offerId}`
             )
-            return true
-        } catch (error) {
-            this.bot.logger.error(
+        } else {
+            this.bot.logger.warn(
                 this.bot.isMobile,
                 'SEARCH-ON-BING-ACTIVATE',
-                `Activation failed | offerId=${promotion.offerId} | message=${error instanceof Error ? error.message : String(error)}`
+                `Activation failed | offerId=${promotion.offerId}`
             )
-            return false
         }
+
+        return ok
     }
 
     private async getSearchQueries(promotion: BasePromotion): Promise<string[]> {

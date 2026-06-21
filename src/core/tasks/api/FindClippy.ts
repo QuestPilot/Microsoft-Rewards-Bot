@@ -1,100 +1,38 @@
-import type { AxiosRequestConfig } from 'axios'
-import { URLS } from '../../../automation/DashboardSelectors'
 import type { FindClippyPromotion } from '../../../types/DashboardData'
 import { TaskBase } from '../../TaskBase'
 
+/**
+ * "Find Clippy" activity. Reporting is delegated to the variant-agnostic seam
+ * `bot.dashboard`; this task only orchestrates and verifies the balance.
+ */
 export class FindClippy extends TaskBase {
-    private cookieHeader: string = ''
+    private gainedPoints = 0
 
-    private fingerprintHeader: { [x: string]: string } = {}
-
-    private gainedPoints: number = 0
-
-    private oldBalance: number = this.bot.userData.currentPoints
+    private oldBalance = this.bot.userData.currentPoints
 
     public async doFindClippy(promotion: FindClippyPromotion) {
         const offerId = promotion.offerId
         const activityType = promotion.activityType
+        this.oldBalance = Number(this.bot.userData.currentPoints ?? 0)
+
+        this.bot.logger.info(
+            this.bot.isMobile,
+            'FIND-CLIPPY',
+            `Starting Find Clippy | offerId=${offerId} | variant=${this.bot.dashboardVariant} | activityType=${activityType} | oldBalance=${this.oldBalance}`
+        )
 
         try {
-            // If no request token (new dashboard), use browser-based reportActivity
-            if (!this.bot.requestToken) {
-                return this.doFindClippyViaBrowser(promotion)
-            }
+            const page = this.getActiveTaskPage()
 
-            this.cookieHeader = this.bot.browser.func.buildCookieHeader(
-                this.bot.isMobile ? this.bot.cookies.mobile : this.bot.cookies.desktop,
-                ['bing.com', 'live.com', 'microsoftonline.com']
-            )
-
-            const fingerprintHeaders = { ...this.bot.fingerprint.headers }
-            delete fingerprintHeaders['Cookie']
-            delete fingerprintHeaders['cookie']
-            this.fingerprintHeader = fingerprintHeaders
-
-            this.bot.logger.info(
-                this.bot.isMobile,
-                'FIND-CLIPPY',
-                `Starting Find Clippy | offerId=${offerId} | activityType=${activityType} | oldBalance=${this.oldBalance}`
-            )
-
-            this.bot.logger.debug(
-                this.bot.isMobile,
-                'FIND-CLIPPY',
-                `Prepared headers | cookieLength=${this.cookieHeader.length} | fingerprintHeaderKeys=${Object.keys(this.fingerprintHeader).length}`
-            )
-
-            const formData = new URLSearchParams({
-                id: offerId,
+            const reported = await this.bot.dashboard.reportActivity(page, {
+                offerId,
                 hash: promotion.hash,
-                timeZone: '60',
-                activityAmount: '1',
-                dbs: '0',
-                form: '',
                 type: activityType,
-                __RequestVerificationToken: this.bot.requestToken
+                destinationUrl: promotion.destinationUrl
             })
-
-            this.bot.logger.debug(
-                this.bot.isMobile,
-                'FIND-CLIPPY',
-                `Prepared Find Clippy form data | offerId=${offerId} | hash=${promotion.hash} | timeZone=60 | activityAmount=1 | type=${activityType}`
-            )
-
-            const request: AxiosRequestConfig = {
-                url: URLS.reportActivity,
-                method: 'POST',
-                headers: {
-                    ...(this.bot.fingerprint?.headers ?? {}),
-                    Cookie: this.cookieHeader,
-                    Referer: 'https://rewards.bing.com/',
-                    Origin: 'https://rewards.bing.com'
-                },
-                data: formData
-            }
-
-            this.bot.logger.debug(
-                this.bot.isMobile,
-                'FIND-CLIPPY',
-                `Sending Find Clippy request | offerId=${offerId} | url=${request.url}`
-            )
-
-            const response = await this.bot.axios.request(request)
-
-            this.bot.logger.debug(
-                this.bot.isMobile,
-                'FIND-CLIPPY',
-                `Received Find Clippy response | offerId=${offerId} | status=${response.status}`
-            )
 
             const newBalance = await this.bot.browser.func.getCurrentPoints()
             this.gainedPoints = newBalance - this.oldBalance
-
-            this.bot.logger.debug(
-                this.bot.isMobile,
-                'FIND-CLIPPY',
-                `Balance delta after Find Clippy | offerId=${offerId} | oldBalance=${this.oldBalance} | newBalance=${newBalance} | gainedPoints=${this.gainedPoints}`
-            )
 
             if (this.gainedPoints > 0) {
                 this.bot.userData.currentPoints = newBalance
@@ -103,82 +41,14 @@ export class FindClippy extends TaskBase {
                 this.bot.logger.info(
                     this.bot.isMobile,
                     'FIND-CLIPPY',
-                    `Found Clippy | offerId=${offerId} | status=${response.status} | gainedPoints=${this.gainedPoints} | newBalance=${newBalance}`,
+                    `Found Clippy | offerId=${offerId} | gainedPoints=${this.gainedPoints} | newBalance=${newBalance}`,
                     'green'
                 )
             } else {
                 this.bot.logger.warn(
                     this.bot.isMobile,
                     'FIND-CLIPPY',
-                    `Found Clippy but no points were gained | offerId=${offerId} | status=${response.status} | oldBalance=${this.oldBalance} | newBalance=${newBalance}`
-                )
-            }
-
-            this.bot.logger.debug(this.bot.isMobile, 'FIND-CLIPPY', `Waiting after Find Clippy | offerId=${offerId}`)
-
-            await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 10000))
-        } catch (error) {
-            this.bot.logger.error(
-                this.bot.isMobile,
-                'FIND-CLIPPY',
-                `Error in doFindClippy | offerId=${offerId} | message=${error instanceof Error ? error.message : String(error)}`
-            )
-        }
-    }
-
-    /**
-     * Browser-based fallback for the new Next.js dashboard.
-     * Uses `fetch()` inside the Playwright page instead of axios + token.
-     */
-    private async doFindClippyViaBrowser(promotion: FindClippyPromotion): Promise<void> {
-        const offerId = promotion.offerId
-        const activityType = promotion.activityType
-
-        this.bot.logger.info(
-            this.bot.isMobile,
-            'FIND-CLIPPY',
-            `Starting Find Clippy (browser mode) | offerId=${offerId} | type=${activityType} | oldBalance=${this.oldBalance}`
-        )
-
-        try {
-            const page = this.getActiveTaskPage()
-            if (!page || page.isClosed()) {
-                this.bot.logger.warn(this.bot.isMobile, 'FIND-CLIPPY', 'Browser page not available, skipping')
-                return
-            }
-
-            if (!page.url().includes('rewards.bing.com/earn')) {
-                await page.goto('https://rewards.bing.com/earn', { waitUntil: 'domcontentloaded' }).catch(() => {})
-                await this.bot.utils.wait(2000)
-            }
-
-            const ok = await this.bot.browser.func.reportActivityViaBrowser(page, {
-                offerId,
-                hash: promotion.hash,
-                type: activityType,
-                destinationUrl: promotion.destinationUrl
-            })
-
-            if (ok) {
-                const newBalance = await this.bot.browser.func.getCurrentPoints()
-                this.gainedPoints = newBalance - this.oldBalance
-
-                if (this.gainedPoints > 0) {
-                    this.bot.userData.currentPoints = newBalance
-                    this.bot.userData.gainedPoints = (this.bot.userData.gainedPoints ?? 0) + this.gainedPoints
-                }
-
-                this.bot.logger.info(
-                    this.bot.isMobile,
-                    'FIND-CLIPPY',
-                    `Completed Find Clippy (browser) | offerId=${offerId} | gainedPoints=${this.gainedPoints}`,
-                    'green'
-                )
-            } else {
-                this.bot.logger.warn(
-                    this.bot.isMobile,
-                    'FIND-CLIPPY',
-                    `Find Clippy (browser) failed | offerId=${offerId}`
+                    `Found Clippy but no points were gained | offerId=${offerId} | reported=${reported} | oldBalance=${this.oldBalance} | newBalance=${newBalance}`
                 )
             }
 
@@ -187,7 +57,7 @@ export class FindClippy extends TaskBase {
             this.bot.logger.error(
                 this.bot.isMobile,
                 'FIND-CLIPPY',
-                `Error in doFindClippyViaBrowser | offerId=${offerId} | message=${error instanceof Error ? error.message : String(error)}`
+                `Error in doFindClippy | offerId=${offerId} | message=${error instanceof Error ? error.message : String(error)}`
             )
         }
     }

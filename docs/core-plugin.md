@@ -30,6 +30,7 @@ Once in the server, click the **View Store** button in the bot — from there yo
 
 | Feature | Free | Core |
 | --- | :---: | :---: |
+| Works on both dashboards (new + classic) | ✓ auto-detected | ✓ auto-detected |
 | Bing searches | ✓ | ✓ |
 | Daily Set | Limited | Full maintained coverage |
 | Activities & quizzes | ✓ | ✓ |
@@ -70,6 +71,17 @@ Core reaches the parts of the Rewards dashboard that the free bot skips entirely
 - **Streak protection** — your daily streak is tracked and synced so one missed day does not reset weeks of progress.
 - **App rewards** — daily check-in and read-to-earn handled silently every run.
 - **Run summary** — a structured Discord notification after each run with per-account results, balance changes, coupons applied, and a Core vs free comparison.
+
+---
+
+## Works on both Microsoft dashboards
+
+Microsoft is rolling out a new Rewards dashboard, but plenty of accounts are still on the **classic** one — and it varies from account to account. The bot detects which dashboard each account is served and runs the right path automatically, so **every account is fully covered on either dashboard** — one install, no configuration.
+
+- On the **new** dashboard, Core works the on-page cards (claim, coupons, streak panel, quests).
+- On the **classic** dashboard, Core uses the matching account endpoints to claim your ready points, keep your streak protected, and clear punch cards — and the classic dashboard often exposes *more* earnable activities, so there's more for Core to collect.
+
+If Microsoft eventually migrates everyone, nothing changes for you — the bot simply stays on the new path.
 
 ---
 

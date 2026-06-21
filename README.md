@@ -20,6 +20,8 @@
 
 Microsoft Rewards Bot automates daily sets, searches, and promotions on Microsoft Rewards — fully hands-free. It ships with a local control panel called **Rewards Desk**, a modular plugin system, and smart automatic updates. An optional premium **Core** plugin adds deeper rewards coverage, coupon claiming, streak protection, and a remote web dashboard.
 
+It supports **both** Microsoft Rewards dashboards in a single project — the new Next.js dashboard and the older one — detecting which one each account is served at login and using the right code path automatically, so every account earns regardless of which dashboard Microsoft has rolled out to it.
+
 > [!NOTE]
 > This repository is source-available for personal non-commercial use and official contributions only. Commercial redistribution, public forks, and bypassing the Core plugin boundary are not permitted.
 

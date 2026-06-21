@@ -58,6 +58,13 @@ export const BING_SEARCH = {
 // ---------------------------------------------------------------------------
 
 export const URLS = {
+    /**
+     * Rewards root/home. Works on BOTH dashboards: the legacy ASP.NET dashboard is
+     * served here directly, and a migrated account is redirected to the Next.js
+     * `/dashboard`. The legacy flow only ever touches this root (never `/earn`,
+     * `/dashboard`, `/redeem` — those are Next.js-only SPA routes).
+     */
+    home: 'https://rewards.bing.com/',
     /** New dashboard base */
     dashboard: 'https://rewards.bing.com/dashboard',
     /** Earn page */

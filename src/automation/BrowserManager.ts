@@ -6,6 +6,7 @@ import path from 'path'
 import rebrowser, { BrowserContext } from 'patchright'
 
 import { loadSessionData, saveFingerprintData } from '../helpers/ConfigLoader'
+import { bracketIPv6IfNeeded } from '../helpers/ProxyUtils'
 import type { MicrosoftRewardsBot } from '../index'
 import { DESKTOP_BROWSER_VIEWPORT, DESKTOP_BROWSER_WINDOW_ARG } from './BrowserViewport'
 import { CORE_PROMO_BANNER_RUNTIME_CONFIG, installCorePromoBanner } from './CorePromoBanner'
@@ -336,9 +337,10 @@ class BrowserManager {
         try {
             const urlObj = new URL(proxy.url)
             const protocol = urlObj.protocol.replace(':', '')
-            return `${protocol}://${urlObj.hostname}:${proxy.port}`
+            return `${protocol}://${bracketIPv6IfNeeded(urlObj.hostname)}:${proxy.port}`
         } catch {
-            return `${proxy.url}:${proxy.port}`
+            // Bare host/IP without a scheme. Bracket IPv6 so the port is not ambiguous.
+            return `${bracketIPv6IfNeeded(proxy.url)}:${proxy.port}`
         }
     }
 

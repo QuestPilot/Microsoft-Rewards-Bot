@@ -17,7 +17,8 @@
         "doDailyStreak": true,
         "doDashboardInfo": true,
         "doClaimPoints": true,
-        "doApplyCoupons": true
+        "doApplyCoupons": true,
+        "doPunchCards": true
     },
     "searchOnBingLocalQueries": true,
     "globalTimeout": "30sec",
@@ -98,12 +99,12 @@
         "temporaryPunchcards": false,
         "collectDashboardInfo": true,
         "streakProtection": false,
-        "dashboardSync": true
+        "dashboardSync": false
     },
     "backgroundAgent": {
         "enabled": false,
         "allowDashboardAutostart": false,
-        "openConsole": true
+        "openConsole": false
     },
     "terminal": {
         "enabled": false

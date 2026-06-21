@@ -17,6 +17,13 @@ export class StreakProtectionGate {
 
     async sync(page: Page, desiredEnabled: boolean): Promise<StreakProtectionSyncResult> {
         try {
+            // The legacy (ASP) dashboard has no Next.js streak panel and no /dashboard
+            // SPA route. The free-tier gate can't do anything here — premium Core
+            // handles legacy streak protection via the togglestreakasync API instead.
+            if (this.bot.dashboardVariant === 'legacy') {
+                return { desiredEnabled, state: 'unavailable', changed: false, reason: 'legacy-dashboard' }
+            }
+
             if (!page.url().includes('rewards.bing.com')) {
                 await page.goto(URLS.dashboard, { waitUntil: 'domcontentloaded' })
                 await this.bot.utils.wait(1000)

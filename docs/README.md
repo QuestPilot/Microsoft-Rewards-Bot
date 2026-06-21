@@ -47,6 +47,10 @@ New here? Run `npm start`, let **Rewards Desk** open, and read the two pages bel
 - [Plugin API reference](./plugin-api.md)
 - [Publishing a plugin](./plugin-marketplace.md)
 
+## Maintainers
+
+- [Removing legacy dashboard support](./LEGACY_REMOVAL.md) — one-pass deletion guide for when Microsoft fully migrates to the new dashboard
+
 ---
 
 ## Suggested reading order

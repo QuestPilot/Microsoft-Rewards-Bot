@@ -55,8 +55,10 @@ import { reportError } from './notifications/ErrorReport'
 import { flushNtfyQueue, sendNtfy } from './notifications/NtfyWebhook'
 import type { Account } from './types/Account'
 import type { AppDashboardData } from './types/AppDashboardData'
-import type { DashboardLog } from './types/Dashboard'
+import type { DashboardLog, DashboardVariant } from './types/Dashboard'
 import type { DashboardData } from './types/DashboardData'
+import type { DashboardActions } from './automation/dashboard/DashboardActions'
+import { getDashboardActions } from './automation/dashboard/DashboardActionsFactory'
 
 interface BrowserSession {
     context: BrowserContext
@@ -130,6 +132,8 @@ interface UserData {
     dashboardInfo: DashboardInfo | null
     coreStats: CoreRunStats
     starBonus?: StarBonusInfo
+    /** `-getTimezoneOffset()` as a string (e.g. "60"). Used by the legacy report payloads. */
+    timezoneOffset: string
 }
 
 export class MicrosoftRewardsBot {
@@ -148,6 +152,15 @@ export class MicrosoftRewardsBot {
 
     public accessToken = ''
     public requestToken = ''
+    /**
+     * Detected Microsoft Rewards dashboard variant per device, resolved once at
+     * login (Next.js first, else legacy). `null` until detected → treated as 'next'.
+     * Reset between accounts by {@link resetDashboardState}.
+     */
+    private dashboardVariantByDevice: { mobile: DashboardVariant | null; desktop: DashboardVariant | null } = {
+        mobile: null,
+        desktop: null
+    }
     public cookies: { mobile: Cookie[]; desktop: Cookie[] }
     public fingerprint!: BrowserFingerprintWithHeaders
     public dashboardEvents: DashboardLog[] = []
@@ -180,7 +193,8 @@ export class MicrosoftRewardsBot {
             currentPoints: 0,
             gainedPoints: 0,
             dashboardInfo: null,
-            coreStats: createEmptyCoreRunStats()
+            coreStats: createEmptyCoreRunStats(),
+            timezoneOffset: String(-new Date().getTimezoneOffset())
         }
         this.logger = new LogService(this)
         this.accounts = []
@@ -199,6 +213,42 @@ export class MicrosoftRewardsBot {
 
     get isMobile(): boolean {
         return getCurrentContext().isMobile
+    }
+
+    /**
+     * The Microsoft Rewards dashboard variant for the current device. Defaults to
+     * 'next' until login detection records it (see AuthManager.getRewardsSession).
+     */
+    get dashboardVariant(): DashboardVariant {
+        const detected = this.isMobile ? this.dashboardVariantByDevice.mobile : this.dashboardVariantByDevice.desktop
+        return detected ?? 'next'
+    }
+
+    /** Record the detected dashboard variant for the current device. */
+    setDashboardVariant(variant: DashboardVariant): void {
+        if (this.isMobile) this.dashboardVariantByDevice.mobile = variant
+        else this.dashboardVariantByDevice.desktop = variant
+    }
+
+    /**
+     * The variant-specific report strategy (legacy axios vs next Server Action).
+     * Tasks call `bot.dashboard.reportActivity(...)` / `reportQuizOnce(...)` and
+     * never branch on the variant themselves.
+     */
+    get dashboard(): DashboardActions {
+        return getDashboardActions(this)
+    }
+
+    /**
+     * Reset per-account dashboard state. Accounts run sequentially in one process,
+     * so without this a legacy account after a next account (or vice-versa) would
+     * inherit the previous account's variant, CSRF token and "JSON API dead" memo.
+     */
+    resetDashboardState(): void {
+        this.dashboardVariantByDevice = { mobile: null, desktop: null }
+        this.requestToken = ''
+        this.userData.timezoneOffset = String(-new Date().getTimezoneOffset())
+        this.browser.func.resetDashboardApiState()
     }
 
     pushDashboardLog(entry: DashboardLog): void {
@@ -922,6 +972,8 @@ export class MicrosoftRewardsBot {
         const accountEmail = account.email
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`)
         this.userData.coreStats = createEmptyCoreRunStats()
+        // Clear any dashboard state carried over from the previous account.
+        this.resetDashboardState()
 
         let mobileSession: BrowserSession | null = null
         let mobileContextClosed = false
@@ -1055,6 +1107,10 @@ export class MicrosoftRewardsBot {
                     if (this.pluginManager.hasOfficialCoreEntitlement() && this.config.core?.temporaryPunchcards !== false) {
                         await this.activities.doTemporaryPunchcards(this.mainMobilePage)
                     }
+                }
+                // Classic punch cards (legacy dashboard; no-op on next where punchCards is empty).
+                if (this.config.workers.doPunchCards) {
+                    await this.workers.doPunchCards(data, this.mainMobilePage)
                 }
                 if (this.accessToken) {
                     if (this.config.workers.doDailyCheckIn) await this.activities.doDailyCheckIn()

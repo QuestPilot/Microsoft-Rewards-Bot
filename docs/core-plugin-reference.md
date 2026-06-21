@@ -37,6 +37,37 @@ Core adds the maintained premium layer for newer or faster-changing dashboard su
 - final Discord/Ntfy run summaries with Core impact metrics;
 - the official remote dashboard.
 
+## Dashboard Applicability (Classic ASP vs New Next.js)
+
+Microsoft serves two Rewards dashboards and the variant is detected per account, per
+device, at login. The bot runs the correct path automatically — no configuration. A
+feature carries the **same tier on both dashboards** (free stays free, Core stays Core);
+only the *implementation* differs, and a few features simply do not exist on the classic
+dashboard because Microsoft never offered them there.
+
+| Capability | Tier | Classic (ASP) | New (Next.js) |
+| --- | :---: | --- | --- |
+| Bing searches, Daily Set, More/Special, UrlReward, Quiz, FindClippy | Free | ✓ account endpoints (`api/reportactivity`, `bingqa`) | ✓ React Server Actions |
+| Classic punch cards | Free | ✓ (often *more* earnable activities here) | — none served (clean no-op) |
+| Claim points | Core | ✓ `api/claimallpointsasync` | ✓ dashboard claim panel |
+| Daily streak (read) | Core | ✓ from dashboard JSON | ✓ from dashboard DOM/RSC |
+| Streak protection (sync) | Core | ✓ `api/togglestreakasync` | ✓ dashboard streak panel |
+| Double search points | Core | ✓ `api/reportactivity` | ✓ server action |
+| App rewards / Daily check-in / Read to earn | Core | ✓ (account endpoints, shape-agnostic) | ✓ |
+| Dashboard info | Core | ✓ minimal snapshot from JSON | ✓ rich snapshot from DOM/RSC |
+| Apply coupons | Core | — not offered on classic (no-op) | ✓ |
+| Set Rewards goal | Core | — not offered on classic (no-op) | ✓ |
+| Temporary punchcards (quests) | Core | — not offered on classic (no-op) | ✓ best effort |
+
+Features marked **“not offered on classic”** are Microsoft new-dashboard surfaces
+(coupons, goals, limited-time quest punchcards). On a classic account they are inert by
+design: Core detects the legacy variant and skips them silently rather than erroring. In
+the Rewards Desk these toggles carry a **“Next only”** badge, and their estimated points
+are not credited to accounts forced to the legacy dashboard.
+
+When Microsoft finishes migrating everyone to the new dashboard, the classic column
+disappears with no behavior change for users — the bot simply stays on the new path.
+
 ## Claimable Points And Coupons
 
 Core handles two dashboard side-panel flows:

@@ -97,6 +97,45 @@ export class TaskBase {
         this.bot.logger.info(this.bot.isMobile, 'MORE-PROMOTIONS', 'All "More Promotion" items have been completed')
     }
 
+    /**
+     * Classic punch cards (`dashboard.punchCards`): a parent promotion with child
+     * activities to complete. Present on the LEGACY dashboard; on the Next.js
+     * dashboard `punchCards` is empty so this is a clean no-op. Ported from the
+     * legacy reference bot. (Next.js "quest" punchcards are handled separately by
+     * the Core premium `doTemporaryPunchcards`.)
+     */
+    public async doPunchCards(data: DashboardData, page: Page) {
+        const punchCards =
+            data.punchCards?.filter(
+                x => !x.parentPromotion?.complete && (x.parentPromotion?.pointProgressMax ?? 0) > 0
+            ) ?? []
+
+        const punchCardActivities: BasePromotion[] = punchCards.flatMap(x => x.childPromotions)
+
+        const activitiesUncompleted: BasePromotion[] = punchCardActivities.filter(x => {
+            if (x.complete) return false
+            if (x.exclusiveLockedFeatureStatus === 'locked') return false
+            if (!x.promotionType) return false
+
+            return true
+        })
+
+        if (!activitiesUncompleted.length) {
+            this.bot.logger.info(this.bot.isMobile, 'PUNCHCARD', 'All "Punch Card" items have already been completed')
+            return
+        }
+
+        this.bot.logger.info(
+            this.bot.isMobile,
+            'PUNCHCARD',
+            `Started solving ${activitiesUncompleted.length} "Punch Card" items`
+        )
+
+        await this.solveActivities(activitiesUncompleted, page)
+
+        this.bot.logger.info(this.bot.isMobile, 'PUNCHCARD', 'All "Punch Card" items have been completed')
+    }
+
     public async doAppPromotions(data: AppDashboardData) {
         const appRewards = data.response.promotions.filter(x => {
             if (x.attributes['complete']?.toLowerCase() !== 'false') return false
@@ -219,6 +258,18 @@ export class TaskBase {
 
                             // Poll (usually 10 points, pollscenarioid in URL)
                             if (activity.pointProgressMax === 10 && destinationUrl.includes('pollscenarioid')) {
+                                // The legacy ASP dashboard does not credit pollscenarioid polls —
+                                // the bingqa endpoint returns HTTP 400. The reference bot skips
+                                // polls entirely on legacy; mirror it. Only NEXT handles polls.
+                                if (this.bot.dashboardVariant === 'legacy') {
+                                    this.bot.logger.info(
+                                        this.bot.isMobile,
+                                        'ACTIVITY',
+                                        `Skipped Poll on legacy dashboard (not creditable) | title="${activity.title}" | offerId=${offerId}`
+                                    )
+                                    break
+                                }
+
                                 this.bot.logger.info(
                                     this.bot.isMobile,
                                     'ACTIVITY',
@@ -246,11 +297,17 @@ export class TaskBase {
                             const basePromotion = activity as BasePromotion
 
                             // Some daily-set quiz activities arrive typed as urlreward but are
-                            // only credited through the quiz flow — the report-activity server
-                            // action returns actionResult=false and a bare URL visit earns
-                            // nothing (e.g. "Westeros Intrigue?", form=dsetqu / IsConversation).
-                            // Route those to the quiz handler instead of doUrlReward.
-                            if (/form=dsetqu|pollscenarioid|filters=isconversation/.test(destinationUrl)) {
+                            // only credited through the quiz flow on the NEXT.js dashboard — its
+                            // report-activity server action returns actionResult=false and a bare
+                            // URL visit earns nothing (e.g. "Westeros Intrigue?", form=dsetqu /
+                            // IsConversation). Route those to the quiz handler instead of doUrlReward.
+                            // LEGACY must NOT take this reroute: on the ASP dashboard these offers
+                            // are credited by the normal reportactivity POST (doUrlReward → HTTP 200),
+                            // whereas the bingqa quiz endpoint rejects them with HTTP 400 (0 points).
+                            if (
+                                this.bot.dashboardVariant !== 'legacy' &&
+                                /form=dsetqu|pollscenarioid|filters=isconversation/.test(destinationUrl)
+                            ) {
                                 this.bot.logger.info(
                                     this.bot.isMobile,
                                     'ACTIVITY',

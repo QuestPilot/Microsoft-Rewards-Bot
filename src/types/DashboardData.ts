@@ -27,7 +27,10 @@ export interface DashboardData {
     coupons: unknown[]
     couponBannerPromotion: null
     popUpPromotions: BingUfMachineTranslationPromo
-    pointClaimBannerPromotion: null
+    // Legacy (ASP) dashboard "claim your N bonus points" banner. Present (passthrough
+    // from the getuserinfo JSON) on legacy accounts when points are ready to claim;
+    // null otherwise and on the Next.js dashboard (which uses its own claim panel).
+    pointClaimBannerPromotion: PointClaimBannerPromotion | null
     highValueSweepstakesPromotions: HighValueSweepstakesPromotion[]
     revIpCountryName: null
     shareAndWinPromotion: null
@@ -39,6 +42,26 @@ export interface DashboardData {
     userGeneratedContentPromotion: null
     created: Date
     findClippyPromotion: FindClippyPromotion
+}
+
+/**
+ * Legacy ASP "point claim" bonus banner (the `#user-pointclaim` card). Passed through
+ * verbatim from Microsoft's getuserinfo JSON, so fields are loosely typed. Only the
+ * few the bot reads to decide whether to claim are declared.
+ */
+export interface PointClaimBannerPromotion {
+    name?: string
+    /** Microsoft serializes this as a boolean at runtime, but 'True'/'False' is tolerated. */
+    complete?: boolean | string
+    pointProgress?: number
+    pointProgressMax?: number
+    attributes?: {
+        claimable_points?: string
+        claimable_points_breakdown?: string
+        title?: string
+        [key: string]: unknown
+    }
+    [key: string]: unknown
 }
 
 export enum ExclusiveLockedFeature {

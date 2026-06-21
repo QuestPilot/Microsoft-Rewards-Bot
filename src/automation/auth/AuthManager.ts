@@ -1,6 +1,9 @@
 import type { Page } from 'patchright'
-import { saveSessionData } from '../../helpers/ConfigLoader'
+import { saveSessionData, saveDashboardVariant } from '../../helpers/ConfigLoader'
 import type { MicrosoftRewardsBot } from '../../index'
+import { getCurrentContext } from '../../context/ExecutionContext'
+import { URLS } from '../DashboardSelectors'
+import type { DashboardVariant } from '../../types/Dashboard'
 
 import { CodeStrategy } from './strategies/CodeStrategy'
 import { EmailStrategy } from './strategies/EmailStrategy'
@@ -79,7 +82,20 @@ export class AuthManager {
         try {
             this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Starting login process')
 
-            await page.goto('https://rewards.bing.com/dashboard', { waitUntil: 'domcontentloaded' }).catch(() => {})
+            // Enter via the Rewards sign-in/enrollment scenario, NOT /dashboard. The
+            // `createuser?...&userScenarioId=anonsignin` entry forces Microsoft's full
+            // OAuth round-trip, which is what mints the rewards.bing.com session cookie.
+            // Starting at /dashboard assumes an already-authenticated session and leaves
+            // legacy accounts stranded on /welcome with an UNauthenticated session
+            // (getuserinfo → HTTP 401). The reference bot fixed this exact "stuck login"
+            // bug with the same change (its commit 64cd22d). This is variant-agnostic:
+            // both legacy and Next.js accounts need the session established here, then
+            // idru=/ redirects each to its own dashboard.
+            await page
+                .goto('https://rewards.bing.com/createuser?idru=%2F&userScenarioId=anonsignin', {
+                    waitUntil: 'domcontentloaded'
+                })
+                .catch(() => {})
             await this.bot.utils.wait(2000)
             await this.bot.browser.utils.reloadBadPage(page)
             await this.bot.browser.utils.disableFido(page)
@@ -961,6 +977,27 @@ export class AuthManager {
                 // Handle the common ones so the flow can complete instead of
                 // stalling on login.live.com and never reaching Bing.
                 const state = await this.detectCurrentState(page)
+
+                // On mobile, the Bing *browser* session is irrelevant — mobile searches
+                // authenticate via the OAuth access token, not the bing.com cookie. The
+                // federated re-login below cannot complete in mobile's single iteration
+                // (it submits the email, then the loop exits before the password page),
+                // leaving the login half-done and corrupting the already-established
+                // rewards.bing.com session — which bounces the whole run to /welcome and
+                // makes the dashboard unreadable. The working reference bot never
+                // re-logins on mobile here; mirror it and leave the rewards session intact.
+                if (
+                    this.bot.isMobile &&
+                    (state === 'EMAIL_INPUT' || state === 'PASSWORD_INPUT' || state === '2FA_TOTP')
+                ) {
+                    this.bot.logger.info(
+                        this.bot.isMobile,
+                        'LOGIN-BING',
+                        'Federated re-login demanded — skipped on mobile (search uses access token), preserving rewards session'
+                    )
+                    break
+                }
+
                 if (state === 'PASSKEY_ERROR' || state === 'PASSKEY_VIDEO') {
                     this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Dismissing Passkey prompt during verification')
                     await this.bot.browser.utils.ghostClick(page, this.selectors.secondaryButton).catch(() => {})
@@ -1046,93 +1083,149 @@ export class AuthManager {
         }
     }
 
-    private async getRewardsSession(page: Page) {
-        const loopMax = 5
+    /**
+     * Record the resolved dashboard variant for the current device, and persist it
+     * (best-effort) so the Rewards Desk can show an auto-detected ASP/NEW badge for
+     * `auto` accounts. Persistence never blocks login — it is a cosmetic hint only.
+     */
+    private async commitDashboardVariant(variant: DashboardVariant): Promise<void> {
+        this.bot.setDashboardVariant(variant)
+        const email = getCurrentContext().account?.email
+        if (email) {
+            await saveDashboardVariant(this.bot.config.sessionPath, email, this.bot.isMobile, variant)
+        }
+    }
 
-        this.bot.logger.info(this.bot.isMobile, 'GET-REWARD-SESSION', 'Fetching request token')
+    /**
+     * Resolve the Microsoft Rewards dashboard variant for the current device and,
+     * when legacy, capture the `__RequestVerificationToken`.
+     *
+     * Multi-signal detection, mirroring the legacy-only reference bot (which defaults
+     * LEGACY and switches to "modern" only when it positively sees `section#dailyset`):
+     *  - Authoritative LEGACY signals (ASP-only): `__RequestVerificationToken`,
+     *    the `var dashboard = {...}` embed, or a `getuserinfo?type=1` response that
+     *    carries a `dashboard` object.
+     *  - Authoritative NEXT signal: `<section id="dailyset">` (present on the new
+     *    dashboard; absent on `/welcome` and login pages, so it does NOT misfire the
+     *    way the broad `self.__next_f` marker did).
+     *  - Default when nothing decisive shows up: LEGACY (source-style).
+     *
+     * Every signal is logged each iteration so a misdetection is diagnosable from the
+     * run log. When legacy is removed, delete the probe/token capture and always 'next'.
+     */
+    private async getRewardsSession(page: Page) {
+        const loopMax = 6
+        const override = getCurrentContext().account?.dashboardMode ?? 'auto'
+
+        this.bot.logger.info(this.bot.isMobile, 'GET-REWARD-SESSION', `Resolving dashboard session (mode=${override})`)
 
         try {
-            await page
-                .goto(`${this.bot.config.baseURL}?_=${Date.now()}`, { waitUntil: 'networkidle', timeout: 10000 })
-                .catch(() => {})
+            if (override === 'next') {
+                await this.commitDashboardVariant('next')
+                this.bot.logger.info(this.bot.isMobile, 'GET-REWARD-SESSION', 'Forced NEXT (dashboardMode)')
+                return
+            }
 
             for (let i = 0; i < loopMax; i++) {
                 if (page.isClosed()) break
 
-                this.bot.logger.debug(this.bot.isMobile, 'GET-REWARD-SESSION', `Token fetch loop ${i + 1}/${loopMax}`)
+                // Navigate to rewards root if not already there. /welcome is a redirect
+                // holding page — session cookies are not active yet so all API probes
+                // return 401 and no DOM signals fire. Force root so the real dashboard
+                // page loads and all signals become readable.
+                const parsedUrl = new URL(page.url())
+                if (parsedUrl.hostname !== 'rewards.bing.com' || parsedUrl.pathname.startsWith('/welcome')) {
+                    await page
+                        .goto(`${URLS.home}?_=${Date.now()}`, { waitUntil: 'networkidle', timeout: 10000 })
+                        .catch(() => {})
+                }
+                if (page.isClosed()) break
 
-                const u = new URL(page.url())
-                const atRewardHome =
-                    u.hostname === 'rewards.bing.com' && (u.pathname === '/' || u.pathname === '/dashboard')
-
-                if (atRewardHome) {
-                    await this.bot.browser.utils.tryDismissAllMessages(page)
-
-                    const html = await page.content()
-
-                    // ── New Next.js dashboard detection ───────────────────────
-                    // The new dashboard (Next.js + React Server Components) does NOT
-                    // embed a __RequestVerificationToken anywhere.  Detect it early
-                    // to avoid wasting 5 retry loops searching for a token that
-                    // will never exist.  Activities will use the Server Action
-                    // fallback in reportActivityViaBrowser() instead.
-                    if (html.includes('self.__next_f') || html.includes('webpackChunk_N_E')) {
-                        this.bot.logger.info(
-                            this.bot.isMobile,
-                            'GET-REWARD-SESSION',
-                            'Next.js dashboard detected — CSRF token not needed, activities will use Server Action fallback'
-                        )
-                        return
-                    }
-
-                    const $ = await this.bot.browser.utils.loadInCheerio(html)
-
-                    // Legacy HTML form/meta extraction
-                    let token: string | null =
-                        $(this.selectors.requestToken).attr('value') ??
-                        $(this.selectors.requestTokenMeta).attr('content') ??
-                        null
-
-                    // Next.js SPA fallback: extract token from inline script data
-                    if (!token) {
-                        $('script').each((_, el) => {
-                            if (token) return
-                            const text = $(el).html() ?? ''
-                            const tokenMatch =
-                                text.match(/"RequestVerificationToken"\s*:\s*"([^"]+)"/) ??
-                                text.match(/__RequestVerificationToken['"]\s*(?:value|content)['"]\s*:\s*['"]([^'"]+)/)
-                            if (tokenMatch?.[1]) {
-                                token = tokenMatch[1]
-                            }
-                        })
-                    }
-
-                    if (token) {
-                        this.bot.requestToken = token
-                        this.bot.logger.info(
-                            this.bot.isMobile,
-                            'GET-REWARD-SESSION',
-                            `Request token retrieved: ${token.substring(0, 10)}...`
-                        )
-                        return
-                    }
-
-                    this.bot.logger.debug(this.bot.isMobile, 'GET-REWARD-SESSION', 'Token not found on page')
-                } else {
-                    this.bot.logger.debug(
-                        this.bot.isMobile,
-                        'GET-REWARD-SESSION',
-                        `Not at reward home: ${u.hostname}${u.pathname}`
-                    )
+                const url = page.url()
+                if (new URL(url).hostname !== 'rewards.bing.com') {
+                    this.bot.logger.debug(this.bot.isMobile, 'GET-REWARD-SESSION', `iter ${i + 1}: not on rewards host (url=${url})`)
+                    await this.bot.utils.wait(1500)
+                    continue
                 }
 
-                await this.bot.utils.wait(1000)
+                await this.bot.browser.utils.tryDismissAllMessages(page)
+                const html = await page.content()
+                const $ = await this.bot.browser.utils.loadInCheerio(html)
+
+                // ── Collect every signal ──
+                let token: string | null =
+                    $(this.selectors.requestToken).attr('value') ??
+                    $(this.selectors.requestTokenMeta).attr('content') ??
+                    null
+                if (!token) {
+                    $('script').each((_, el) => {
+                        if (token) return
+                        const text = $(el).html() ?? ''
+                        const m =
+                            text.match(/"RequestVerificationToken"\s*:\s*"([^"]+)"/) ??
+                            text.match(/__RequestVerificationToken['"]\s*(?:value|content)['"]\s*:\s*['"]([^'"]+)/)
+                        if (m?.[1]) token = m[1]
+                    })
+                }
+                const hasLegacyEmbed = /var\s+dashboard\s*=/.test(html)
+                const hasDailySetSection = $('section#dailyset').length > 0
+                const hasNextFlight = html.includes('self.__next_f') || html.includes('webpackChunk_N_E')
+                const probe = await this.probeLegacyDashboardApi(page)
+
+                this.bot.logger.info(
+                    this.bot.isMobile,
+                    'GET-REWARD-SESSION',
+                    `iter ${i + 1}/${loopMax} | url=${url} | token=${!!token} | varDashboard=${hasLegacyEmbed} | getuserinfo=${probe.status}(dashboard=${probe.legacy}) | section#dailyset=${hasDailySetSection} | __next_f=${hasNextFlight}`
+                )
+
+                // ── Authoritative LEGACY signals win first ──
+                if (override === 'legacy' || token || hasLegacyEmbed || probe.legacy) {
+                    await this.commitDashboardVariant('legacy')
+                    if (token) this.bot.requestToken = token
+                    else {
+                        const captured = await this.captureRequestToken(page)
+                        if (captured) this.bot.requestToken = captured
+                    }
+                    this.bot.logger.info(
+                        this.bot.isMobile,
+                        'GET-REWARD-SESSION',
+                        `variant=LEGACY (token=${!!this.bot.requestToken}, embed=${hasLegacyEmbed}, api=${probe.legacy})`
+                    )
+                    return
+                }
+
+                // ── NEXT signals ──
+                // `section#dailyset` is authoritative but only appears after the SPA
+                // hydrates. The `self.__next_f` / webpack flight markers are in the
+                // server-rendered HTML immediately, so a slow-hydrating Next dashboard
+                // is not misdetected as legacy and defaulted onto legacy endpoints.
+                // Guard the flight marker against `/welcome`, which is itself a Next
+                // page but NOT the dashboard — a legacy account transiently bounced
+                // there must not be classified as next. Legacy signals are checked
+                // first (above), so this only runs when no legacy signal is present.
+                const onWelcome = new URL(url).pathname.startsWith('/welcome')
+                if (hasDailySetSection || (hasNextFlight && !onWelcome)) {
+                    await this.commitDashboardVariant('next')
+                    this.bot.logger.info(
+                        this.bot.isMobile,
+                        'GET-REWARD-SESSION',
+                        `variant=NEXT (dailyset=${hasDailySetSection}, flight=${hasNextFlight})`
+                    )
+                    return
+                }
+
+                await this.bot.utils.wait(1500)
             }
 
+            // Nothing decisive (often a transient /welcome). Default LEGACY like the
+            // reference bot; for a real new-dashboard account set dashboardMode:"next".
+            await this.commitDashboardVariant('legacy')
+            const captured = await this.captureRequestToken(page)
+            if (captured) this.bot.requestToken = captured
             this.bot.logger.warn(
                 this.bot.isMobile,
                 'GET-REWARD-SESSION',
-                'No RequestVerificationToken found, some activities may not work'
+                `No decisive dashboard marker after ${loopMax} tries — defaulting to LEGACY (token=${!!this.bot.requestToken}). If this account is on the NEW dashboard, set dashboardMode:"next".`
             )
         } catch (error) {
             throw this.bot.logger.error(
@@ -1141,6 +1234,83 @@ export class AuthManager {
                 `Fatal error: ${error instanceof Error ? error.message : String(error)}`
             )
         }
+    }
+
+    /**
+     * Probe the legacy JSON API (`getuserinfo?type=1`) from the page context so the
+     * session cookies are attached automatically. A `dashboard` object in the
+     * response is a definitive "this account is on the legacy ASP dashboard" signal;
+     * the Next.js dashboard 404s this endpoint. Retried a few times because the page
+     * may still be settling right after login.
+     */
+    private async probeLegacyDashboardApi(page: Page): Promise<{ legacy: boolean; status: number }> {
+        if (page.isClosed()) return { legacy: false, status: -1 }
+        try {
+            return await page.evaluate(async () => {
+                try {
+                    const res = await fetch('https://rewards.bing.com/api/getuserinfo?type=1', {
+                        credentials: 'include',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    if (!res.ok) return { legacy: false, status: res.status }
+                    const data = (await res.json().catch(() => null)) as { dashboard?: unknown } | null
+                    return { legacy: !!(data && data.dashboard), status: res.status }
+                } catch {
+                    // status 0 = fetch threw (e.g. cross-origin / network) before a response.
+                    return { legacy: false, status: 0 }
+                }
+            })
+        } catch {
+            // status -2 = the page navigated mid-evaluation (e.g. a /welcome bounce).
+            return { legacy: false, status: -2 }
+        }
+    }
+
+    /**
+     * Capture the legacy `__RequestVerificationToken` from the rewards page. The page
+     * can briefly sit on `/welcome` before settling on the dashboard home, so this
+     * retries and nudges back to the home when it has drifted.
+     */
+    private async captureRequestToken(page: Page): Promise<string | null> {
+        for (let i = 0; i < 5; i++) {
+            if (page.isClosed()) break
+
+            if (new URL(page.url()).hostname === 'rewards.bing.com') {
+                await this.bot.browser.utils.tryDismissAllMessages(page)
+                const html = await page.content()
+                const $ = await this.bot.browser.utils.loadInCheerio(html)
+
+                let token: string | null =
+                    $(this.selectors.requestToken).attr('value') ??
+                    $(this.selectors.requestTokenMeta).attr('content') ??
+                    null
+
+                if (!token) {
+                    $('script').each((_, el) => {
+                        if (token) return
+                        const text = $(el).html() ?? ''
+                        const tokenMatch =
+                            text.match(/"RequestVerificationToken"\s*:\s*"([^"]+)"/) ??
+                            text.match(/__RequestVerificationToken['"]\s*(?:value|content)['"]\s*:\s*['"]([^'"]+)/)
+                        if (tokenMatch?.[1]) {
+                            token = tokenMatch[1]
+                        }
+                    })
+                }
+
+                if (token) return token
+
+                // Drifted to /welcome (or a non-home page) → nudge back to the home.
+                if (page.url().includes('/welcome') || new URL(page.url()).pathname.length > 1) {
+                    await page
+                        .goto(`${URLS.home}?_=${Date.now()}`, { waitUntil: 'networkidle', timeout: 8000 })
+                        .catch(() => {})
+                }
+            }
+
+            await this.bot.utils.wait(1000)
+        }
+        return null
     }
 
     async getAppAccessToken(page: Page, account: Account) {

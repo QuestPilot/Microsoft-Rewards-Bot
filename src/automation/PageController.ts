@@ -30,6 +30,15 @@ export default class PageController {
     }
 
     /**
+     * Reset per-account dashboard fetch state so a fresh account does not inherit
+     * the previous account's "JSON API is dead" memo. Called at the top of each
+     * account run (see MicrosoftRewardsBot.resetDashboardState).
+     */
+    resetDashboardApiState(): void {
+        this.dashboardApiUnavailable = false
+    }
+
+    /**
      * Fetch user desktop dashboard data.
      *
      * Primary path: JSON API at rewards.bing.com/api/getuserinfo?type=1
@@ -85,9 +94,12 @@ export default class PageController {
      * browser page. Both paths feed {@link parseDashboardHtml}.
      */
     private async getDashboardDataFromHtml(): Promise<DashboardData> {
+        // Legacy (ASP) accounts have no `/dashboard` SPA route — the dashboard JSON is
+        // embedded on the root home page instead. Next accounts keep using baseURL.
+        const rewardsBase = this.bot.dashboardVariant === 'legacy' ? URLS.home : this.bot.config.baseURL
         try {
             const request: AxiosRequestConfig = {
-                url: this.bot.config.baseURL,
+                url: rewardsBase,
                 method: 'GET',
                 timeout: 15_000,
                 'axios-retry': { retries: 2 },
@@ -107,7 +119,7 @@ export default class PageController {
             // to the authenticated browser page instead.
             const axiosFinalUrl =
                 ((response.request as { res?: { responseUrl?: string } } | undefined)?.res?.responseUrl) ??
-                this.bot.config.baseURL
+                rewardsBase
             const axiosBlocked = this.classifyUnreachableDashboard(axiosFinalUrl)
             if (axiosBlocked) {
                 this.bot.logger.warn(
@@ -128,7 +140,7 @@ export default class PageController {
 
         try {
             const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
-            await page.goto(this.bot.config.baseURL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
+            await page.goto(rewardsBase, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
 
             // A logged-out / unenrolled account gets bounced to sign-in or /welcome.
             // Throw an actionable error rather than the generic parse failure so the

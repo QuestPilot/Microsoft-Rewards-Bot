@@ -55,11 +55,15 @@ export interface ConfigCore {
     readToEarn?: boolean
     dailyCheckIn?: boolean
     dailyStreak?: boolean
+    /** New (Next.js) dashboard only — no-op on classic (ASP) accounts. */
     setGoal?: boolean
     claimPoints?: boolean
+    /** New (Next.js) dashboard only — no-op on classic (ASP) accounts. */
     applyCoupons?: boolean
+    /** New (Next.js) dashboard only — no-op on classic (ASP) accounts. */
     temporaryPunchcards?: boolean
     collectDashboardInfo?: boolean
+    /** Both dashboards: Next via the streak panel, legacy via the Core account API. */
     streakProtection?: boolean
     dashboardSync?: boolean
 }
@@ -111,6 +115,8 @@ export interface ConfigWorkers {
     doDashboardInfo: boolean
     doClaimPoints: boolean
     doApplyCoupons: boolean
+    /** Classic punch cards (`dashboard.punchCards`). Present on legacy; empty (no-op) on next. */
+    doPunchCards: boolean
 }
 
 // Webhooks

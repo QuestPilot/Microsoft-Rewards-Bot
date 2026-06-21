@@ -5,6 +5,7 @@ import path from 'path'
 
 import type { Account, ConfigSaveFingerprint } from '../types/Account'
 import type { Config } from '../types/Config'
+import type { DashboardVariant } from '../types/Dashboard'
 import { writeJsonAtomic } from './AtomicFile'
 import { validateAccounts, validateConfig } from './SchemaValidator'
 
@@ -93,6 +94,16 @@ export function loadConfig(): Config {
         const configDir = resolveFirstExistingFile(['config.json', 'config.example.json'], 'config file')
         const configData = readJsonFile<Config>(configDir, 'config file')
         validateConfig(configData)
+
+        // We cache the raw parsed JSON (not Zod's output) on purpose: ConfigSchema
+        // strips unknown keys, which would drop passthrough fields like `plugins`.
+        // The schema's `.default(true)` on these two opt-out workers therefore never
+        // reaches the cached object, so apply them explicitly here — a hand-edited
+        // config that omits them still enables them as intended.
+        if (configData.workers) {
+            if (configData.workers.doApplyCoupons === undefined) configData.workers.doApplyCoupons = true
+            if (configData.workers.doPunchCards === undefined) configData.workers.doPunchCards = true
+        }
 
         configCache = configData
 
@@ -211,5 +222,47 @@ export async function saveStorageState(
         await writeJsonAtomic(path.join(sessionDir, storageFileName), storageState, 0)
     } catch (error) {
         throw new Error(errorMessage(error))
+    }
+}
+
+/**
+ * Persist the last-detected dashboard variant per device for an account, at
+ * `sessions/<email>/dashboard-variant.json`. This is a COSMETIC hint consumed only
+ * by the Rewards Desk (to badge auto-detected accounts as ASP/NEW) — the bot's own
+ * logic never reads it back, so failures are swallowed and never block login. The
+ * other device's value is preserved (mobile/desktop runs persist independently).
+ *
+ * Removable with legacy support: a single-variant future drops the ASP badge.
+ */
+export async function saveDashboardVariant(
+    sessionPath: string,
+    email: string,
+    isMobile: boolean,
+    variant: DashboardVariant
+): Promise<void> {
+    try {
+        const sessionDir = getSessionDir(sessionPath, email)
+        const file = path.join(sessionDir, 'dashboard-variant.json')
+
+        if (!fs.existsSync(sessionDir)) {
+            await fs.promises.mkdir(sessionDir, { recursive: true })
+        }
+
+        let current: { mobile?: DashboardVariant | null; desktop?: DashboardVariant | null; updatedAt?: string } = {}
+        if (fs.existsSync(file)) {
+            try {
+                current = JSON.parse(await fs.promises.readFile(file, 'utf-8'))
+            } catch {
+                current = {}
+            }
+        }
+
+        if (isMobile) current.mobile = variant
+        else current.desktop = variant
+        current.updatedAt = new Date().toISOString()
+
+        await writeJsonAtomic(file, current, 0)
+    } catch {
+        // Cosmetic Desk hint only — never fail login over it.
     }
 }
