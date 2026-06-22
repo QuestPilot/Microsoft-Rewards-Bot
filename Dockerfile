@@ -22,8 +22,8 @@ RUN rm -rf node_modules \
     && npm ci --omit=dev --ignore-scripts \
     && npm cache clean --force
 
-# Install Chromium Headless Shell, and cleanup
-RUN npx patchright install --with-deps --only-shell chromium \
+# Install full Chromium binary (not headless-shell) — the bot requires the full browser
+RUN npx patchright install --with-deps chromium \
     && rm -rf /root/.cache /tmp/* /var/tmp/*
 
 ###############################################################################

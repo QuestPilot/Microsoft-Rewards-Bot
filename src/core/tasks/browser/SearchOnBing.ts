@@ -126,6 +126,9 @@ export class SearchOnBing extends TaskBase {
 
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 7000))
 
+                // Occasionally visit a search result — more realistic browsing behaviour
+                await this.visitSearchResult(page)
+
                 // Check for point updates
                 const newBalance = await this.bot.browser.func.getCurrentPoints()
                 this.gainedPoints = newBalance - this.oldBalance
@@ -180,6 +183,49 @@ export class SearchOnBing extends TaskBase {
             'SEARCH-ON-BING-SEARCH',
             `Finished all queries with no points gained | queriesTried=${queries.length} | oldBalance=${this.oldBalance} | finalBalance=${this.bot.userData.currentPoints}`
         )
+    }
+
+    /** Visit the first organic Bing result, scroll, then go back to Bing.
+     *  Runs on ~65 % of searches to vary session behaviour. */
+    private async visitSearchResult(page: Page): Promise<void> {
+        if (Math.random() > 0.65) return
+
+        try {
+            const resultSelector = '#b_results li.b_algo h2 a[href^="http"]'
+            const href = await page
+                .locator(resultSelector)
+                .first()
+                .getAttribute('href', { timeout: 3000 })
+                .catch(() => null)
+            if (!href) return
+
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'SEARCH-ON-BING-VISIT',
+                `Visiting search result | url=${href.slice(0, 80)}…`
+            )
+
+            await this.bot.utils.wait(this.bot.utils.randomDelay(500, 1500))
+            await this.bot.browser.utils.ghostClick(page, resultSelector)
+
+            await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {})
+            await this.bot.utils.wait(this.bot.utils.randomDelay(1500, 3000))
+
+            // Scroll down in 2–4 steps to simulate reading
+            const steps = this.bot.utils.randomNumber(2, 4)
+            for (let i = 0; i < steps; i++) {
+                await page.mouse.wheel(0, this.bot.utils.randomNumber(250, 550))
+                await this.bot.utils.wait(this.bot.utils.randomDelay(700, 1600))
+            }
+
+            // Go back to Bing results
+            await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(async () => {
+                await page.goto(this.bingHome, { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {})
+            })
+            await this.bot.utils.wait(this.bot.utils.randomDelay(800, 1800))
+        } catch {
+            // Non-critical — a failed result visit must never break the search loop
+        }
     }
 
     // The task needs to be activated before being able to complete it.

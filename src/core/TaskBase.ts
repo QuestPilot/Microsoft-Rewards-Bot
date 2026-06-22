@@ -59,9 +59,16 @@ export class TaskBase {
     }
 
     public async doMorePromotions(data: DashboardData, page: Page) {
+        // Merge morePromotions, morePromotionsWithoutPromotionalItems, and
+        // highValueSweepstakesPromotions into a single deduplicated list so that
+        // sweepstakes entries are attempted alongside regular More Promotions.
         const morePromotions: BasePromotion[] = [
             ...new Map(
-                [...(data.morePromotions ?? []), ...(data.morePromotionsWithoutPromotionalItems ?? [])]
+                [
+                    ...(data.morePromotions ?? []),
+                    ...(data.morePromotionsWithoutPromotionalItems ?? []),
+                    ...(data.highValueSweepstakesPromotions ?? [])
+                ]
                     .filter(Boolean)
                     .map(p => [p.offerId, p as BasePromotion] as const)
             ).values()
@@ -349,13 +356,39 @@ export class TaskBase {
                             break
                         }
 
-                        // Unsupported types
-                        default: {
+                        // Welcome Tour / First Run Experience (FRE) activities.
+                        // These are Microsoft onboarding promotions that carry pointProgressMax > 0
+                        // and are creditable via a single reportActivity call (same path as UrlReward).
+                        case 'welcometour': {
+                            const basePromotion = activity as BasePromotion
+
                             this.bot.logger.info(
                                 this.bot.isMobile,
                                 'ACTIVITY',
-                                `Skipped activity "${activity.title}" | offerId=${offerId} | Reason: Unsupported type "${activity.promotionType}"`
+                                `Found activity type "WelcomeTour" | title="${activity.title}" | offerId=${offerId}`
                             )
+
+                            await this.bot.activities.doUrlReward(basePromotion)
+                            break
+                        }
+
+                        // Unsupported types
+                        default: {
+                            // Use warn when the activity has points (it was worth attempting),
+                            // debug when it has no points (routine noise we don't need to surface).
+                            if (activity.pointProgressMax > 0) {
+                                this.bot.logger.warn(
+                                    this.bot.isMobile,
+                                    'ACTIVITY',
+                                    `Skipped activity "${activity.title}" | offerId=${offerId} | Reason: Unsupported type "${activity.promotionType}" (pointProgressMax=${activity.pointProgressMax})`
+                                )
+                            } else {
+                                this.bot.logger.debug(
+                                    this.bot.isMobile,
+                                    'ACTIVITY',
+                                    `Skipped activity "${activity.title}" | offerId=${offerId} | Reason: Unsupported type "${activity.promotionType}"`
+                                )
+                            }
                             break
                         }
                     }

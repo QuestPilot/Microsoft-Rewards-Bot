@@ -327,6 +327,10 @@ export default class AutomationUtils {
 
             await locator.waitFor({ state: 'attached', timeout: 5000 })
             await locator.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {})
+            // Let any scroll animation settle before measuring the bounding box —
+            // without this the bbox can be measured mid-scroll and the cursor lands
+            // at the old (pre-scroll) position.
+            await this.bot.utils.wait(150)
             await this.moveMagicCursorTo(page, selector)
 
             try {
@@ -377,17 +381,25 @@ export default class AutomationUtils {
                 .catch(() => null)
             if (!box || (box.width === 0 && box.height === 0)) return
 
-            const ok = await page.evaluate(({ x, y }: { x: number; y: number }) => {
-                const move = (window as unknown as {
-                    __mgcMoveTo?: (x: number, y: number, click?: boolean) => void
-                }).__mgcMoveTo
-                if (typeof move !== 'function') return false
-                move(x, y, true)
-                return true
-            }, {
-                x: box.x + box.width / 2,
-                y: box.y + box.height / 2
-            })
+            const target = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+
+            const evalMove = () =>
+                page.evaluate(({ x, y }: { x: number; y: number }) => {
+                    const move = (window as unknown as {
+                        __mgcMoveTo?: (x: number, y: number, click?: boolean) => void
+                    }).__mgcMoveTo
+                    if (typeof move !== 'function') return false
+                    move(x, y, true)
+                    return true
+                }, target).catch(() => false)
+
+            let ok = await evalMove()
+            if (!ok) {
+                // The init script can still be loading on a page that was just
+                // navigated — wait a beat and try once more before giving up.
+                await this.bot.utils.wait(200)
+                ok = await evalMove()
+            }
 
             if (ok) {
                 // Let the cursor orient, glide to the target (~0.5s) and land

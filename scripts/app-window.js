@@ -2167,7 +2167,7 @@ function html() {
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Temporary punchcards<span class="beta-badge">Beta</span><span class="next-badge">Next only</span></div><div class="toggle-sub">New-dashboard limited-time punchcards (distinct from classic punch cards)</div></div><label class="toggle"><input type="checkbox" id="tog-core-temporaryPunchcards"><span class="toggle-slider"></span></label></div>
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Dashboard data</div><div class="toggle-sub">Rich dashboard snapshots, ready-to-claim &amp; streak info</div></div><label class="toggle"><input type="checkbox" id="tog-core-collectDashboardInfo"><span class="toggle-slider"></span></label></div>
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Set Rewards goal<span class="next-badge">Next only</span></div><div class="toggle-sub">Auto-pick an eligible gift card as your Rewards goal</div></div><label class="toggle"><input type="checkbox" id="tog-core-setGoal"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Page Harvester<span class="beta-badge">Diagnostic</span><span class="next-badge">Next only</span></div><div class="toggle-sub">Snapshots all Rewards pages (HTML + data) into the Page/ folder. Enable once, run the bot — Page/ is rebuilt and the toggle resets automatically. For selector maintenance only, does not earn points.</div></div><label class="toggle"><input type="checkbox" id="tog-core-captureDashboardPages"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Page Harvester<span class="beta-badge">Diagnostic</span></div><div class="toggle-sub">Snapshots all Rewards pages (HTML + data) into the Page/ folder. Enable once, run the bot — Page/ is rebuilt and the toggle resets automatically. For selector maintenance only, does not earn points.</div></div><label class="toggle"><input type="checkbox" id="tog-core-captureDashboardPages"><span class="toggle-slider"></span></label></div>
         </div>
       </div>
       <details class="settings-section settings-section-advanced adv-collapse" id="settings-advanced">
@@ -2760,7 +2760,7 @@ function html() {
     // Core features that only exist on the new (Next.js) dashboard. They silently
     // no-op on classic (ASP) accounts, so the UI badges them and never credits
     // their estimated points to accounts forced onto the legacy dashboard.
-    var CORE_NEXT_ONLY = { applyCoupons:true, temporaryPunchcards:true, setGoal:true, captureDashboardPages:true };
+    var CORE_NEXT_ONLY = { applyCoupons:true, temporaryPunchcards:true, setGoal:true };
 
     // ── Config popup forms (essentials on top, advanced expander) ──
     var CFG_FORMS = {

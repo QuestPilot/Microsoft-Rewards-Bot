@@ -49,15 +49,16 @@ test('capture flag is opt-in (default false) and schema-validated', () => {
     assert.match(schema, /captureDashboardPages:\s*z\.boolean\(\)\.optional\(\)/)
 })
 
-test('Desk wires the capture toggle as a Core, next-only, points-less control', () => {
+test('Desk wires the capture toggle as a Core, dual-dashboard, points-less control', () => {
     const desk = read('scripts/app-window.js')
     // Toggle element + master key list.
     assert.match(desk, /id="tog-core-captureDashboardPages"/)
     assert.match(desk, /'captureDashboardPages'/)
     // Named "Page Harvester" in the UI.
     assert.match(desk, /Page Harvester/)
-    // Badged next-only so legacy accounts aren't misled.
-    assert.match(desk, /CORE_NEXT_ONLY\s*=\s*\{[^}]*captureDashboardPages:true/)
+    // Works on BOTH dashboards (RSC capture for Next, var-dashboard JSON for legacy)
+    // — must NOT be in CORE_NEXT_ONLY.
+    assert.doesNotMatch(desk, /CORE_NEXT_ONLY\s*=\s*\{[^}]*captureDashboardPages/)
     // It grants no points — must NOT appear in the points-estimate map, and must
     // NOT be wired to a backing open-source worker flag (it has none).
     const est = desk.slice(desk.indexOf('var CORE_EST'), desk.indexOf('var CORE_EST') + 700)

@@ -73,16 +73,39 @@ export class NextDashboardActions implements DashboardActions {
                     /* URL parse failed — proceed with fallback */
                 }
 
-                this.bot.logger.info(
-                    this.bot.isMobile,
-                    'NEXT-REPORT-ACTIVITY',
-                    `Server Action failed, falling back to URL navigation | offerId=${params.offerId} | destination=${params.destinationUrl.slice(0, 80)}…`
-                )
+                // Determine whether this activity is known to credit asynchronously.
+                // Punchcard child activities and items with an OCID query parameter are
+                // both observed to post credit 10–30+ seconds after the page visit rather
+                // than synchronously — a balance check immediately after will show 0 delta.
+                const isAsyncCredit =
+                    params.offerId.toLowerCase().includes('punchcard') ||
+                    (() => {
+                        try { return new URL(params.destinationUrl).searchParams.has('OCID') }
+                        catch { return false }
+                    })()
+
+                if (isAsyncCredit) {
+                    this.bot.logger.info(
+                        this.bot.isMobile,
+                        'NEXT-REPORT-ACTIVITY',
+                        `URL navigation sent — credit may be async (OCID/punchcard) | offerId=${params.offerId} | destination=${params.destinationUrl.slice(0, 80)}…`
+                    )
+                } else {
+                    this.bot.logger.info(
+                        this.bot.isMobile,
+                        'NEXT-REPORT-ACTIVITY',
+                        `Server Action failed, falling back to URL navigation | offerId=${params.offerId} | destination=${params.destinationUrl.slice(0, 80)}…`
+                    )
+                }
                 try {
                     await page.goto(params.destinationUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 })
                     await this.bot.utils.wait(this.bot.utils.randomDelay(3000, 6000))
                     await page.goto('https://rewards.bing.com/earn', { waitUntil: 'domcontentloaded', timeout: 15_000 })
                     await this.bot.utils.wait(2000)
+                    // Navigation succeeded. For punchcard/OCID activities Microsoft credits
+                    // the visit asynchronously — the balance check right after this call will
+                    // show 0 delta. The credit typically appears within minutes, so no retry
+                    // is needed; it will be reflected in the next run's balance read.
                     return true
                 } catch (navError) {
                     this.bot.logger.error(
