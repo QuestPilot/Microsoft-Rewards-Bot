@@ -16,6 +16,7 @@ import type {
     ApplyCouponsResult,
     ClaimPointsResult,
     DailyStreakInfo,
+    DashboardCaptureResult,
     DashboardInfo,
     PremiumTaskMap,
     TemporaryPunchcardsResult
@@ -163,6 +164,17 @@ export default class ActivityRunner {
 
         const gate = new StreakProtectionGate(this.bot)
         return gate.sync(page, desiredEnabled)
+    }
+
+    doCaptureDashboardPages = async (page: Page): Promise<DashboardCaptureResult> => {
+        if (this.premiumTasks.doCaptureDashboardPages) {
+            return this.premiumTasks.doCaptureDashboardPages(page)
+        }
+        this.coreHint(
+            'Dashboard Capture',
+            'Core can harvest full-fidelity dashboard page snapshots (HTML + RSC flight data) for selector maintenance.'
+        )
+        return { captured: 0, routes: [], outputDir: 'Page', problems: [] }
     }
 
     private coreHint(feature: string, detail: string): void {

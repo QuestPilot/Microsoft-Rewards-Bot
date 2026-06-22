@@ -66,6 +66,12 @@ export interface ConfigCore {
     /** Both dashboards: Next via the streak panel, legacy via the Core account API. */
     streakProtection?: boolean
     dashboardSync?: boolean
+    /**
+     * Core-only maintenance harvester. When `true`, the bot wipes and repopulates the
+     * `Page/` folder with full-fidelity dashboard snapshots (HTML + RSC flight data +
+     * screenshots) at the start of a run, for offline selector maintenance. Opt-in
+     * (defaults `false`); Next.js-only; no-op without a Core license. */
+    captureDashboardPages?: boolean
 }
 
 export interface ConfigSafetyAdvisory {

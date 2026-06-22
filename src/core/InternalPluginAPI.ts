@@ -55,6 +55,22 @@ export interface PremiumTaskMap {
     doApplyCoupons: (page: Page) => Promise<ApplyCouponsResult>
     doTemporaryPunchcards: (page: Page) => Promise<TemporaryPunchcardsResult>
     syncStreakProtection: (page: Page, desiredEnabled: boolean) => Promise<StreakProtectionSyncResult>
+    doCaptureDashboardPages: (page: Page) => Promise<DashboardCaptureResult>
+}
+
+/**
+ * Result of the Core-only dashboard page harvester (selector/RSC maintenance tool).
+ * The open-source bot ships a no-op stub; the real implementation lives in Core.
+ */
+export interface DashboardCaptureResult {
+    /** Number of routes successfully captured. */
+    captured: number
+    /** Route names that were captured (e.g. "dashboard", "earn"). */
+    routes: string[]
+    /** Output directory the snapshots were written to, relative to the run cwd. */
+    outputDir: string
+    /** Aggregated analyzer problems across every captured route (selector drift hints). */
+    problems: string[]
 }
 
 export interface ClaimEntry {

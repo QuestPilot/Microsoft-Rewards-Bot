@@ -1063,6 +1063,23 @@ export class MicrosoftRewardsBot {
                     } | App: ${appEarnable?.totalEarnablePoints ?? 0} | ${accountEmail} | locale: ${this.userData.geoLocale}`
                 )
 
+                // Core diagnostic harvester (opt-in via core.captureDashboardPages). Runs
+                // FIRST — before coupons/claim mutate the dashboard — so the claim card and
+                // coupon state are captured pristine. Wipes & repopulates the Page/ folder
+                // with full-fidelity snapshots (HTML + RSC flight + screenshots) for offline
+                // selector maintenance. No-op stub without Core; next-only.
+                if (this.config.core?.captureDashboardPages) {
+                    const capture = await this.activities.doCaptureDashboardPages(this.mainMobilePage)
+                    if (capture.captured > 0) {
+                        this.logger.info(
+                            'main',
+                            'DASHBOARD-CAPTURE',
+                            `Harvested ${capture.captured} page(s) → ${capture.outputDir}` +
+                                (capture.problems.length ? ` | ${capture.problems.length} problem(s) flagged` : '')
+                        )
+                    }
+                }
+
                 if (this.config.workers.doApplyCoupons) {
                     const couponResult = await this.activities.doApplyCoupons(this.mainMobilePage)
                     this.userData.coreStats.couponsAvailable += couponResult.available

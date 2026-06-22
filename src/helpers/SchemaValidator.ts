@@ -148,7 +148,8 @@ export const ConfigSchema = z.object({
         temporaryPunchcards: z.boolean().optional(),
         collectDashboardInfo: z.boolean().optional(),
         streakProtection: z.boolean().optional(),
-        dashboardSync: z.boolean().optional()
+        dashboardSync: z.boolean().optional(),
+        captureDashboardPages: z.boolean().optional()
     }).optional(),
     safetyAdvisory: SafetyAdvisorySchema.optional()
 })

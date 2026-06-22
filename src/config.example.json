@@ -99,7 +99,8 @@
         "temporaryPunchcards": false,
         "collectDashboardInfo": true,
         "streakProtection": false,
-        "dashboardSync": false
+        "dashboardSync": false,
+        "captureDashboardPages": false
     },
     "backgroundAgent": {
         "enabled": false,
