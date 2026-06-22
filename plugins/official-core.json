@@ -1,14 +1,39 @@
 {
-  "plugin": "core",
-  "version": "2.0.1.7",
-  "targets": {
-    "win32-x64-node-24.15.0": {
-      "indexSha256": "3ff89a1098d56a2c96e23a77f46f1105f5135c0654b1baf8d56c73b7d89a6ea2",
-      "bytecodeTarget": {
-        "node": "24.15.0",
-        "platform": "win32",
-        "arch": "x64"
-      }
-    }
-  }
+    "plugin":  "core",
+    "version":  "2.0.1.8",
+    "targets":  {
+                    "win32-x64-node-24.15.0":  {
+                                                   "indexSha256":  "7fd7110e0fd92734f72efc96fec10a216ba56c21a72572eab4f12e5f6b439ee6",
+                                                   "bytecodeTarget":  {
+                                                                          "node":  "24.15.0",
+                                                                          "platform":  "win32",
+                                                                          "arch":  "x64"
+                                                                      }
+                                               },
+                    "linux-x64-node-24.15.0":  {
+                                                   "indexSha256":  "59275074a7cd2f4be8efac54fe6b8df14837c21f4ab16b6c4e54e423dc87ec35",
+                                                   "bytecodeTarget":  {
+                                                                          "node":  "24.15.0",
+                                                                          "platform":  "linux",
+                                                                          "arch":  "x64"
+                                                                      }
+                                               },
+                    "linux-arm64-node-24.15.0":  {
+                                                     "indexSha256":  "7891306fcd5aca54fed06d9fb45708d1453e54cda11fac2a3bcb6437152cacf7",
+                                                     "bytecodeTarget":  {
+                                                                            "node":  "24.15.0",
+                                                                            "platform":  "linux",
+                                                                            "arch":  "arm64"
+                                                                        }
+                                                 },
+                    "darwin-x64-node-24.15.0":  {
+                                                    "indexSha256":  "59275074a7cd2f4be8efac54fe6b8df14837c21f4ab16b6c4e54e423dc87ec35",
+                                                    "bytecodeTarget":  {
+                                                                           "node":  "24.15.0",
+                                                                           "platform":  "darwin",
+                                                                           "arch":  "x64"
+                                                                       },
+                                                    "compatibleArtifactSource":  "linux-x64-node-24.15.0"
+                                                }
+                }
 }
