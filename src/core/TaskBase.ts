@@ -399,6 +399,13 @@ export class TaskBase {
 
         if (fields.includes('exploreonbing') || fields.includes('searchonbing')) return true
 
+        // Punchcard children whose type is urlreward must be processed as UrlReward,
+        // NOT as SearchOnBing. Their credit comes from navigating to the specific
+        // tracked destination URL (OCID parameter), not from a generic Bing search.
+        // A generic search without the OCID tracking never credits the punchcard.
+        // (Genuine punchcard SearchOnBing items would have matched the string check above.)
+        if ((activity.offerId ?? '').toLowerCase().includes('punchcard')) return false
+
         try {
             const destination = new URL(destinationUrl)
             const hostname = destination.hostname.toLowerCase()

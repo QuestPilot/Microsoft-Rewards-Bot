@@ -72,3 +72,17 @@ test('Main() auto-disables capture toggle in config.json after a successful capt
     assert.match(index, /config\.json/)
     assert.match(index, /cfgRaw\.core\.captureDashboardPages = false/)
 })
+
+test('punchcard URL rewards with Bing search destination are treated as UrlReward not SearchOnBing', () => {
+    const taskBase = read('src/core/TaskBase.ts')
+    // Punchcard children must be excluded from the URL-pattern-based SearchOnBing
+    // classification so they go through UrlReward and navigate to the tracked
+    // destination URL (OCID), not a generic search that earns nothing.
+    assert.match(taskBase, /offerId.*punchcard.*return false|includes.*punchcard.*return false/)
+    // String-based check (fields contain 'searchonbing') must still come BEFORE
+    // the punchcard guard so genuine search punchcards are not broken.
+    const body = taskBase.slice(taskBase.indexOf('isSearchOnBingPromotion'))
+    const stringCheckIdx = body.indexOf("fields.includes('searchonbing')")
+    const punchcardGuardIdx = body.indexOf("includes('punchcard')")
+    assert.ok(stringCheckIdx < punchcardGuardIdx, 'string check must precede punchcard guard')
+})
