@@ -297,7 +297,7 @@ export class SearchOnBing extends TaskBase {
                         'SEARCH-ON-BING-QUERY',
                         `No suggestions found, falling back to activity title | title="${promotion.title}"`
                     )
-                    return [promotion.title]
+                    return [this.cleanSearchTitle(promotion.title)]
                 } else {
                     this.bot.logger.info(
                         this.bot.isMobile,
@@ -339,7 +339,16 @@ export class SearchOnBing extends TaskBase {
                 'SEARCH-ON-BING-QUERY',
                 `Falling back to promotion title as search query | title="${promotion.title}"`
             )
-            return [promotion.title]
+            return [this.cleanSearchTitle(promotion.title)]
         }
+    }
+
+    /** Strip punchcard CTA noise ("Click to complete.", "Search on Bing for…") from a
+     *  title before using it as a Bing search query so the search term is meaningful. */
+    private cleanSearchTitle(title: string): string {
+        return title
+            .replace(/\.\s*click\s+to\s+complete\.?\s*$/i, '')
+            .replace(/^search\s+on\s+bing\s+(for\s+)?/i, '')
+            .trim() || title
     }
 }

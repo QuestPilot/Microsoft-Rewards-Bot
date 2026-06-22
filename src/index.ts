@@ -1,5 +1,6 @@
 import childProcess from 'child_process'
 import cluster, { Worker } from 'cluster'
+import fs from 'fs'
 import path from 'path'
 import type { BrowserContext, Cookie, Page } from 'patchright'
 import readline from 'readline'
@@ -1077,6 +1078,17 @@ export class MicrosoftRewardsBot {
                             `Harvested ${capture.captured} page(s) → ${capture.outputDir}` +
                                 (capture.problems.length ? ` | ${capture.problems.length} problem(s) flagged` : '')
                         )
+                        // Auto-disable: write false back to config.json so the Desk toggle
+                        // resets automatically. The user must re-enable it for each new capture.
+                        this.config.core!.captureDashboardPages = false
+                        try {
+                            const cfgPath = path.join(process.cwd(), 'src', 'config.json')
+                            const cfgRaw = JSON.parse(fs.readFileSync(cfgPath, 'utf8'))
+                            if (cfgRaw?.core) {
+                                cfgRaw.core.captureDashboardPages = false
+                                fs.writeFileSync(cfgPath, JSON.stringify(cfgRaw, null, 4) + '\n', 'utf8')
+                            }
+                        } catch { /* config write is best-effort */ }
                     }
                 }
 

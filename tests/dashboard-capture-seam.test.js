@@ -54,6 +54,8 @@ test('Desk wires the capture toggle as a Core, next-only, points-less control', 
     // Toggle element + master key list.
     assert.match(desk, /id="tog-core-captureDashboardPages"/)
     assert.match(desk, /'captureDashboardPages'/)
+    // Named "Page Harvester" in the UI.
+    assert.match(desk, /Page Harvester/)
     // Badged next-only so legacy accounts aren't misled.
     assert.match(desk, /CORE_NEXT_ONLY\s*=\s*\{[^}]*captureDashboardPages:true/)
     // It grants no points — must NOT appear in the points-estimate map, and must
@@ -62,4 +64,11 @@ test('Desk wires the capture toggle as a Core, next-only, points-less control', 
     assert.doesNotMatch(est, /captureDashboardPages/)
     const workerMap = desk.slice(desk.indexOf('CORE_WORKER_MAP = {'), desk.indexOf('CORE_WORKER_MAP = {') + 200)
     assert.doesNotMatch(workerMap, /captureDashboardPages/)
+})
+
+test('Main() auto-disables capture toggle in config.json after a successful capture', () => {
+    const index = read('src/index.ts')
+    assert.match(index, /captureDashboardPages = false/)
+    assert.match(index, /config\.json/)
+    assert.match(index, /cfgRaw\.core\.captureDashboardPages = false/)
 })
