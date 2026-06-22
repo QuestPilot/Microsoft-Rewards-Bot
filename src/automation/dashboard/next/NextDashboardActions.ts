@@ -53,6 +53,26 @@ export class NextDashboardActions implements DashboardActions {
             // Fallback (UrlReward-style): visit the destination URL like a real user.
             // Microsoft credits the activity when the destination is visited.
             if (params.allowUrlNavFallback && params.destinationUrl) {
+                // Interactive AI tools (bing.com/tools/ai/*) require genuine user input
+                // (clicks, form submissions) to grant credit — silent navigation never works.
+                // Skip the fallback for these to avoid wasting ~15s per item.
+                try {
+                    const destUrl = new URL(params.destinationUrl)
+                    if (
+                        destUrl.hostname.endsWith('bing.com') &&
+                        destUrl.pathname.startsWith('/tools/ai')
+                    ) {
+                        this.bot.logger.info(
+                            this.bot.isMobile,
+                            'NEXT-REPORT-ACTIVITY',
+                            `Skipping URL fallback — interactive AI tool requires user input | offerId=${params.offerId} | destination=${params.destinationUrl.slice(0, 80)}…`
+                        )
+                        return false
+                    }
+                } catch {
+                    /* URL parse failed — proceed with fallback */
+                }
+
                 this.bot.logger.info(
                     this.bot.isMobile,
                     'NEXT-REPORT-ACTIVITY',

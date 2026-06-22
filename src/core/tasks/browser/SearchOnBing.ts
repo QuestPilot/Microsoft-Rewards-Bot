@@ -33,12 +33,24 @@ export class SearchOnBing extends TaskBase {
 
             const activated = await this.activateSearchTask(promotion, page)
             if (!activated) {
-                this.bot.logger.warn(
+                // For punchcard child activities, the server action "activation" step
+                // may return false because punchcard children are tracked differently —
+                // the credit comes from doing the actual Bing search, not the pre-report.
+                // Proceed with the search anyway; worst case we do the search with no credit.
+                const isPunchcard = offerId.toLowerCase().includes('punchcard')
+                if (!isPunchcard) {
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'SEARCH-ON-BING',
+                        `Search activity couldn't be activated, aborting | offerId=${offerId}`
+                    )
+                    return
+                }
+                this.bot.logger.info(
                     this.bot.isMobile,
                     'SEARCH-ON-BING',
-                    `Search activity couldn't be activated, aborting | offerId=${offerId}`
+                    `Punchcard search activation returned false — proceeding with search (credit comes from Bing search) | offerId=${offerId}`
                 )
-                return
             }
 
             // Do the bing search here
