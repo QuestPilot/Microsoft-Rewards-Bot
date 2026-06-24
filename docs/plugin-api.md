@@ -134,7 +134,7 @@ export default class SummaryPlugin implements IPlugin {
 
 ## Security Model
 
-Plugins are local code and should be installed only from trusted sources. The marketplace checks metadata and checksums, but it is not a sandbox. Paid or proprietary plugins must clearly document their own license and support channel.
+Marketplace-installed plugins (`source: "marketplace"`) run **sandboxed** in a V8 isolate with no Node APIs and no access to credentials or the bot object — they exchange only the public API over a JSON bridge, and account emails are tokenized before crossing the boundary. A plugin that needs full access must be granted **Trusted Mode** (`trust: "full"`) locally and explicitly; the marketplace can never grant it. A plugin folder you place in `plugins/` yourself runs in-process unless you mark its entry `trust: "sandbox"`. Paid or proprietary plugins must clearly document their own license and support channel.
 
 Related pages:
 

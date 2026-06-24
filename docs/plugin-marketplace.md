@@ -59,7 +59,11 @@ The bot keeps an integrity catalog at `plugins/catalog.json`. Adding an entry le
 
 Paid plugins use an external link (`purchaseUrl`) for payment — the bot does not handle money, commissions, or license issuance for third-party plugins.
 
-> The bot does **not** sandbox plugin code. A plugin runs with the same access as the bot. Tell users to install plugins only from authors they trust, and only install plugins you trust yourself.
+### The signed marketplace catalog
+
+Beyond the local integrity catalog, the marketplace is anchored by a **signed** catalog (`plugins/marketplace.json` + `plugins/marketplace.sig`): an Ed25519 signature, verified by the bot against the trusted public key(s) in `scripts/security/marketplace-keys/`. It pins each plugin's `sha256`, carries a monotonic `sequence` (rollback protection) and a freshness TTL, and lists `revoked` plugins plus a global `killSwitch`. The bot verifies it before installing or loading any `source: "marketplace"` plugin and **fails closed** if it is missing, unsigned, stale, or revoked. The private signing key lives only on the server (core-api) — never on a client.
+
+> **How third-party plugins run — the trust model.** A plugin installed from the marketplace (`source: "marketplace"` in `plugins.jsonc`) runs **sandboxed**: inside a V8 isolate with **no** Node APIs — no `fs`, `process`, `child_process`, network, the OS credential vault, or the bot object. It sees only the public plugin API over a JSON bridge, and account emails are tokenized before they cross the boundary. A plugin that genuinely needs full access (e.g. to read the accounts file) must be granted **Trusted Mode** (`trust: "full"`) — an explicit, local, opt-in decision the marketplace can never make for you. A plain plugin folder you drop into `plugins/` yourself still runs **in-process** by default; set `trust: "sandbox"` on its entry to isolate it too. Either way, only install plugins from authors you trust.
 
 ## Publishing rules
 

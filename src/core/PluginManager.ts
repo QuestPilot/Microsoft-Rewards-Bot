@@ -65,11 +65,33 @@ interface PluginPackageManifest {
     }
 }
 
+/** Handle returned by the out-of-process plugin sandbox (scripts/plugin-sandbox.js). */
+interface SandboxedPluginHandle {
+    name: string | null
+    version: string | null
+    hooks: { onBotInitialized: boolean; onAccountStart: boolean; onAccountEnd: boolean; destroy: boolean }
+    sinkCount: number
+    emitNotification(notification: unknown): Promise<void>
+    runLifecycle(name: string, payload?: unknown): Promise<void>
+    dispose(): void
+}
+
+type CreatePluginSandbox = (options: {
+    source: string
+    config?: Record<string, unknown>
+    apiVersion?: string
+    log?: PluginLogger
+    memoryLimitMb?: number
+    timeoutMs?: number
+}) => Promise<SandboxedPluginHandle>
+
 export class PluginManager {
     private bot: MicrosoftRewardsBot
     private plugins: IPlugin[] = []
     private pluginConfigs = new WeakMap<IPlugin, Record<string, unknown>>()
     private officialCorePlugins = new WeakSet<IPlugin>()
+    private sandboxedPlugins = new WeakSet<IPlugin>()
+    private readonly sandboxAccountKey = crypto.randomBytes(32)
     private registeredTasks: Partial<PremiumTaskMap> = {}
     private registeredSelectors: Record<string, Record<string, unknown>> = {}
     private diagnosticsProviders: PluginDiagnosticsProvider[] = []
@@ -94,7 +116,27 @@ export class PluginManager {
 
         const { config: pluginConfig, hasFile: hasConfigFile } = this.loadPluginConfig()
 
-        const ignoredFiles = new Set(['README.md', 'plugins.jsonc', 'official-core.json', 'official-core.sig', 'catalog.json'])
+        // Local offline panic switch: disable every plugin except verified Core.
+        // Works without core-api — the incident-response control for a bad plugin.
+        const thirdPartyDisabled = process.env.MSRB_DISABLE_PLUGINS === '1'
+        if (thirdPartyDisabled && cluster.isPrimary) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                'MSRB_DISABLE_PLUGINS=1 set — loading only verified Core; all other plugins are disabled'
+            )
+        }
+
+        const ignoredFiles = new Set([
+            'README.md',
+            'plugins.jsonc',
+            'official-core.json',
+            'official-core.sig',
+            'catalog.json',
+            'marketplace.json',
+            'marketplace.sig',
+            'marketplace.example.json'
+        ])
         const entries = fs
             .readdirSync(pluginsDir, { withFileTypes: true })
             .filter(entry => !entry.name.startsWith('.') && !ignoredFiles.has(entry.name))
@@ -114,6 +156,10 @@ export class PluginManager {
         for (const entry of entries) {
             const entryName = this.getPluginEntryName(entry)
             const entryConfig = pluginConfig[entryName]
+
+            if (thirdPartyDisabled && entryName !== 'core') {
+                continue
+            }
 
             if (hasConfigFile) {
                 if (!entryConfig) {
@@ -136,9 +182,9 @@ export class PluginManager {
 
             try {
                 if (entry.isDirectory()) {
-                    await this.loadDirectoryPlugin(entryName, path.join(pluginsDir, entry.name), entryConfig?.config ?? {})
+                    await this.loadDirectoryPlugin(entryName, path.join(pluginsDir, entry.name), entryConfig)
                 } else if (entry.name.endsWith('.js') || entry.name.endsWith('.jsc')) {
-                    await this.loadPluginFile(entryName, path.join(pluginsDir, entry.name), entryConfig?.config ?? {})
+                    await this.loadPluginFile(entryName, path.join(pluginsDir, entry.name), entryConfig)
                 }
             } catch (error) {
                 this.bot.logger.error(
@@ -303,30 +349,38 @@ export class PluginManager {
     private async loadDirectoryPlugin(
         entryName: string,
         dirPath: string,
-        pluginConfig: Record<string, unknown>
+        entryConfig: PluginConfigEntry | undefined
     ): Promise<void> {
         const jscPath = path.join(dirPath, 'index.jsc')
         const jsPath = path.join(dirPath, 'index.js')
 
         if (entryName === 'core' && fs.existsSync(jsPath)) {
-            await this.loadPluginFile(entryName, jsPath, pluginConfig)
+            await this.loadPluginFile(entryName, jsPath, entryConfig)
         } else if (fs.existsSync(jscPath)) {
-            await this.loadPluginFile(entryName, jscPath, pluginConfig)
+            await this.loadPluginFile(entryName, jscPath, entryConfig)
         } else if (fs.existsSync(jsPath)) {
-            await this.loadPluginFile(entryName, jsPath, pluginConfig)
+            await this.loadPluginFile(entryName, jsPath, entryConfig)
         }
     }
 
     private async loadPluginFile(
         entryName: string,
         filePath: string,
-        pluginConfig: Record<string, unknown>
+        entryConfig: PluginConfigEntry | undefined
     ): Promise<void> {
+        const pluginConfig = entryConfig?.config ?? {}
+
         // Verify the official Core plugin BEFORE loading its bytecode
         const isOfficialCore = this.isVerifiedOfficialCore(entryName, filePath)
 
         // Enforce the catalog.json sha256 for third-party plugins (fail closed on mismatch)
         if (!isOfficialCore) this.assertCatalogHash(entryName, filePath)
+
+        // Untrusted third-party plugins run in a V8 isolate with no Node APIs.
+        // Core and trusted/first-party plugins keep the in-process require() path.
+        if (this.resolvePluginTrust(isOfficialCore, entryConfig) === 'sandboxed') {
+            return this.loadSandboxedPlugin(entryName, filePath, entryConfig)
+        }
 
         if (filePath.endsWith('.jsc') || this.isOfficialCoreLoader(entryName, filePath)) {
             this.assertBytecodeTarget(entryName, filePath)
@@ -385,6 +439,194 @@ export class PluginManager {
                 `Registered ${isOfficialCore ? 'official ' : ''}plugin: ${plugin.name}@${plugin.version}`
             )
         }
+    }
+
+    /**
+     * Decide how a plugin runs:
+     *  - `core`      — the verified official Core plugin (in-process, full trust).
+     *  - `sandboxed` — untrusted: marketplace-sourced, or explicitly `trust: 'sandbox'`.
+     *  - `trusted`   — in-process: explicit `trust: 'full'` (Trusted Mode), or a local
+     *                  first-party plugin with no trust hint (backward compatible).
+     */
+    private resolvePluginTrust(isOfficialCore: boolean, entryConfig: PluginConfigEntry | undefined): 'core' | 'sandboxed' | 'trusted' {
+        if (isOfficialCore) return 'core'
+        if (entryConfig?.trust === 'full') return 'trusted'
+        if (entryConfig?.trust === 'sandbox' || entryConfig?.source === 'marketplace') return 'sandboxed'
+        return 'trusted'
+    }
+
+    /**
+     * Load an untrusted plugin inside a V8 isolate (no Node APIs, no secrets). The
+     * plugin's source is read and handed to scripts/plugin-sandbox.js; the returned
+     * handle is adapted to the IPlugin interface so the rest of the manager is
+     * agnostic to how the plugin runs. If isolation is unavailable on this platform
+     * we FAIL CLOSED (never run untrusted code in-process).
+     */
+    private async loadSandboxedPlugin(
+        entryName: string,
+        filePath: string,
+        entryConfig: PluginConfigEntry | undefined
+    ): Promise<void> {
+        if (filePath.endsWith('.jsc')) {
+            throw new Error(`Sandboxed plugin "${entryName}" must ship JavaScript source (.js), not bytecode (.jsc)`)
+        }
+
+        // Marketplace-sourced plugins must be vouched for by the SIGNED catalog
+        // (signature + pinned sha256 + not revoked + not stale). Fail closed.
+        if (entryConfig?.source === 'marketplace') {
+            this.assertMarketplaceTrust(entryName, filePath, entryConfig)
+        }
+
+        let createPluginSandbox: CreatePluginSandbox
+        try {
+            // Lazy-require: isolated-vm is a native module. If it can't load here,
+            // refuse the plugin rather than run untrusted code unsandboxed.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            ;({ createPluginSandbox } = require('../../scripts/plugin-sandbox') as { createPluginSandbox: CreatePluginSandbox })
+        } catch (error) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Plugin isolation is unavailable (${error instanceof Error ? error.message : String(error)}); refusing to load untrusted plugin "${entryName}" unsandboxed`
+            )
+            return
+        }
+
+        const pluginConfig = entryConfig?.config ?? {}
+        const source = fs.readFileSync(filePath, 'utf-8')
+        const sandbox = await createPluginSandbox({
+            source,
+            config: pluginConfig,
+            apiVersion: PLUGIN_API_VERSION,
+            log: this.createLogger(),
+            memoryLimitMb: 64,
+            timeoutMs: 5000
+        })
+
+        if (typeof sandbox.name !== 'string' || typeof sandbox.version !== 'string') {
+            sandbox.dispose()
+            throw new Error(`Sandboxed plugin "${entryName}" must export string { name, version }`)
+        }
+        if (sandbox.name !== entryName) {
+            sandbox.dispose()
+            throw new Error(`Plugin name "${sandbox.name}" must match configured entry "${entryName}"`)
+        }
+
+        // Circuit breaker: if a sandboxed plugin repeatedly throws or times out, disable
+        // it for the rest of the run so a flaky/hostile plugin cannot stall the bot.
+        // (Catastrophic V8 OOM crashes are a separate, harder problem — see the child-
+        // process hosting follow-up; this handles the recoverable failure modes.)
+        const breaker = { failures: 0, tripped: false }
+        const MAX_FAILURES = 3
+        const guard = (action: string, run: () => Promise<void>): Promise<void> => {
+            if (breaker.tripped) return Promise.resolve()
+            return run().catch((error: unknown) => {
+                breaker.failures += 1
+                const message = error instanceof Error ? error.message : String(error)
+                this.bot.logger.warn(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Sandboxed plugin "${entryName}" ${action} failed (${breaker.failures}/${MAX_FAILURES}): ${message}`
+                )
+                if (breaker.failures >= MAX_FAILURES && !breaker.tripped) {
+                    breaker.tripped = true
+                    this.bot.logger.error(
+                        'main',
+                        'PLUGIN-MANAGER',
+                        `Sandboxed plugin "${entryName}" disabled after ${MAX_FAILURES} failures`
+                    )
+                    try { sandbox.dispose() } catch {}
+                }
+            })
+        }
+
+        const adapter: IPlugin = {
+            name: sandbox.name,
+            version: sandbox.version,
+            register: () => {}, // registration already ran inside the isolate
+            destroy: () => sandbox.dispose()
+        }
+        if (sandbox.hooks.onBotInitialized) {
+            adapter.onBotInitialized = () => guard('onBotInitialized', () => sandbox.runLifecycle('onBotInitialized'))
+        }
+        if (sandbox.hooks.onAccountStart) {
+            adapter.onAccountStart = context =>
+                guard('onAccountStart', () => sandbox.runLifecycle('onAccountStart', { email: this.tokenizeAccount(context.email) }))
+        }
+        if (sandbox.hooks.onAccountEnd) {
+            adapter.onAccountEnd = context =>
+                guard('onAccountEnd', () =>
+                    sandbox.runLifecycle('onAccountEnd', {
+                        email: this.tokenizeAccount(context.email),
+                        result: { ...context.result, email: this.tokenizeAccount(context.result.email) }
+                    })
+                )
+        }
+
+        // Forward host notifications into the isolate so the plugin's own sinks fire.
+        if (sandbox.sinkCount > 0) {
+            this.notificationSinks.push(notification => guard('notify', () => sandbox.emitNotification(notification)))
+        }
+
+        this.plugins.push(adapter)
+        this.pluginConfigs.set(adapter, pluginConfig)
+        this.sandboxedPlugins.add(adapter)
+
+        if (cluster.isPrimary) {
+            this.bot.logger.info('main', 'PLUGIN-MANAGER', `Registered sandboxed plugin: ${adapter.name}@${adapter.version}`)
+        }
+    }
+
+    /**
+     * Enforce marketplace trust for a `source: 'marketplace'` plugin: the signed
+     * catalog must verify (signature + freshness), list this plugin with a pinned
+     * sha256 that matches the on-disk file, and not have revoked it. Throws (fail
+     * closed) on any failure — the caller's catch skips the plugin.
+     */
+    private assertMarketplaceTrust(entryName: string, filePath: string, entryConfig: PluginConfigEntry | undefined): void {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mp = require('../../scripts/security/marketplace-catalog') as {
+            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string }): {
+                ok: boolean
+                reason?: string
+                catalog?: unknown
+                expired?: boolean
+            }
+            findEntry(catalog: unknown, name: string, version?: string): { sha256?: string; version?: string } | undefined
+            isRevoked(catalog: unknown, opts: { name?: string; version?: string; sha256?: string }): boolean
+        }
+
+        const result = mp.verifyMarketplaceCatalog({
+            root: process.cwd(),
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined
+        })
+        if (!result.ok) {
+            throw new Error(`marketplace catalog is not trusted (${result.reason}); refusing "${entryName}"`)
+        }
+        if (result.expired) {
+            throw new Error(`marketplace catalog is stale; refusing "${entryName}"`)
+        }
+        const entry = mp.findEntry(result.catalog, entryName, entryConfig?.version)
+        if (!entry || !entry.sha256) {
+            throw new Error(`"${entryName}" is not pinned in the signed marketplace catalog`)
+        }
+        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+        if (fileHash.toLowerCase() !== String(entry.sha256).toLowerCase()) {
+            throw new Error(`"${entryName}" sha256 does not match the signed marketplace catalog`)
+        }
+        if (mp.isRevoked(result.catalog, { name: entryName, version: entry.version, sha256: entry.sha256 })) {
+            throw new Error(`"${entryName}" is revoked by the marketplace catalog`)
+        }
+    }
+
+    /**
+     * Stable opaque token for an account email so untrusted (sandboxed) plugins can
+     * correlate per-account state within a run WITHOUT receiving PII. The HMAC key is
+     * random per process, so tokens are not linkable across runs/installs. Trusted
+     * in-process plugins keep receiving the real email (unchanged public contract).
+     */
+    private tokenizeAccount(email: string): string {
+        return 'acct_' + crypto.createHmac('sha256', this.sandboxAccountKey).update(String(email ?? '')).digest('hex').slice(0, 16)
     }
 
     private isVerifiedOfficialCore(entryName: string, filePath: string): boolean {

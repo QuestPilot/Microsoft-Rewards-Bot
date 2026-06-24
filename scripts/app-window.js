@@ -473,29 +473,9 @@ function sendInput(value) {
     return true
 }
 
-const CONFIG_SRC  = path.join(ROOT, 'src',  'config.json')
-const CONFIG_DIST = path.join(ROOT, 'dist', 'config.json')
-
-function readConfigRaw() {
-    // Prefer dist/config.json — that's what the bot actually reads at runtime
-    const file = fs.existsSync(CONFIG_DIST) ? CONFIG_DIST : CONFIG_SRC
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')) }
-    catch { return {} }
-}
-
-function writeConfigPatch(patch) {
-    const cfg = readConfigRaw()
-    ;(function merge(t, s) {
-        for (const [k, v] of Object.entries(s)) {
-            if (v !== null && typeof v === 'object' && !Array.isArray(v) && t[k] && typeof t[k] === 'object') merge(t[k], v)
-            else t[k] = v
-        }
-    })(cfg, patch)
-    const json = JSON.stringify(cfg, null, 4)
-    // Write to both so src and dist stay in sync
-    atomicWriteText(CONFIG_SRC, json)
-    if (fs.existsSync(CONFIG_DIST)) atomicWriteText(CONFIG_DIST, json)
-}
+// Config read/patch helpers extracted to ./desk/config.js (behavior identical).
+const { createConfig } = require('./desk/config')
+const { readConfigRaw, writeConfigPatch } = createConfig({ root: ROOT, atomicWriteText })
 
 // ── Auto-detected dashboard variant (cosmetic badge hint) ────────────────────
 // The bot writes sessions/<email>/dashboard-variant.json after detecting which
@@ -526,74 +506,9 @@ function enrichAccountsWithVariant(accounts) {
 }
 
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
-const PLUGINS_JSONC = path.join(ROOT, 'plugins', 'plugins.jsonc')
-
-const PLUGIN_META = {
-    'core': {
-        official: true,
-        description: 'Official premium plugin: auto-claim points, coupons, double-search, app rewards, read-to-earn, streak protection, punchcards & the remote dashboard. Requires a valid Core license.'
-    },
-    'run-summary': {
-        official: false,
-        description: 'Writes per-account run summaries to diagnostics/run-summary after each run.'
-    },
-    'run-health': {
-        official: false,
-        description: 'Tracks recent failures, zero-point runs, and account duration without storing credentials.'
-    },
-    'session-health': {
-        official: false,
-        description: 'Checks the official sessions directory for missing, empty, or stale browser sessions.'
-    }
-}
-
-function stripJsonc(raw) {
-    // Remove block comments, then line comments (avoiding :// in URLs), then trailing commas
-    let s = raw.replace(/\/\*[\s\S]*?\*\//g, '')
-    s = s.replace(/(^|[^:"'])\/\/.*$/gm, '$1')
-    s = s.replace(/,(\s*[}\]])/g, '$1')
-    return s
-}
-
-function readPluginsConfig() {
-    try {
-        return JSON.parse(stripJsonc(fs.readFileSync(PLUGINS_JSONC, 'utf8')))
-    } catch {
-        return {}
-    }
-}
-
-function isPluginEnabled(name) {
-    const plugin = readPluginsConfig()[name]
-    return Boolean(plugin && typeof plugin === 'object' && plugin.enabled !== false)
-}
-
-function readPluginsList() {
-    const cfg = readPluginsConfig()
-    return Object.entries(cfg)
-        .filter(([, v]) => v && typeof v === 'object')
-        .map(([name, v]) => ({
-            name,
-            enabled: v.enabled !== false,
-            priority: typeof v.priority === 'number' ? v.priority : 0,
-            official: (PLUGIN_META[name] && PLUGIN_META[name].official) || false,
-            description: (PLUGIN_META[name] && PLUGIN_META[name].description) || 'Custom plugin.'
-        }))
-        .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name))
-}
-
-function setPluginEnabled(name, enabled) {
-    let src = fs.readFileSync(PLUGINS_JSONC, 'utf8')
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const keyIdx = src.search(new RegExp('"' + escaped + '"\\s*:'))
-    if (keyIdx < 0) throw new Error('Plugin not found: ' + name)
-    const enabledIdx = src.indexOf('"enabled"', keyIdx)
-    if (enabledIdx < 0) throw new Error('No enabled flag for: ' + name)
-    const tail = src.slice(enabledIdx).replace(/("enabled"\s*:\s*)(true|false)/, '$1' + (enabled ? 'true' : 'false'))
-    src = src.slice(0, enabledIdx) + tail
-    atomicWriteText(PLUGINS_JSONC, src)
-    return true
-}
+// Extracted to ./desk/plugins-config.js (behavior identical).
+const { createPluginsConfig } = require('./desk/plugins-config')
+const { isPluginEnabled, readPluginsList, setPluginEnabled } = createPluginsConfig({ root: ROOT, atomicWriteText })
 
 function atomicWriteText(filePath, content) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -660,81 +575,9 @@ function launchTerminalMode() {
 }
 
 // ── Docs (docs/*.md) ────────────────────────────────────────────────────────
-const DOCS_DIR = path.join(ROOT, 'docs')
-
-function titleizeDoc(name) {
-    const base = name.replace(/\.md$/i, '')
-    if (base.toLowerCase() === 'readme') return 'Overview'
-    return base.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
-
-function docTitle(name) {
-    // Prefer the file's first H1 so nav labels match the actual page title;
-    // fall back to a titleized filename.
-    try {
-        const text = fs.readFileSync(path.join(DOCS_DIR, name), 'utf8')
-        const match = text.match(/^\s*#\s+(.+?)\s*$/m)
-        if (match) return name.toLowerCase() === 'readme.md' ? 'Overview' : match[1].trim()
-    } catch {
-        // fall through
-    }
-    return titleizeDoc(name)
-}
-
-function listDocs() {
-    const DOC_ORDER = [
-        'README.md',
-        'rewards-desk.md', 'updates.md', 'docker.md', 'node-version.md', 'scheduler.md', 'troubleshooting.md', 'licensing.md',
-        'core-plugin.md', 'core-plugin-reference.md', 'dashboard.md',
-        'plugins.md', 'create-plugin.md', 'plugin-api.md', 'plugin-marketplace.md',
-        'auto-update-release.md', 'core-release-security.md', 'dashboard-testing.md', 'safety-advisory.md', 'selectors-reference.md',
-    ]
-    const CORE_DOCS = new Set(['core-plugin.md', 'core-plugin-reference.md', 'dashboard.md'])
-    const CATEGORY_START = {
-        'rewards-desk.md': 'For Everyone',
-        'core-plugin.md': 'Core',
-        'plugins.md': 'Developers',
-        'auto-update-release.md': 'Maintainers',
-    }
-    try {
-        const found = fs.readdirSync(DOCS_DIR).filter(f => /\.md$/i.test(f))
-        found.sort((a, b) => {
-            const ai = DOC_ORDER.findIndex(n => n.toLowerCase() === a.toLowerCase())
-            const bi = DOC_ORDER.findIndex(n => n.toLowerCase() === b.toLowerCase())
-            const ap = ai === -1 ? 1000 : ai
-            const bp = bi === -1 ? 1000 : bi
-            return ap - bp || a.localeCompare(b)
-        })
-        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
-        const list = found.map(name => {
-            let isNew = false
-            try { isNew = (Date.now() - fs.statSync(path.join(DOCS_DIR, name)).mtimeMs) < SEVEN_DAYS } catch {}
-            return {
-                name,
-                title: docTitle(name),
-                core: CORE_DOCS.has(name.toLowerCase()),
-                category: CATEGORY_START[name.toLowerCase()] || null,
-                isNew,
-            }
-        })
-        const whatsNew = { name: 'whats-new', title: "What's New", core: false, category: null, isNew: false, virtual: true }
-        return { files: [whatsNew, ...list], default: list.length ? list[0].name : null, version: APP_VERSION }
-    } catch {
-        return { files: [], default: null, version: APP_VERSION }
-    }
-}
-
-function readDocFile(name) {
-    // Prevent path traversal — only allow a bare .md filename inside docs/
-    if (!/^[\w.-]+\.md$/i.test(name)) return null
-    const full = path.join(DOCS_DIR, name)
-    if (!full.startsWith(DOCS_DIR)) return null
-    try {
-        return fs.readFileSync(full, 'utf8')
-    } catch {
-        return null
-    }
-}
+// Extracted to ./desk/docs.js — behavior identical; covered by tests/desk-behavior.test.js.
+const { createDocs } = require('./desk/docs')
+const { listDocs, readDocFile } = createDocs({ root: ROOT, appVersion: APP_VERSION })
 
 async function loadDeskLicenseState() {
     try {
@@ -4519,120 +4362,17 @@ function html() {
 </html>`
 }
 
-function jsonResponse(res, statusCode, payload) {
-    res.writeHead(statusCode, {
-        'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'no-store',
-        'x-content-type-options': 'nosniff'
-    })
-    res.end(JSON.stringify(payload))
-}
+// Localhost HTTP utilities extracted to ./desk/http.js (behavior identical; the
+// security gate + body limit are covered by tests/desk-behavior.test.js).
+const { createHttp } = require('./desk/http')
+const { jsonResponse, safeEqual, authorizeApiRequest, readApiBody, parseJson } = createHttp({
+    getServerAddress: () => server.address(),
+    apiToken: API_TOKEN,
+    maxBodyBytes: MAX_API_BODY_BYTES
+})
 
-function safeEqual(left, right) {
-    const a = Buffer.from(String(left || ''))
-    const b = Buffer.from(String(right || ''))
-    return a.length === b.length && crypto.timingSafeEqual(a, b)
-}
-
-function authorizeApiRequest(req, res) {
-    const address = server.address()
-    const expectedHost = address && typeof address === 'object' ? `127.0.0.1:${address.port}` : null
-    if (!expectedHost || req.headers.host !== expectedHost) {
-        jsonResponse(res, 403, { error: 'Invalid host' })
-        return false
-    }
-    const origin = req.headers.origin
-    if (origin && origin !== `http://${expectedHost}`) {
-        jsonResponse(res, 403, { error: 'Invalid origin' })
-        return false
-    }
-    if (!safeEqual(req.headers['x-msrb-token'], API_TOKEN)) {
-        jsonResponse(res, 401, { error: 'Unauthorized' })
-        return false
-    }
-    return true
-}
-
-function readApiBody(req, res, callback) {
-    let body = ''
-    let size = 0
-    let finished = false
-    req.on('data', chunk => {
-        if (finished) return
-        size += chunk.length
-        if (size > MAX_API_BODY_BYTES) {
-            finished = true
-            jsonResponse(res, 413, { error: 'Request body too large' })
-            req.destroy()
-            return
-        }
-        body += chunk
-    })
-    req.on('end', () => {
-        if (!finished) callback(body)
-    })
-}
-
-function getProxyAgent(proxy) {
-    if (!proxy || !proxy.url) return null;
-    let url = proxy.url;
-    if (!/^https?:\/\//i.test(url) && !/^socks/i.test(url)) {
-        url = 'http://' + url;
-    }
-    if (proxy.port && !/:[0-9]+$/.test(url)) {
-        url = url.replace(/\/+$/, '') + ':' + proxy.port;
-    }
-    if (proxy.username && proxy.password) {
-        const urlObj = new URL(url);
-        urlObj.username = encodeURIComponent(proxy.username);
-        urlObj.password = encodeURIComponent(proxy.password);
-        url = urlObj.toString();
-    } else if (proxy.username) {
-        const urlObj = new URL(url);
-        urlObj.username = encodeURIComponent(proxy.username);
-        url = urlObj.toString();
-    }
-    
-    if (/^socks/i.test(url)) {
-        const { SocksProxyAgent } = require('socks-proxy-agent');
-        return {
-            httpAgent: new SocksProxyAgent(url),
-            httpsAgent: new SocksProxyAgent(url)
-        };
-    } else {
-        const { HttpsProxyAgent } = require('https-proxy-agent');
-        const { HttpProxyAgent } = require('http-proxy-agent');
-        return {
-            httpAgent: new HttpProxyAgent(url),
-            httpsAgent: new HttpsProxyAgent(url)
-        };
-    }
-}
-
-async function testProxy(proxy) {
-    const start = Date.now();
-    const agents = getProxyAgent(proxy);
-    if (!agents) return { ok: false, error: 'No proxy configured' };
-    
-    try {
-        const axios = require('axios');
-        await axios.get('https://login.live.com', {
-            httpAgent: agents.httpAgent,
-            httpsAgent: agents.httpsAgent,
-            timeout: 8000,
-            validateStatus: () => true
-        });
-        return {
-            ok: true,
-            latencyMs: Date.now() - start
-        };
-    } catch (err) {
-        return {
-            ok: false,
-            error: err.message || 'Connection timeout'
-        };
-    }
-}
+// Proxy helpers extracted to ./desk/proxy.js (behavior identical).
+const { testProxy } = require('./desk/proxy')
 
 // Cross-process control file: the desk touches it to ask the running bot to
 // bring its off-screen ("headless" on desktop) browser window on-screen. The
@@ -5059,187 +4799,11 @@ server.listen(PORT, '127.0.0.1', () => {
     setInterval(() => void refreshAgentState(), 900)
 })
 
-// Prepare the app browser profile for a clean launch.
-//
-// Chrome stores a "SingletonLock" (and related files) in the root of the
-// user-data-dir. If the machine is shut down or rebooted while the desk is
-// open, those files are left behind. On next boot Chrome reads the stale lock,
-// tries to contact the process that is gone, and exits WITHOUT opening a window
-// — forcing the user to launch twice.
-//
-// Fix: delete ALL regular files in the profile root before spawning Chrome.
-// Sub-directories (Default/, Safe Browsing/, …) hold real profile data and are
-// left untouched, so preferences, extensions, and cached state survive. Only
-// the root-level files (all lock variants, Local State, etc.) are cleared.
-// Chrome re-creates whatever it needs on startup, cleanly, every time.
-//
-// We also create the directory proactively — if %TEMP% was wiped (e.g. on
-// Windows "Storage Sense" cleanup), Chrome would try to build the profile from
-// scratch; giving it a pre-made dir shaves off noticeable startup latency.
-// Remove leftover per-process desk profiles from previous/crashed sessions so
-// tmp does not accumulate them. CRITICAL: only delete profiles that are clearly
-// STALE (not touched in the last hour). A profile in use by a concurrent or
-// still-open desk has a fresh mtime and is left untouched — otherwise a second
-// launch (which users do habitually) would yank the first window's profile out
-// from under it and no window would ever appear.
-function cleanupStaleAppProfiles(currentDir) {
-    try {
-        const base = path.dirname(currentDir)
-        const current = path.basename(currentDir)
-        const staleBefore = Date.now() - 60 * 60 * 1000 // 1 hour
-        for (const name of fs.readdirSync(base)) {
-            if (name === current || !name.startsWith('microsoft-rewards-bot-app')) continue
-            const full = path.join(base, name)
-            try {
-                if (fs.statSync(full).mtimeMs > staleBefore) continue // active/recent — leave alone
-                fs.rmSync(full, { recursive: true, force: true })
-            } catch {
-                // dir in use or already gone — skip
-            }
-        }
-    } catch {
-        // ignore
-    }
-}
+// Browser launcher extracted to ./desk/browser-launcher.js (behavior identical).
+const { createBrowserLauncher } = require('./desk/browser-launcher')
+const { openAppWindow } = createBrowserLauncher({ windowWidth: APP_WINDOW_WIDTH, windowHeight: APP_WINDOW_HEIGHT, pushLog })
 
-function prepareBrowserProfile(profileDir) {
-    try {
-        fs.mkdirSync(profileDir, { recursive: true })
-    } catch {
-        // ignore
-    }
-    try {
-        for (const entry of fs.readdirSync(profileDir, { withFileTypes: true })) {
-            if (!entry.isDirectory()) {
-                fs.rmSync(path.join(profileDir, entry.name), { force: true })
-            }
-        }
-    } catch {
-        // Best-effort — never block the launch on a cleanup error.
-    }
-}
-
-function openAppWindow(url) {
-    const browser = resolveAppBrowser()
-    if (!browser) {
-        // No Chromium-based browser available at all — last-resort only.
-        pushLog('warn', 'Desk window: bundled Chromium unavailable, opening in the default browser.')
-        openDefaultBrowser(url)
-        return
-    }
-
-    // Diagnostic so the desk console shows exactly which browser is used —
-    // confirms it's our bundled Chromium and not a system Edge/Chrome.
-    pushLog('info', `Desk window: launching ${path.basename(browser.command)} (${browser.command})`)
-
-    // Use a profile dir that is UNIQUE to this desk process. A shared fixed dir
-    // could still carry a stale Chrome "SingletonLock" from a previous/crashed
-    // session, and Chrome would then exit WITHOUT opening a window — forcing the
-    // user to launch the shortcut twice. A per-process dir can never have a stale
-    // lock, so the very FIRST launch always opens. We clean up leftover sibling
-    // profiles best-effort so tmp does not grow unbounded.
-    const profileDir = path.join(os.tmpdir(), `microsoft-rewards-bot-app-${process.pid}`)
-    cleanupStaleAppProfiles(profileDir)
-
-    // Then launch ONCE — on Windows the launcher process returns immediately while
-    // the real browser runs detached, so we must NOT treat a fast exit as a
-    // failure (doing so previously caused duplicate windows + the default browser
-    // opening too).
-    prepareBrowserProfile(profileDir)
-    childProcess
-        .spawn(
-            browser.command,
-            [
-                ...browser.args,
-                `--app=${url}`,
-                // Disable the Chromium sandbox, exactly like the bot's own
-                // BrowserManager does. The bundled Chromium lives under
-                // %LOCALAPPDATA%\ms-playwright; with the sandbox ON, the helper
-                // process fails with "Sandbox cannot access executable …
-                // Access is denied (0x5)", the network/renderer service crashes,
-                // and the app window never paints — so the Desk shows the CMD
-                // window but no page (and a relaunch only sometimes worked).
-                // Patchright/Playwright launch with the sandbox off by default;
-                // this manual spawn must pass the flag itself.
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                `--window-size=${APP_WINDOW_WIDTH},${APP_WINDOW_HEIGHT}`,
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--disable-extensions',
-                '--disable-sync',
-                '--disable-default-apps',
-                '--disable-background-networking',
-                '--metrics-recording-only',
-                // Suppress the "Chrome for Testing — only for automated testing"
-                // infobar. The reliable flag is --disable-infobars: Chrome for
-                // Testing builds re-purpose it specifically to hide THIS banner
-                // (it is NOT the no-op it became on stable Chrome ≥109). This is
-                // exactly what Patchright/Playwright passes by default to kill the
-                // banner — but the desk window is spawned manually, so it does not
-                // inherit those defaults and must pass the flag itself. We keep
-                // --test-type as a belt-and-suspenders fallback.
-                '--disable-infobars',
-                '--test-type=webdriver',
-                `--user-data-dir=${profileDir}`,
-                process.platform === 'linux' ? '--class=RewardsBot' : ''
-            ].filter(Boolean),
-            {
-                detached: true,
-                stdio: 'ignore',
-                // Do NOT set windowsHide: true here. windowsHide maps to SW_HIDE
-                // in the STARTUPINFO passed to CreateProcess, which tells the child
-                // to hide its first window. For a GUI app like Chromium this can
-                // cause the app window to be created but never made visible. The
-                // flag is appropriate for console helper processes (Node, etc.) but
-                // must NOT be used when we want an actual window on screen.
-                windowsHide: false
-            }
-        )
-        .unref()
-}
-
-function resolveAppBrowser() {
-    // Escape hatch for power users / debugging only.
-    if (process.env.MSRB_APP_BROWSER) return { command: process.env.MSRB_APP_BROWSER, args: [] }
-
-    // ALWAYS use the Chromium we install via npm (Patchright). One identical
-    // browser for every user and every OS → consistent behaviour, fewer
-    // environment-specific bugs, and we never touch the user's system browsers
-    // (no Edge, no Firefox, no Chrome). start.js guarantees it is installed via
-    // ensurePatchrightChromium() before the desk window is opened.
-    return resolveBundledChromium()
-}
-
-function resolveBundledChromium() {
-    try {
-        const { chromium } = require('patchright')
-        const executablePath = chromium.executablePath()
-        if (executablePath && fs.existsSync(executablePath)) return { command: executablePath, args: [] }
-    } catch {
-        return null
-    }
-    return null
-}
-
-function commandExists(command) {
-    const checker = process.platform === 'win32' ? 'where' : 'which'
-    return childProcess.spawnSync(checker, [command], { stdio: 'ignore' }).status === 0
-}
-
-function openDefaultBrowser(url) {
-    const command = process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open'
-    const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url]
-    childProcess.spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref()
-}
-
-function parseJson(value, fallback) {
-    try {
-        return JSON.parse(value)
-    } catch {
-        return fallback
-    }
-}
+// parseJson is provided by ./desk/http.js (destructured from createHttp above).
 
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)

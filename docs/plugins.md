@@ -16,6 +16,8 @@ When `plugins/plugins.jsonc` exists, it decides which plugins are active:
 - `enabled: false` keeps the plugin installed but inactive
 - higher `priority` values load first
 - each entry can pass a plugin-specific `config` object
+- `source: "marketplace"` marks a plugin installed from the marketplace — it is verified against the signed catalog and runs **sandboxed** (a V8 isolate with no Node APIs)
+- `trust: "sandbox"` isolates a local plugin too; `trust: "full"` (**Trusted Mode**) runs it in-process with full access — an explicit, local opt-in for plugins that genuinely need it
 
 The built-in Core plugin lives in `plugins/core/` and is distributed as a proprietary compiled package. Third-party plugins can live beside it and use the same loader, but they use a separate public API.
 

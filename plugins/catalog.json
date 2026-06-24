@@ -56,7 +56,7 @@
                         "installUrl":  "plugins/run-summary",
                         "supportUrl":  "docs/plugins.md",
                         "purchaseUrl":  "",
-                        "sha256":  "f9d34ce30f1ee9526e1d9f784bfae5ae5ebcb2a3ef50e421a2d78f157d9908f7"
+                        "sha256":  "84605042948520143a6a27479a0ac7b774af441d8955c2bd0e22bf9a6b25dc41"
                     },
                     {
                         "name":  "run-health",
@@ -68,7 +68,7 @@
                         "installUrl":  "plugins/run-health",
                         "supportUrl":  "plugins/run-health/README.md",
                         "purchaseUrl":  "",
-                        "sha256":  "7c753b5f2d6d3ea32b561ca6ba7cabbf09fc67447aa42cc92c80c70c1ace1f01"
+                        "sha256":  "0d3f1f032d657be1c81898d59e5907b00bca29222d6d3849f1f221f378389dfa"
                     },
                     {
                         "name":  "session-health",

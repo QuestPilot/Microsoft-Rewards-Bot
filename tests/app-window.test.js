@@ -4,7 +4,21 @@ const path = require('node:path')
 const test = require('node:test')
 
 const root = path.resolve(__dirname, '..')
-const source = fs.readFileSync(path.join(root, 'scripts/app-window.js'), 'utf8')
+// The Desk is being modularized into scripts/desk/*.js. Assert against app-window.js
+// PLUS every extracted module so these invariants are found wherever the code now
+// lives. (Behavioral coverage of the HTTP/UI contract lives in desk-behavior.test.js.)
+const source = (() => {
+    let combined = fs.readFileSync(path.join(root, 'scripts/app-window.js'), 'utf8')
+    const deskDir = path.join(root, 'scripts', 'desk')
+    try {
+        for (const file of fs.readdirSync(deskDir)) {
+            if (file.endsWith('.js')) combined += '\n' + fs.readFileSync(path.join(deskDir, file), 'utf8')
+        }
+    } catch {
+        // no desk/ modules yet
+    }
+    return combined
+})()
 
 test('app window runs as a desktop-style launcher instead of the old browser page', () => {
     assert.match(source, /--app=\$\{url\}/)
