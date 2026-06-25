@@ -56,7 +56,13 @@ function createBrowserLauncher({ windowWidth, windowHeight, pushLog }) {
         }
     }
 
-    function openAppWindow(url) {
+    function openAppWindow(url, options = {}) {
+        // A separate Desk-style window (e.g. the developer portal at bot.lgtw.tf) must
+        // use a DISTINCT profile dir, otherwise it shares the Desk's per-pid dir and a
+        // Chrome SingletonLock prevents the second window from ever opening.
+        const suffix = options && options.profileSuffix
+            ? '-' + String(options.profileSuffix).replace(/[^a-z0-9-]/gi, '').slice(0, 24)
+            : ''
         const browser = resolveAppBrowser()
         if (!browser) {
             // No Chromium-based browser available at all — last-resort only.
@@ -75,7 +81,7 @@ function createBrowserLauncher({ windowWidth, windowHeight, pushLog }) {
         // user to launch the shortcut twice. A per-process dir can never have a stale
         // lock, so the very FIRST launch always opens. We clean up leftover sibling
         // profiles best-effort so tmp does not grow unbounded.
-        const profileDir = path.join(os.tmpdir(), `microsoft-rewards-bot-app-${process.pid}`)
+        const profileDir = path.join(os.tmpdir(), `microsoft-rewards-bot-app-${process.pid}${suffix}`)
         cleanupStaleAppProfiles(profileDir)
 
         // Then launch ONCE — on Windows the launcher process returns immediately while

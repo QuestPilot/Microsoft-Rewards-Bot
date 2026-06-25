@@ -105,3 +105,30 @@ test('addMarketplacePlugin rejects invalid name or version', () => {
     assert.throws(() => pc.addMarketplacePlugin('BAD NAME!', '1.0.0'), /Invalid plugin name/)
     assert.throws(() => pc.addMarketplacePlugin('valid-name', 'not-a-version'), /Invalid version/)
 })
+
+test('setPluginVersion replaces the pinned version (preserving comments)', () => {
+    assert.equal(pc.setPluginVersion('cool-plugin', '2.0.0'), true)
+    assert.equal(pc.readPluginsConfig()['cool-plugin'].version, '2.0.0')
+    const raw = fs.readFileSync(path.join(root, 'plugins', 'plugins.jsonc'), 'utf8')
+    assert.ok(raw.includes('// the official core plugin'), 'comments must survive')
+    assert.throws(() => pc.setPluginVersion('cool-plugin', 'nope'), /Invalid version/)
+})
+
+test('setPluginAutoUpdate inserts then flips the autoUpdate flag', () => {
+    assert.equal(pc.readPluginsList().find(p => p.name === 'cool-plugin').autoUpdate, true, 'defaults to on')
+    assert.equal(pc.setPluginAutoUpdate('cool-plugin', false), true)
+    assert.equal(pc.readPluginsConfig()['cool-plugin'].autoUpdate, false)
+    assert.equal(pc.setPluginAutoUpdate('cool-plugin', true), true)
+    assert.equal(pc.readPluginsConfig()['cool-plugin'].autoUpdate, true)
+})
+
+test('removePlugin deletes the entry and leaves the rest valid', () => {
+    assert.ok(pc.readPluginsConfig()['cool-plugin'], 'present before removal')
+    assert.equal(pc.removePlugin('cool-plugin'), true)
+    const cfg = pc.readPluginsConfig()
+    assert.equal(cfg['cool-plugin'], undefined, 'entry is gone')
+    // surrounding entries intact and file still parses
+    assert.equal(cfg.core.priority, 10)
+    assert.equal(cfg['my-plugin'].enabled, true)
+    assert.throws(() => pc.removePlugin('ghost'), /Plugin not found/)
+})

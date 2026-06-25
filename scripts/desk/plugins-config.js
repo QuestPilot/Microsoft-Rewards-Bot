@@ -49,6 +49,8 @@ function createPluginsConfig({ root, atomicWriteText }) {
                 enabled: v.enabled !== false,
                 priority: typeof v.priority === 'number' ? v.priority : 0,
                 source: v.source === 'marketplace' ? 'marketplace' : 'local',
+                version: typeof v.version === 'string' ? v.version : '',
+                autoUpdate: v.autoUpdate !== false,
                 trust: v.trust === 'full' ? 'full' : '',
                 official: (PLUGIN_META[name] && PLUGIN_META[name].official) || false,
                 description: (PLUGIN_META[name] && PLUGIN_META[name].description) || 'Custom plugin.'
@@ -114,7 +116,89 @@ function createPluginsConfig({ root, atomicWriteText }) {
         return true
     }
 
-    return { PLUGINS_JSONC, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin }
+    // Remove a plugin's entry from plugins.jsonc (comment-safe). Brace-matches the
+    // plugin's own { } object and drops it plus one adjacent comma. Any comment lines
+    // above the entry are left in place (harmless). The bot's loader / readPluginsConfig
+    // tolerates trailing commas, so even an imperfect trim still parses.
+    function removePlugin(name) {
+        let src = fs.readFileSync(PLUGINS_JSONC, 'utf8')
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const keyIdx = src.search(new RegExp('"' + escaped + '"\\s*:\\s*\\{'))
+        if (keyIdx < 0) throw new Error('Plugin not found: ' + name)
+        const braceIdx = src.indexOf('{', keyIdx)
+        let depth = 0
+        let endIdx = -1
+        for (let i = braceIdx; i < src.length; i++) {
+            if (src[i] === '{') depth++
+            else if (src[i] === '}') { depth--; if (depth === 0) { endIdx = i; break } }
+        }
+        if (endIdx < 0) throw new Error('Malformed plugin entry: ' + name)
+        let start = keyIdx
+        let end = endIdx + 1
+        // Drop a trailing comma if present, else a preceding one (last-entry case).
+        let after = end
+        while (after < src.length && /\s/.test(src[after])) after++
+        if (src[after] === ',') {
+            end = after + 1
+        } else {
+            let before = start - 1
+            while (before >= 0 && /\s/.test(src[before])) before--
+            if (src[before] === ',') start = before
+        }
+        atomicWriteText(PLUGINS_JSONC, src.slice(0, start) + src.slice(end))
+        return true
+    }
+
+    // Pin a plugin to a specific version (used by the Desk "Update" action). Comment-
+    // preserving, scoped to the plugin's own { } object — mirrors setPluginTrust.
+    function setPluginVersion(name, version) {
+        if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error('Invalid version: ' + version)
+        let src = fs.readFileSync(PLUGINS_JSONC, 'utf8')
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const keyIdx = src.search(new RegExp('"' + escaped + '"\\s*:\\s*\\{'))
+        if (keyIdx < 0) throw new Error('Plugin not found: ' + name)
+        const braceIdx = src.indexOf('{', keyIdx)
+        let depth = 0
+        let endIdx = -1
+        for (let i = braceIdx; i < src.length; i++) {
+            if (src[i] === '{') depth++
+            else if (src[i] === '}') { depth--; if (depth === 0) { endIdx = i; break } }
+        }
+        if (endIdx < 0) throw new Error('Malformed plugin entry: ' + name)
+        const objText = src.slice(braceIdx, endIdx + 1)
+        const newObjText = /"version"\s*:\s*"[^"]*"/.test(objText)
+            ? objText.replace(/("version"\s*:\s*")[^"]*(")/, '$1' + version + '$2')
+            : objText.replace(/^\{/, '{\n        "version": "' + version + '",')
+        src = src.slice(0, braceIdx) + newObjText + src.slice(endIdx + 1)
+        atomicWriteText(PLUGINS_JSONC, src)
+        return true
+    }
+
+    // Toggle a plugin's auto-update flag (marketplace plugins). Comment-preserving,
+    // scoped to the plugin's own { } object — mirrors setPluginTrust.
+    function setPluginAutoUpdate(name, autoUpdate) {
+        let src = fs.readFileSync(PLUGINS_JSONC, 'utf8')
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const keyIdx = src.search(new RegExp('"' + escaped + '"\\s*:\\s*\\{'))
+        if (keyIdx < 0) throw new Error('Plugin not found: ' + name)
+        const braceIdx = src.indexOf('{', keyIdx)
+        let depth = 0
+        let endIdx = -1
+        for (let i = braceIdx; i < src.length; i++) {
+            if (src[i] === '{') depth++
+            else if (src[i] === '}') { depth--; if (depth === 0) { endIdx = i; break } }
+        }
+        if (endIdx < 0) throw new Error('Malformed plugin entry: ' + name)
+        const objText = src.slice(braceIdx, endIdx + 1)
+        const newObjText = /"autoUpdate"\s*:\s*(true|false)/.test(objText)
+            ? objText.replace(/("autoUpdate"\s*:\s*)(true|false)/, '$1' + (autoUpdate ? 'true' : 'false'))
+            : objText.replace(/^\{/, '{\n        "autoUpdate": ' + (autoUpdate ? 'true' : 'false') + ',')
+        src = src.slice(0, braceIdx) + newObjText + src.slice(endIdx + 1)
+        atomicWriteText(PLUGINS_JSONC, src)
+        return true
+    }
+
+    return { PLUGINS_JSONC, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion, setPluginAutoUpdate }
 }
 
 module.exports = { createPluginsConfig }

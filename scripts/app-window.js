@@ -508,7 +508,7 @@ function enrichAccountsWithVariant(accounts) {
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 // Extracted to ./desk/plugins-config.js (behavior identical).
 const { createPluginsConfig } = require('./desk/plugins-config')
-const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin } = createPluginsConfig({ root: ROOT, atomicWriteText })
+const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion } = createPluginsConfig({ root: ROOT, atomicWriteText })
 
 function atomicWriteText(filePath, content) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -1526,60 +1526,57 @@ function html() {
       *,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
     }
 
-    /* ── Plugins page ───────────────────────────────────────────── */
-    .plugins-wrap{display:none;flex-direction:column;gap:16px;overflow-y:auto;min-height:0;padding-bottom:8px}
+    /* ── Plugins page (unified catalog) ─────────────────────────── */
+    .plugins-wrap{display:none;flex-direction:column;gap:14px;overflow-y:auto;min-height:0;padding-bottom:8px}
     .plugins-wrap.vis{display:flex}
     .plugins-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
     .plugins-head h2{font-size:20px;font-weight:800;margin:0 0 4px}
-    .plugins-head p{font-size:13px;color:var(--muted);margin:0;max-width:520px;line-height:1.55}
-    .plugins-list{display:flex;flex-direction:column;gap:11px}
-    .plugin-card{
-      background:linear-gradient(180deg,rgba(10,22,40,.96),rgba(5,12,24,.97));
-      border:1px solid var(--border);border-radius:14px;padding:16px 18px;
-      display:flex;align-items:center;gap:14px;transition:border-color .15s;
-    }
-    .plugin-card:hover{border-color:rgba(46,232,255,.22)}
-    .plugin-card.is-core{border-color:rgba(247,200,92,.25);background:linear-gradient(180deg,rgba(20,17,5,.96),rgba(10,9,3,.97))}
-    .plugin-ico{
-      width:42px;height:42px;border-radius:11px;flex-shrink:0;
-      display:flex;align-items:center;justify-content:center;
-      background:rgba(46,232,255,.08);border:1px solid rgba(46,232,255,.18);color:var(--cyan);
-    }
-    .plugin-card.is-core .plugin-ico{background:rgba(247,200,92,.1);border-color:rgba(247,200,92,.25);color:var(--gold)}
-    .plugin-ico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .plugin-info{flex:1;min-width:0}
-    .plugin-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
-    .plugin-name .chip{font-size:9px;font-weight:800;letter-spacing:.05em;padding:1px 6px;border-radius:4px;text-transform:uppercase}
-    .chip-official{background:rgba(247,200,92,.16);color:var(--gold);border:1px solid rgba(247,200,92,.3)}
-    .chip-prio{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border)}
-    .plugin-desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
-    .plugin-locked{font-size:11px;color:var(--gold);margin-top:4px;display:flex;align-items:center;gap:5px}
-    .plugin-locked svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2}
-    .plugins-doc-card{
-      display:flex;align-items:center;gap:16px;flex-wrap:wrap;
-      background:linear-gradient(135deg,rgba(30,155,255,.08),rgba(46,232,255,.04));
-      border:1px solid rgba(46,232,255,.2);border-radius:14px;padding:18px 22px;
-    }
-    .plugins-doc-card .txt{flex:1;min-width:220px}
-    .plugins-doc-card .txt h3{font-size:14px;font-weight:700;margin:0 0 3px}
-    .plugins-doc-card .txt p{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5}
-    .plugins-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:4px}
-    .plugins-tab{padding:9px 18px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
-    .plugins-tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
-    .plugins-tab:hover:not(.active){color:var(--text)}
-    .mkt-grid{display:flex;flex-direction:column;gap:11px}
-    .mkt-card{background:linear-gradient(180deg,rgba(10,22,40,.96),rgba(5,12,24,.97));border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;transition:border-color .15s}
-    .mkt-card:hover{border-color:rgba(56,224,200,.22)}
-    .mkt-card-info{flex:1;min-width:0}
-    .mkt-card-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
-    .mkt-card-meta{font-size:11.5px;color:var(--muted);margin-top:2px}
-    .mkt-card-desc{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5}
-    .mkt-card-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;min-width:80px}
-    .mkt-install-btn{padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;border:1px solid rgba(56,224,200,.35);background:rgba(56,224,200,.12);color:#38e0c8;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap}
-    .mkt-install-btn:hover:not(:disabled){background:rgba(56,224,200,.22);border-color:rgba(56,224,200,.5)}
-    .mkt-install-btn:disabled{opacity:.5;cursor:not-allowed}
-    .mkt-installed-tag{font-size:11px;color:#38e0c8;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap}
-    .mkt-empty{padding:48px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7}
+    .plugins-head p{font-size:13px;color:var(--muted);margin:0;max-width:580px;line-height:1.55}
+    .plugins-head-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .plugins-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .plugins-search{flex:1;min-width:180px;padding:9px 13px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+    .plugins-search:focus{border-color:rgba(46,232,255,.32)}
+    .plugins-search::placeholder{color:var(--muted)}
+    .psection{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 2px 0;display:flex;align-items:center;gap:7px}
+    .psection .pcount{color:var(--cyan)}
+    .plugins-catalog{display:flex;flex-direction:column;gap:10px}
+    .pcard{background:linear-gradient(180deg,rgba(10,22,40,.96),rgba(5,12,24,.97));border:1px solid var(--border);border-radius:14px;padding:15px 17px;display:flex;align-items:flex-start;gap:14px;transition:border-color .15s}
+    .pcard:hover{border-color:rgba(46,232,255,.22)}
+    .pcard.is-core{border-color:rgba(247,200,92,.3);background:linear-gradient(180deg,rgba(26,22,8,.96),rgba(12,10,3,.97))}
+    .pcard.is-core:hover{border-color:rgba(247,200,92,.45)}
+    .pcard-ico{width:42px;height:42px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.08);border:1px solid rgba(46,232,255,.18);color:var(--cyan);margin-top:1px}
+    .pcard.is-core .pcard-ico{background:rgba(247,200,92,.1);border-color:rgba(247,200,92,.28);color:var(--gold)}
+    .pcard-ico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .pcard-body{flex:1;min-width:0}
+    .pcard-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+    .pchip{font-size:9px;font-weight:800;letter-spacing:.04em;padding:2px 6px;border-radius:5px;text-transform:uppercase;white-space:nowrap}
+    .pchip-official{background:rgba(247,200,92,.16);color:var(--gold);border:1px solid rgba(247,200,92,.3)}
+    .pchip-mkt{background:rgba(56,224,200,.14);color:#38e0c8;border:1px solid rgba(56,224,200,.3)}
+    .pchip-ver{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border);text-transform:none;letter-spacing:0}
+    .pchip-installed{background:rgba(47,210,125,.14);color:var(--green);border:1px solid rgba(47,210,125,.3)}
+    .pchip-trusted{background:rgba(255,140,90,.14);color:#ffae7a;border:1px solid rgba(255,140,90,.32)}
+    .pchip-update{background:rgba(46,232,255,.14);color:var(--cyan);border:1px solid rgba(46,232,255,.32);text-transform:none;letter-spacing:0}
+    .pchip-off{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
+    .pcard-meta{font-size:11.5px;color:var(--muted);margin-top:3px}
+    .pcard-desc{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5;max-width:580px}
+    .pcard-manage{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:9px}
+    .pmanage-trust{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#ffae7a;cursor:pointer}
+    .pmanage-trust input{accent-color:#ff8c5a}
+    .plink{font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px;transition:color .15s}
+    .plink:hover{color:var(--text)}
+    .plink.danger:hover{color:var(--rose)}
+    .plink svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+    .pcard-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;min-width:94px}
+    .pbtn{padding:7px 15px;font-size:12px;font-weight:700;border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,opacity .15s;border:1px solid transparent}
+    .pbtn:disabled{opacity:.5;cursor:not-allowed}
+    .pbtn-install{border-color:rgba(56,224,200,.4);background:rgba(56,224,200,.14);color:#38e0c8}
+    .pbtn-install:hover:not(:disabled){background:rgba(56,224,200,.24);border-color:rgba(56,224,200,.6)}
+    .pbtn-update{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.14);color:var(--cyan)}
+    .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.24)}
+    .pcard-locked{font-size:11px;color:var(--gold);margin-top:7px;display:flex;align-items:center;gap:5px}
+    .pcard-locked svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+    .pempty{padding:34px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;border:1px dashed var(--border);border-radius:14px}
+    .pempty code{font-size:11px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px}
 
     /* ── Docs page ──────────────────────────────────────────────── */
     .docs-wrap{display:none;flex-direction:column;min-height:0;flex:1;gap:12px;overflow:hidden}
@@ -2228,37 +2225,19 @@ function html() {
       <div class="plugins-head">
         <div>
           <h2>Plugins</h2>
-          <p>Manage bot extensions. <b>My Plugins</b> controls what's active on the next run. <b>Marketplace</b> lets you browse and install community plugins — sandboxed by default.</p>
+          <p>Browse and install community plugins from the marketplace. Core and everything you install is managed right here — sandboxed by default.</p>
         </div>
-        <button class="btn btn-secondary btn-sm" id="plugins-back">← Back</button>
-      </div>
-      <div class="plugins-tabs">
-        <button class="plugins-tab active" id="tab-my-plugins">My Plugins</button>
-        <button class="plugins-tab" id="tab-marketplace">✦ Marketplace</button>
-      </div>
-      <!-- My Plugins sub-view -->
-      <div id="plugins-subview-mine">
-        <div class="plugins-list" id="plugins-list"></div>
-        <div class="plugins-doc-card" style="margin-top:8px">
-          <div class="plugin-ico">
-            <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          </div>
-          <div class="txt">
-            <h3>Build your own plugin</h3>
-            <p>Add custom tasks to the bot with the public plugin API. Full guide and examples on GitHub.</p>
-          </div>
-          <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish a plugin →</button>
-          <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Read the plugin guide →</button>
+        <div class="plugins-head-actions">
+          <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish / Manage my plugins →</button>
+          <button class="btn btn-secondary btn-sm" id="plugins-back">← Back</button>
         </div>
       </div>
-      <!-- Marketplace sub-view -->
-      <div id="plugins-subview-market" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-          <span style="font-size:12px;color:var(--muted)">Community plugins run <b>sandboxed</b> — V8 isolate with no file system, network, or Node access.</span>
-          <button class="btn btn-secondary btn-sm" id="mkt-refresh-btn">↻ Refresh</button>
-        </div>
-        <div class="mkt-grid" id="mkt-grid"></div>
+      <div class="plugins-toolbar">
+        <input class="plugins-search" id="plugins-search" type="text" placeholder="Search plugins…" autocomplete="off" spellcheck="false">
+        <button class="btn btn-secondary btn-sm" id="plugins-refresh-btn">↻ Refresh</button>
+        <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Guide ↗</button>
       </div>
+      <div class="plugins-catalog" id="plugins-catalog"></div>
     </div>
 
     <!-- Docs view -->
@@ -2793,7 +2772,7 @@ function html() {
       if (v === 'accounts') loadAccEditor();
       if (v === 'settings') loadSettings();
       if (v === 'core') renderCoreView();
-      if (v === 'plugins') switchPluginsTab(_activePluginsTab);
+      if (v === 'plugins') loadPluginsCatalog(false);
       if (v === 'docs') loadDocs();
       var active = v === 'dash' ? G('view-dash') : G('view-' + v);
       if (active) {
@@ -3630,10 +3609,17 @@ function html() {
     G('plugins-back').addEventListener('click', function() { setView('dash'); });
     G('docs-back').addEventListener('click', function() { setView('dash'); });
     G('plugins-doc-btn').addEventListener('click', function() { window.open(PLUGIN_DOC_URL); });
-    G('plugins-publish-btn').addEventListener('click', function() { window.open('https://bot.lgtw.tf/?view=developers'); });
-    G('tab-my-plugins').addEventListener('click', function() { switchPluginsTab('mine'); });
-    G('tab-marketplace').addEventListener('click', function() { switchPluginsTab('market'); });
-    G('mkt-refresh-btn').addEventListener('click', function() { loadMarketplace(true); });
+    G('plugins-publish-btn').addEventListener('click', function() {
+      // Open the developer site in a dedicated Desk-style window (own cookie jar so
+      // Discord login works); fall back to the system browser if the Desk can't.
+      fetch('/api/open-portal', {method:'POST'}).then(function(r){ if(!r.ok) window.open('https://bot.lgtw.tf/?view=developers'); }).catch(function(){ window.open('https://bot.lgtw.tf/?view=developers'); });
+    });
+    G('plugins-refresh-btn').addEventListener('click', function() { loadPluginsCatalog(true); });
+    var _pluginSearchT;
+    G('plugins-search').addEventListener('input', function() {
+      var q = this.value; clearTimeout(_pluginSearchT);
+      _pluginSearchT = setTimeout(function(){ renderCatalog(q); }, 110);
+    });
     G('docs-github').addEventListener('click', function() { window.open(DOCS_GITHUB_URL); });
     // Terminal / developer mode
     G('btn-terminal-mode').addEventListener('click', async function() {
@@ -3937,147 +3923,225 @@ function html() {
     }
 
     // ── Plugins page ───────────────────────────────────────────────
-    var _activePluginsTab = 'mine';
-    var _mktLoaded = false;
+    // ── Plugins page (unified catalog) ─────────────────────────────
+    var _catalog = [];
+    var _catalogCore = null;
+    var _catalogMeta = { source: 'none', error: null };
+    var _hasCoreLicense = false;
 
-    function switchPluginsTab(tab) {
-      _activePluginsTab = tab;
-      G('tab-my-plugins').classList.toggle('active', tab === 'mine');
-      G('tab-marketplace').classList.toggle('active', tab === 'market');
-      G('plugins-subview-mine').style.display = tab === 'mine' ? '' : 'none';
-      G('plugins-subview-market').style.display = tab === 'market' ? '' : 'none';
-      if (tab === 'mine') loadPlugins();
-      if (tab === 'market') loadMarketplace(false);
+    function escAttr(s) { return esc(String(s == null ? '' : s)); }
+
+    function cmpVer(a, b) {
+      var pa = String(a || '').split(/[-.+]/), pb = String(b || '').split(/[-.+]/);
+      for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
+        var na = parseInt(pa[i], 10), nb = parseInt(pb[i], 10);
+        if (isNaN(na) && isNaN(nb)) continue;
+        if (isNaN(na)) return -1;
+        if (isNaN(nb)) return 1;
+        if (na > nb) return 1;
+        if (na < nb) return -1;
+      }
+      return 0;
     }
 
-    async function loadPlugins() {
-      var list = G('plugins-list');
-      list.innerHTML = '<div class="docs-loading">Loading plugins…</div>';
-      var data;
-      try { data = await fetch('/api/plugins').then(function(r){return r.json();}); }
-      catch(e) { list.innerHTML = '<div class="docs-loading">Could not read plugins.jsonc.</div>'; return; }
-      var plugins = data.plugins || [];
-      if (!plugins.length) { list.innerHTML = '<div class="docs-loading">No plugins configured.</div>'; return; }
-      list.innerHTML = plugins.map(function(p) {
-        var isCore = p.name === 'core';
-        var locked = isCore && !data.hasCoreLicense;
-        var chips = '';
-        if (p.official) chips += '<span class="chip chip-official">Official</span>';
-        if (p.source === 'marketplace') chips += '<span class="chip" style="background:rgba(56,224,200,.16);color:#38e0c8">Marketplace</span>';
-        chips += '<span class="chip chip-prio">priority ' + (p.priority != null ? p.priority : 0) + '</span>';
-        var icon = isCore
-          ? '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>'
-          : '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"></path>';
-        return '<div class="plugin-card' + (isCore?' is-core':'') + '">' +
-          '<div class="plugin-ico"><svg viewBox="0 0 24 24">'+icon+'</svg></div>' +
-          '<div class="plugin-info"><div class="plugin-name">'+esc(p.name)+chips+'</div>' +
-          '<div class="plugin-desc">'+esc(p.description||'Custom plugin.')+'</div>' +
-          (p.source==='marketplace'?'<label class="plugin-trust" style="display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:#ffb27a;cursor:pointer"><input type="checkbox" data-trust="'+esc(p.name)+'"'+(p.trust==='full'?' checked':'')+'> Trusted Mode — full access (only for plugins you fully trust)</label>':'') +
-          (locked?'<div class="plugin-locked"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Requires a valid Core license to load</div>':'') +
-          '</div>' +
-          '<label class="toggle"><input type="checkbox" data-plugin="'+esc(p.name)+'" data-source="'+esc(p.source||'local')+'"'+(p.enabled?' checked':'')+'><span class="toggle-slider"></span></label>' +
-          '</div>';
-      }).join('');
-      list.querySelectorAll('input[data-plugin]').forEach(function(inp) {
+    async function loadPluginsCatalog(forceRefresh) {
+      var wrap = G('plugins-catalog');
+      if (!_catalog.length && !_catalogCore) wrap.innerHTML = '<div class="docs-loading">Loading plugins…</div>';
+      var pluginsData = { plugins: [], hasCoreLicense: false };
+      var catData = { catalog: null, source: 'none' };
+      try {
+        var results = await Promise.all([
+          fetch('/api/plugins').then(function(r){ return r.json(); }),
+          fetch('/api/marketplace-catalog' + (forceRefresh ? '?refresh=1' : '')).then(function(r){ return r.json(); }).catch(function(e){ return { catalog: null, source: 'none', error: e.message }; })
+        ]);
+        pluginsData = results[0] || pluginsData;
+        catData = results[1] || catData;
+      } catch(e) {
+        wrap.innerHTML = '<div class="pempty">Could not read plugins.<br><span style="font-size:11px;opacity:.7">Make sure the bot is running, then try again.</span></div>';
+        return;
+      }
+      var installed = {};
+      (pluginsData.plugins || []).forEach(function(p){ installed[p.name] = p; });
+      _hasCoreLicense = !!pluginsData.hasCoreLicense;
+      _catalogCore = installed['core'] || null;
+      var catalogPlugins = (catData && catData.catalog && Array.isArray(catData.catalog.plugins)) ? catData.catalog.plugins : [];
+      _catalogMeta = { source: (catData && catData.source) || 'none', error: (catData && catData.error) || null };
+
+      var byName = {};
+      catalogPlugins.forEach(function(c){
+        if (!c || c.name === 'core') return;
+        var existing = byName[c.name];
+        if (!existing || cmpVer(c.version, existing.latest) > 0) {
+          byName[c.name] = { name: c.name, version: c.version || '', author: c.authorUsername || '', license: c.license || '', description: c.description || '', inCatalog: true, latest: c.version || '' };
+        }
+      });
+      (pluginsData.plugins || []).forEach(function(p){
+        if (p.name === 'core') return;
+        var m = byName[p.name] || { name: p.name, version: p.version || '', author: '', license: '', description: p.description || '', inCatalog: false, latest: '' };
+        m.installed = true;
+        m.enabled = p.enabled;
+        m.source = p.source;
+        m.trust = p.trust;
+        m.installedVersion = p.version || '';
+        if (!m.description && p.description) m.description = p.description;
+        byName[p.name] = m;
+      });
+      _catalog = Object.keys(byName).map(function(k){ return byName[k]; });
+      _catalog.sort(function(a, b){
+        var ai = a.installed ? 0 : 1, bi = b.installed ? 0 : 1;
+        if (ai !== bi) return ai - bi;
+        return a.name.localeCompare(b.name);
+      });
+      renderCatalog(G('plugins-search') ? G('plugins-search').value : '');
+    }
+
+    function coreCardHtml(core) {
+      var star = '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>';
+      return '<div class="pcard is-core">' +
+        '<div class="pcard-ico"><svg viewBox="0 0 24 24">' + star + '</svg></div>' +
+        '<div class="pcard-body">' +
+          '<div class="pcard-name">Core<span class="pchip pchip-official">Official</span>' + (core.enabled ? '' : '<span class="pchip pchip-off">Off</span>') + '</div>' +
+          '<div class="pcard-desc">The official premium plugin — auto-claim, coupons, doubled search points, app rewards, read-to-earn, streak protection, punchcards and the remote dashboard.</div>' +
+          (_hasCoreLicense ? '' : '<div class="pcard-locked"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Activate a Core license to unlock</div>') +
+        '</div>' +
+        '<div class="pcard-actions"><label class="toggle"><input type="checkbox" data-plugin="core"' + (core.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label></div>' +
+      '</div>';
+    }
+
+    function pluginCardHtml(p) {
+      var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"></path>';
+      var updatable = p.installed && p.inCatalog && p.installedVersion && p.latest && cmpVer(p.latest, p.installedVersion) > 0;
+      var chips = '';
+      if (p.installedVersion || p.version) chips += '<span class="pchip pchip-ver">v' + esc(p.installedVersion || p.version) + '</span>';
+      if (p.installed) chips += '<span class="pchip pchip-installed">Installed</span>';
+      else if (p.inCatalog) chips += '<span class="pchip pchip-mkt">Marketplace</span>';
+      if (p.installed && p.trust === 'full') chips += '<span class="pchip pchip-trusted">Trusted</span>';
+      if (p.installed && !p.enabled) chips += '<span class="pchip pchip-off">Off</span>';
+      if (updatable) chips += '<span class="pchip pchip-update">Update v' + esc(p.latest) + '</span>';
+      var meta = [];
+      if (p.author) meta.push('by ' + esc(p.author));
+      if (p.license) meta.push(esc(p.license));
+      if (p.installed && !p.inCatalog) meta.push('local');
+
+      var actions;
+      if (!p.installed) {
+        actions = '<button class="pbtn pbtn-install" data-install="' + escAttr(p.name) + '" data-ver="' + escAttr(p.version) + '">Install</button>';
+      } else {
+        actions = '<label class="toggle"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>';
+        if (updatable) actions += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
+      }
+
+      var manage = '';
+      if (p.installed) {
+        var mrow = '';
+        if (p.source === 'marketplace') mrow += '<label class="pmanage-trust"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted Mode (full access)</label>';
+        mrow += '<button class="plink danger" data-remove="' + escAttr(p.name) + '"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>';
+        manage = '<div class="pcard-manage">' + mrow + '</div>';
+      }
+
+      return '<div class="pcard' + (p.installed ? ' is-installed' : '') + '">' +
+        '<div class="pcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
+        '<div class="pcard-body">' +
+          '<div class="pcard-name">' + esc(p.name) + chips + '</div>' +
+          (meta.length ? '<div class="pcard-meta">' + meta.join(' &middot; ') + '</div>' : '') +
+          (p.description ? '<div class="pcard-desc">' + esc(p.description) + '</div>' : '') +
+          manage +
+        '</div>' +
+        '<div class="pcard-actions">' + actions + '</div>' +
+      '</div>';
+    }
+
+    function marketplaceEmptyHtml() {
+      if (_catalogMeta.error) return '<div class="pempty">Could not reach the marketplace.<br><span style="font-size:11px;opacity:.7">' + esc(_catalogMeta.error) + '</span></div>';
+      return '<div class="pempty">No community plugins yet.<br><span style="font-size:11px;opacity:.7">When the catalog is published they appear here. Made one? Hit <b>Publish / Manage</b>.</span></div>';
+    }
+
+    function renderCatalog(filterQ) {
+      var wrap = G('plugins-catalog');
+      if (!wrap) return;
+      var q = (filterQ || '').trim().toLowerCase();
+      var html = '';
+      if (_catalogCore) {
+        var matchCore = !q || ('core official premium ' + (_catalogCore.description || '')).toLowerCase().indexOf(q) >= 0;
+        if (matchCore) html += coreCardHtml(_catalogCore);
+      }
+      var items = _catalog.filter(function(p){
+        if (!q) return true;
+        return (p.name + ' ' + (p.author || '') + ' ' + (p.description || '')).toLowerCase().indexOf(q) >= 0;
+      });
+      var inst = items.filter(function(p){ return p.installed; });
+      var avail = items.filter(function(p){ return !p.installed; });
+      if (inst.length) {
+        html += '<div class="psection">Installed <span class="pcount">' + inst.length + '</span></div>';
+        html += inst.map(pluginCardHtml).join('');
+      }
+      html += '<div class="psection">Marketplace' + (avail.length ? ' <span class="pcount">' + avail.length + '</span>' : '') + '</div>';
+      html += avail.length ? avail.map(pluginCardHtml).join('') : marketplaceEmptyHtml();
+      wrap.innerHTML = html;
+      bindCatalogEvents();
+    }
+
+    function bindCatalogEvents() {
+      var wrap = G('plugins-catalog');
+      wrap.querySelectorAll('input[data-plugin]').forEach(function(inp) {
         inp.addEventListener('change', function() {
           var name = inp.getAttribute('data-plugin');
           var source = inp.getAttribute('data-source');
           if (inp.checked && source === 'marketplace') {
-            if (!window.confirm('"'+name+'" is a community plugin — made by the community, NOT the official team. It runs sandboxed with limited access. Enable it?')) {
-              inp.checked = false; return;
-            }
+            if (!window.confirm('"' + name + '" is a community plugin — made by the community, NOT the official team. It runs sandboxed with limited access. Enable it?')) { inp.checked = false; return; }
           }
           fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, enabled:inp.checked})}).catch(function(){});
         });
       });
-      list.querySelectorAll('input[data-trust]').forEach(function(inp) {
+      wrap.querySelectorAll('input[data-trust]').forEach(function(inp) {
         inp.addEventListener('change', function() {
           var name = inp.getAttribute('data-trust');
           if (inp.checked) {
-            if (!window.confirm('⚠ Trusted Mode gives "'+name+'" FULL access to your computer (files, network, etc.) — it will NO LONGER be sandboxed. Only do this for a community plugin you fully trust. Continue?')) {
-              inp.checked = false; return;
-            }
+            if (!window.confirm('⚠ Trusted Mode gives "' + name + '" FULL access to your computer (files, network, etc.) — it will NO LONGER be sandboxed. Only do this for a plugin you fully trust. Continue?')) { inp.checked = false; return; }
           }
           fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, trust: inp.checked ? 'full' : 'sandbox'})}).catch(function(){});
         });
       });
-    }
-
-    async function loadMarketplace(forceRefresh) {
-      if (_mktLoaded && !forceRefresh) return;
-      _mktLoaded = false;
-      var grid = G('mkt-grid');
-      grid.innerHTML = '<div class="docs-loading">Loading marketplace…</div>';
-      var data;
-      try {
-        var url = '/api/marketplace-catalog' + (forceRefresh ? '?refresh=1' : '');
-        data = await fetch(url).then(function(r) { return r.json(); });
-      } catch(e) {
-        grid.innerHTML = '<div class="mkt-empty">Could not load the marketplace.<br><span style="font-size:11px;opacity:.7">Check your connection and try again.</span></div>';
-        return;
-      }
-      var catalog = data && data.catalog;
-      if (!catalog || !Array.isArray(catalog.plugins) || !catalog.plugins.length) {
-        grid.innerHTML = '<div class="mkt-empty">' +
-          (data && data.error
-            ? 'Could not fetch the marketplace: ' + esc(data.error)
-            : 'No plugins yet — the catalog is empty or not synced.<br><span style="font-size:11px;opacity:.7">Start the bot once (with <code>MSRB_MARKETPLACE_CATALOG_URL</code> set) to pull the catalog, then click ↻ Refresh.</span>') +
-          '</div>';
-        return;
-      }
-      var installedNames = new Set();
-      try {
-        var mine = await fetch('/api/plugins').then(function(r) { return r.json(); });
-        (mine.plugins || []).forEach(function(p) { installedNames.add(p.name); });
-      } catch {}
-      _mktLoaded = true;
-      var CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
-      grid.innerHTML = catalog.plugins.map(function(p) {
-        var installed = installedNames.has(p.name);
-        return '<div class="mkt-card">' +
-          '<div class="plugin-ico"><svg viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"></path></svg></div>' +
-          '<div class="mkt-card-info">' +
-            '<div class="mkt-card-name">' + esc(p.name || '') +
-              '<span class="chip chip-prio">v' + esc(p.version || '') + '</span>' +
-              (installed ? '<span class="chip" style="background:rgba(56,224,200,.14);color:#38e0c8">Installed</span>' : '') +
-            '</div>' +
-            (p.authorUsername ? '<div class="mkt-card-meta">by ' + esc(p.authorUsername) + (p.license ? ' &middot; ' + esc(p.license) : '') + '</div>' : '') +
-            (p.description ? '<div class="mkt-card-desc">' + esc(p.description) + '</div>' : '') +
-          '</div>' +
-          '<div class="mkt-card-actions">' +
-            (installed
-              ? '<div class="mkt-installed-tag">' + CHECK + ' Installed</div>'
-              : '<button class="mkt-install-btn" data-mkt-name="' + esc(p.name) + '" data-mkt-ver="' + esc(p.version || '') + '">Install</button>') +
-          '</div>' +
-        '</div>';
-      }).join('');
-      grid.querySelectorAll('.mkt-install-btn').forEach(function(btn) {
+      wrap.querySelectorAll('button[data-install]').forEach(function(btn) {
         btn.addEventListener('click', async function() {
-          var name = btn.getAttribute('data-mkt-name');
-          var ver = btn.getAttribute('data-mkt-ver');
-          if (!window.confirm('"' + name + '" is a community plugin (not the official team). It will run SANDBOXED — no file system, network, or Node APIs.\\nThe bot downloads and verifies it on next start.\\n\\nInstall it?')) return;
-          btn.disabled = true;
-          btn.textContent = 'Installing…';
+          var name = btn.getAttribute('data-install');
+          var ver = btn.getAttribute('data-ver');
+          if (!window.confirm('"' + name + '" is a community plugin (not the official team). It will run SANDBOXED — no file system, network, or Node APIs.\\nThe bot downloads and verifies it on the next start.\\n\\nInstall it?')) return;
+          btn.disabled = true; btn.textContent = 'Installing…';
           try {
-            var r = await fetch('/api/plugins/install', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:name, version:ver})});
-            if (r.ok) {
-              var card = btn.closest('.mkt-card');
-              card.querySelector('.mkt-card-actions').innerHTML = '<div class="mkt-installed-tag">' + CHECK + ' Installed</div>';
-              var nameEl = card.querySelector('.mkt-card-name');
-              if (nameEl && !nameEl.querySelector('[style]')) nameEl.innerHTML += '<span class="chip" style="background:rgba(56,224,200,.14);color:#38e0c8">Installed</span>';
-              loadPlugins();
-            } else {
-              var msg = await r.text();
-              btn.disabled = false; btn.textContent = 'Install';
-              alert('Could not install "' + name + '": ' + (msg || 'Unknown error'));
-            }
-          } catch(e) {
-            btn.disabled = false; btn.textContent = 'Install';
-            alert('Install failed: ' + e.message);
-          }
+            var r = await fetch('/api/plugins/install', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, version:ver})});
+            if (r.ok) { loadPluginsCatalog(false); }
+            else { var msg = await r.text(); btn.disabled = false; btn.textContent = 'Install'; alert('Could not install "' + name + '": ' + (msg || 'Unknown error')); }
+          } catch(e) { btn.disabled = false; btn.textContent = 'Install'; alert('Install failed: ' + e.message); }
+        });
+      });
+      wrap.querySelectorAll('button[data-update]').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          var name = btn.getAttribute('data-update');
+          var ver = btn.getAttribute('data-ver');
+          btn.disabled = true; btn.textContent = 'Updating…';
+          try {
+            var r = await fetch('/api/plugins/update', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, version:ver})});
+            if (r.ok) { loadPluginsCatalog(false); }
+            else { var msg = await r.text(); btn.disabled = false; btn.textContent = 'Update'; alert('Could not update "' + name + '": ' + (msg || 'Unknown error')); }
+          } catch(e) { btn.disabled = false; btn.textContent = 'Update'; alert('Update failed: ' + e.message); }
+        });
+      });
+      wrap.querySelectorAll('button[data-remove]').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          var name = btn.getAttribute('data-remove');
+          if (!window.confirm('Remove "' + name + '"? This disables it and deletes its downloaded files. You can re-install it from the marketplace anytime.')) return;
+          try {
+            var r = await fetch('/api/plugins/remove', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name})});
+            if (r.ok) { loadPluginsCatalog(false); }
+            else { var msg = await r.text(); alert('Could not remove "' + name + '": ' + (msg || 'Unknown error')); }
+          } catch(e) { alert('Remove failed: ' + e.message); }
         });
       });
     }
+
+    // (legacy loadMarketplace removed — marketplace browsing is unified into
+    // loadPluginsCatalog / renderCatalog above.)
 
     // ── Docs page ──────────────────────────────────────────────────
     var _docsLoaded = false;
@@ -4902,6 +4966,51 @@ const server = http.createServer((req, res) => {
                 res.writeHead(400); res.end(String(e.message))
             }
         })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/plugins/update') {
+        readApiBody(req, res, body => {
+            const data = parseJson(body, null)
+            if (!data || typeof data.name !== 'string' || typeof data.version !== 'string') {
+                res.writeHead(400); res.end('Missing name or version'); return
+            }
+            try {
+                setPluginVersion(data.name, data.version)
+                res.writeHead(204); res.end()
+            } catch(e) {
+                res.writeHead(400); res.end(String(e.message))
+            }
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/plugins/remove') {
+        readApiBody(req, res, body => {
+            const data = parseJson(body, null)
+            if (!data || typeof data.name !== 'string') { res.writeHead(400); res.end('Missing name'); return }
+            if (data.name === 'core') { res.writeHead(400); res.end('Core cannot be removed'); return }
+            if (!/^[a-z0-9][a-z0-9._-]{0,48}$/i.test(data.name)) { res.writeHead(400); res.end('Invalid plugin name'); return }
+            try {
+                removePlugin(data.name)
+                // Best-effort: delete the downloaded plugin folder (guarded against path escape).
+                try {
+                    const pluginsDir = path.join(ROOT, 'plugins')
+                    const dir = path.join(pluginsDir, data.name)
+                    if (dir.startsWith(pluginsDir + path.sep) && fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true })
+                } catch {}
+                res.writeHead(204); res.end()
+            } catch(e) {
+                res.writeHead(400); res.end(String(e.message))
+            }
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/open-portal') {
+        try {
+            openAppWindow('https://bot.lgtw.tf/?view=developers', { profileSuffix: 'portal' })
+            res.writeHead(204); res.end()
+        } catch(e) {
+            res.writeHead(500); res.end(String(e.message))
+        }
         return
     }
     if (req.method === 'POST' && req.url === '/api/terminal-mode') {
