@@ -268,6 +268,7 @@ export class PluginManager {
                 catalog?: unknown
                 expired?: boolean
             }
+            isPluginStale(publishedBotVersion?: string | null, botVersion?: string, window?: number): boolean
         }
         let installer: {
             ensureMarketplacePlugin(options: {
@@ -281,7 +282,7 @@ export class PluginManager {
                 botVersion?: string
                 apiVersion?: string
                 now?: string
-            }): Promise<{ installed: boolean; reason: string; version?: string; updateAvailable?: string }>
+            }): Promise<{ installed: boolean; reason: string; version?: string; updateAvailable?: string; publishedBotVersion?: string | null }>
         }
         try {
             // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -340,6 +341,19 @@ export class PluginManager {
                     now: new Date().toISOString()
                 })
                 this.logMarketplaceInstall(name, result)
+                // Auto bot-version staleness: the plugin was stamped (server-side) with
+                // the bot version at publish time. We don't block — just warn loudly when
+                // this bot has moved well ahead of that stamp (also covers headless/CLI).
+                if (result.installed && result.publishedBotVersion && cluster.isPrimary) {
+                    const staleWindow = Number(process.env.MSRB_PLUGIN_STALE_WINDOW) || undefined
+                    if (mp.isPluginStale(result.publishedBotVersion, botVersion, staleWindow)) {
+                        this.bot.logger.warn(
+                            'main',
+                            'PLUGIN-MANAGER',
+                            `Community plugin "${name}" was published for bot v${result.publishedBotVersion}; this bot (v${botVersion}) is well ahead, so it MAY be outdated. It still runs — consider updating it or asking the author to republish.`
+                        )
+                    }
+                }
             } catch (error) {
                 this.bot.logger.error(
                     'main',

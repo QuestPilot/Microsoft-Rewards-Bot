@@ -144,7 +144,7 @@ async function ensureMarketplacePlugin(o) {
                 String(marker.sha256).toLowerCase() === expected &&
                 sha256(fs.readFileSync(indexPath)) === expected
             ) {
-                return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
+                return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable, publishedBotVersion: entry.publishedBotVersion }
             }
         } catch {
             // fall through to reinstall
@@ -156,8 +156,8 @@ async function ensureMarketplacePlugin(o) {
     if (fs.existsSync(indexPath)) {
         try {
             if (sha256(fs.readFileSync(indexPath)) === expected) {
-                atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, installedAt: now || null }, null, 2))
-                return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
+                atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, publishedBotVersion: entry.publishedBotVersion || null, installedAt: now || null }, null, 2))
+                return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable, publishedBotVersion: entry.publishedBotVersion }
             }
         } catch {
             // fall through to (re)download
@@ -174,8 +174,8 @@ async function ensureMarketplacePlugin(o) {
 
     const wasUpdate = Boolean(installedVersion && installedVersion !== entry.version)
     atomicWrite(indexPath, bytes)
-    atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, installedAt: now || null }, null, 2))
-    return { installed: true, reason: wasUpdate ? 'updated' : 'installed', version: entry.version, updateAvailable }
+    atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, publishedBotVersion: entry.publishedBotVersion || null, installedAt: now || null }, null, 2))
+    return { installed: true, reason: wasUpdate ? 'updated' : 'installed', version: entry.version, updateAvailable, publishedBotVersion: entry.publishedBotVersion }
 }
 
 // ── multi-file (tree) install ─────────────────────────────────────────────────
@@ -218,15 +218,15 @@ async function ensureTree({ targetDir, name, entry, fetcher, now, updateAvailabl
     try {
         const marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'))
         if (marker.version === entry.version && marker.manifestSha256 === entry.manifestSha256 && treeMatches(targetDir, manifest)) {
-            return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
+            return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable, publishedBotVersion: entry.publishedBotVersion }
         }
     } catch {
         // fall through to (re)install
     }
     // Self-heal: a correct tree is already on disk (marker lost / verified manual drop).
     if (fs.existsSync(path.join(targetDir, 'index.js')) && treeMatches(targetDir, manifest)) {
-        atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, manifestSha256: entry.manifestSha256, files: manifest, installedAt: now || null }, null, 2))
-        return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
+        atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, manifestSha256: entry.manifestSha256, files: manifest, publishedBotVersion: entry.publishedBotVersion || null, installedAt: now || null }, null, 2))
+        return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable, publishedBotVersion: entry.publishedBotVersion }
     }
 
     if (typeof fetcher !== 'function') return { installed: false, reason: 'no-fetcher' }
@@ -251,7 +251,7 @@ async function ensureTree({ targetDir, name, entry, fetcher, now, updateAvailabl
         }
         fs.writeFileSync(
             path.join(tmpDir, '.installed.json'),
-            JSON.stringify({ name, version: entry.version, manifestSha256: entry.manifestSha256, files: manifest, installedAt: now || null }, null, 2)
+            JSON.stringify({ name, version: entry.version, manifestSha256: entry.manifestSha256, files: manifest, publishedBotVersion: entry.publishedBotVersion || null, installedAt: now || null }, null, 2)
         )
         fs.rmSync(targetDir, { recursive: true, force: true })
         fs.renameSync(tmpDir, targetDir)
@@ -260,7 +260,7 @@ async function ensureTree({ targetDir, name, entry, fetcher, now, updateAvailabl
     }
 
     const wasUpdate = Boolean(installedVersion && installedVersion !== entry.version)
-    return { installed: true, reason: wasUpdate ? 'updated' : 'installed', version: entry.version, updateAvailable }
+    return { installed: true, reason: wasUpdate ? 'updated' : 'installed', version: entry.version, updateAvailable, publishedBotVersion: entry.publishedBotVersion }
 }
 
 module.exports = { ensureMarketplacePlugin, sha256, apiCompatible }

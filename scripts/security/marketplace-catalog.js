@@ -131,6 +131,35 @@ function cmpVersion(a, b) {
     return 0
 }
 
+// ── plugin staleness (auto bot-version compatibility) ─────────────────────────
+// A plugin is stamped (server-side, at publish) with the bot version current at the
+// time. We DON'T block old plugins — we just flag them as possibly outdated once the
+// running bot has moved more than a window ahead of that stamp. Coarse distance:
+// major*10000 + minor*100 + patch, so the window (~20) trips after ~20 patch updates
+// in the same minor, or after any minor/major bump.
+const DEFAULT_STALE_WINDOW = 20
+
+function coarseVersion(v) {
+    const m = String(v || '').match(/(\d+)\.(\d+)(?:\.(\d+))?/)
+    if (!m) return null
+    return Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3] || 0)
+}
+
+/** How far `botVersion` is AHEAD of `publishedBotVersion` (0 if not ahead / unknown). */
+function botAheadDistance(publishedBotVersion, botVersion) {
+    const p = coarseVersion(publishedBotVersion)
+    const b = coarseVersion(botVersion)
+    if (p == null || b == null) return 0
+    return Math.max(0, b - p)
+}
+
+/** True when the running bot is more than `window` ahead of the plugin's stamp. */
+function isPluginStale(publishedBotVersion, botVersion, window) {
+    if (!publishedBotVersion || !botVersion) return false
+    const w = Number.isFinite(window) && window > 0 ? window : DEFAULT_STALE_WINDOW
+    return botAheadDistance(publishedBotVersion, botVersion) > w
+}
+
 /** The highest-version catalog entry for `name` (the "latest approved"), or undefined. */
 function findLatestEntry(catalog, name) {
     if (!catalog || !Array.isArray(catalog.plugins)) return undefined
@@ -160,4 +189,4 @@ function isRevoked(catalog, { name, version, sha256 } = {}) {
     })
 }
 
-module.exports = { verifyMarketplaceCatalog, loadTrustedKeys, findEntry, findLatestEntry, cmpVersion, isRevoked, FORMAT, DEFAULT_KEYS_DIR }
+module.exports = { verifyMarketplaceCatalog, loadTrustedKeys, findEntry, findLatestEntry, cmpVersion, isRevoked, isPluginStale, botAheadDistance, FORMAT, DEFAULT_KEYS_DIR }

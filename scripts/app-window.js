@@ -1556,6 +1556,7 @@ function html() {
     .pchip-installed{background:rgba(47,210,125,.14);color:var(--green);border:1px solid rgba(47,210,125,.3)}
     .pchip-trusted{background:rgba(255,140,90,.14);color:#ffae7a;border:1px solid rgba(255,140,90,.32)}
     .pchip-update{background:rgba(46,232,255,.14);color:var(--cyan);border:1px solid rgba(46,232,255,.32);text-transform:none;letter-spacing:0}
+    .pchip-stale{background:rgba(247,200,92,.14);color:var(--gold);border:1px solid rgba(247,200,92,.3);text-transform:none;letter-spacing:0}
     .pchip-off{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
     .pcard-meta{font-size:11.5px;color:var(--muted);margin-top:3px}
     .pcard-desc{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5;max-width:580px}
@@ -3987,6 +3988,7 @@ function html() {
         m.installedVersion = p.installedVersion || p.version || '';
         m.pinned = !!p.version;
         m.autoUpdate = p.autoUpdate;
+        m.stale = p.stale;
         if (!m.description && p.description) m.description = p.description;
         byName[p.name] = m;
       });
@@ -4022,6 +4024,7 @@ function html() {
       else if (p.inCatalog) chips += '<span class="pchip pchip-mkt">Marketplace</span>';
       if (p.installed && p.trust === 'full') chips += '<span class="pchip pchip-trusted">Trusted</span>';
       if (p.installed && !p.enabled) chips += '<span class="pchip pchip-off">Off</span>';
+      if (p.installed && p.stale) chips += '<span class="pchip pchip-stale" title="Published for an older bot version — may be outdated, but still runs.">May be outdated</span>';
       if (updatable) chips += '<span class="pchip pchip-update">' + (held ? 'Update v' + esc(p.latest) : 'Auto-updates to v' + esc(p.latest)) + '</span>';
       var meta = [];
       if (p.author) meta.push('by ' + esc(p.author));
@@ -4964,12 +4967,19 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/plugins') {
         const list = readPluginsList()
-        // Enrich each plugin with the on-disk installed version (.installed.json) so the
-        // catalog shows accurate "update available" even for unpinned/auto-updating plugins.
+        // Enrich each plugin with its on-disk installed version (.installed.json) for
+        // accurate "update available", and a "may be outdated" flag when this bot has
+        // moved well ahead of the bot version the plugin was published for.
+        let mpcat = null
+        try { mpcat = require('./security/marketplace-catalog') } catch {}
+        const staleWindow = Number(process.env.MSRB_PLUGIN_STALE_WINDOW) || undefined
         for (const p of list) {
             try {
                 const marker = JSON.parse(fs.readFileSync(path.join(ROOT, 'plugins', p.name, '.installed.json'), 'utf8'))
                 if (marker && typeof marker.version === 'string') p.installedVersion = marker.version
+                if (marker && marker.publishedBotVersion && mpcat && mpcat.isPluginStale(marker.publishedBotVersion, APP_VERSION, staleWindow)) {
+                    p.stale = true
+                }
             } catch {}
         }
         res.writeHead(200, { 'content-type': 'application/json' })
