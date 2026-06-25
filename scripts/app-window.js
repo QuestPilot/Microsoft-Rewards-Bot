@@ -508,7 +508,7 @@ function enrichAccountsWithVariant(accounts) {
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 // Extracted to ./desk/plugins-config.js (behavior identical).
 const { createPluginsConfig } = require('./desk/plugins-config')
-const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust } = createPluginsConfig({ root: ROOT, atomicWriteText })
+const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin } = createPluginsConfig({ root: ROOT, atomicWriteText })
 
 function atomicWriteText(filePath, content) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -1563,6 +1563,23 @@ function html() {
     .plugins-doc-card .txt{flex:1;min-width:220px}
     .plugins-doc-card .txt h3{font-size:14px;font-weight:700;margin:0 0 3px}
     .plugins-doc-card .txt p{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5}
+    .plugins-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:4px}
+    .plugins-tab{padding:9px 18px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
+    .plugins-tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+    .plugins-tab:hover:not(.active){color:var(--text)}
+    .mkt-grid{display:flex;flex-direction:column;gap:11px}
+    .mkt-card{background:linear-gradient(180deg,rgba(10,22,40,.96),rgba(5,12,24,.97));border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;transition:border-color .15s}
+    .mkt-card:hover{border-color:rgba(56,224,200,.22)}
+    .mkt-card-info{flex:1;min-width:0}
+    .mkt-card-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+    .mkt-card-meta{font-size:11.5px;color:var(--muted);margin-top:2px}
+    .mkt-card-desc{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5}
+    .mkt-card-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;min-width:80px}
+    .mkt-install-btn{padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;border:1px solid rgba(56,224,200,.35);background:rgba(56,224,200,.12);color:#38e0c8;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap}
+    .mkt-install-btn:hover:not(:disabled){background:rgba(56,224,200,.22);border-color:rgba(56,224,200,.5)}
+    .mkt-install-btn:disabled{opacity:.5;cursor:not-allowed}
+    .mkt-installed-tag{font-size:11px;color:#38e0c8;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap}
+    .mkt-empty{padding:48px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7}
 
     /* ── Docs page ──────────────────────────────────────────────── */
     .docs-wrap{display:none;flex-direction:column;min-height:0;flex:1;gap:12px;overflow:hidden}
@@ -2211,21 +2228,36 @@ function html() {
       <div class="plugins-head">
         <div>
           <h2>Plugins</h2>
-          <p>Plugins extend the bot with extra tasks and selectors. Toggle them on or off — changes are written to <code style="font-size:11px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px">plugins/plugins.jsonc</code> and apply on the next run.</p>
+          <p>Manage bot extensions. <b>My Plugins</b> controls what's active on the next run. <b>Marketplace</b> lets you browse and install community plugins — sandboxed by default.</p>
         </div>
         <button class="btn btn-secondary btn-sm" id="plugins-back">← Back</button>
       </div>
-      <div class="plugins-list" id="plugins-list"></div>
-      <div class="plugins-doc-card">
-        <div class="plugin-ico">
-          <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      <div class="plugins-tabs">
+        <button class="plugins-tab active" id="tab-my-plugins">My Plugins</button>
+        <button class="plugins-tab" id="tab-marketplace">✦ Marketplace</button>
+      </div>
+      <!-- My Plugins sub-view -->
+      <div id="plugins-subview-mine">
+        <div class="plugins-list" id="plugins-list"></div>
+        <div class="plugins-doc-card" style="margin-top:8px">
+          <div class="plugin-ico">
+            <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <div class="txt">
+            <h3>Build your own plugin</h3>
+            <p>Add custom tasks to the bot with the public plugin API. Full guide and examples on GitHub.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish a plugin →</button>
+          <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Read the plugin guide →</button>
         </div>
-        <div class="txt">
-          <h3>Build your own plugin</h3>
-          <p>Add custom tasks to the bot with the public plugin API. Full guide and examples on GitHub.</p>
+      </div>
+      <!-- Marketplace sub-view -->
+      <div id="plugins-subview-market" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <span style="font-size:12px;color:var(--muted)">Community plugins run <b>sandboxed</b> — V8 isolate with no file system, network, or Node access.</span>
+          <button class="btn btn-secondary btn-sm" id="mkt-refresh-btn">↻ Refresh</button>
         </div>
-        <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish a plugin →</button>
-        <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Read the plugin guide →</button>
+        <div class="mkt-grid" id="mkt-grid"></div>
       </div>
     </div>
 
@@ -2761,7 +2793,7 @@ function html() {
       if (v === 'accounts') loadAccEditor();
       if (v === 'settings') loadSettings();
       if (v === 'core') renderCoreView();
-      if (v === 'plugins') loadPlugins();
+      if (v === 'plugins') switchPluginsTab(_activePluginsTab);
       if (v === 'docs') loadDocs();
       var active = v === 'dash' ? G('view-dash') : G('view-' + v);
       if (active) {
@@ -3599,6 +3631,9 @@ function html() {
     G('docs-back').addEventListener('click', function() { setView('dash'); });
     G('plugins-doc-btn').addEventListener('click', function() { window.open(PLUGIN_DOC_URL); });
     G('plugins-publish-btn').addEventListener('click', function() { window.open('https://bot.lgtw.tf/?view=developers'); });
+    G('tab-my-plugins').addEventListener('click', function() { switchPluginsTab('mine'); });
+    G('tab-marketplace').addEventListener('click', function() { switchPluginsTab('market'); });
+    G('mkt-refresh-btn').addEventListener('click', function() { loadMarketplace(true); });
     G('docs-github').addEventListener('click', function() { window.open(DOCS_GITHUB_URL); });
     // Terminal / developer mode
     G('btn-terminal-mode').addEventListener('click', async function() {
@@ -3902,6 +3937,19 @@ function html() {
     }
 
     // ── Plugins page ───────────────────────────────────────────────
+    var _activePluginsTab = 'mine';
+    var _mktLoaded = false;
+
+    function switchPluginsTab(tab) {
+      _activePluginsTab = tab;
+      G('tab-my-plugins').classList.toggle('active', tab === 'mine');
+      G('tab-marketplace').classList.toggle('active', tab === 'market');
+      G('plugins-subview-mine').style.display = tab === 'mine' ? '' : 'none';
+      G('plugins-subview-market').style.display = tab === 'market' ? '' : 'none';
+      if (tab === 'mine') loadPlugins();
+      if (tab === 'market') loadMarketplace(false);
+    }
+
     async function loadPlugins() {
       var list = G('plugins-list');
       list.innerHTML = '<div class="docs-loading">Loading plugins…</div>';
@@ -3951,6 +3999,82 @@ function html() {
             }
           }
           fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, trust: inp.checked ? 'full' : 'sandbox'})}).catch(function(){});
+        });
+      });
+    }
+
+    async function loadMarketplace(forceRefresh) {
+      if (_mktLoaded && !forceRefresh) return;
+      _mktLoaded = false;
+      var grid = G('mkt-grid');
+      grid.innerHTML = '<div class="docs-loading">Loading marketplace…</div>';
+      var data;
+      try {
+        var url = '/api/marketplace-catalog' + (forceRefresh ? '?refresh=1' : '');
+        data = await fetch(url).then(function(r) { return r.json(); });
+      } catch(e) {
+        grid.innerHTML = '<div class="mkt-empty">Could not load the marketplace.<br><span style="font-size:11px;opacity:.7">Check your connection and try again.</span></div>';
+        return;
+      }
+      var catalog = data && data.catalog;
+      if (!catalog || !Array.isArray(catalog.plugins) || !catalog.plugins.length) {
+        grid.innerHTML = '<div class="mkt-empty">' +
+          (data && data.error
+            ? 'Could not fetch the marketplace: ' + esc(data.error)
+            : 'No plugins yet — the catalog is empty or not synced.<br><span style="font-size:11px;opacity:.7">Start the bot once (with <code>MSRB_MARKETPLACE_CATALOG_URL</code> set) to pull the catalog, then click ↻ Refresh.</span>') +
+          '</div>';
+        return;
+      }
+      var installedNames = new Set();
+      try {
+        var mine = await fetch('/api/plugins').then(function(r) { return r.json(); });
+        (mine.plugins || []).forEach(function(p) { installedNames.add(p.name); });
+      } catch {}
+      _mktLoaded = true;
+      var CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      grid.innerHTML = catalog.plugins.map(function(p) {
+        var installed = installedNames.has(p.name);
+        return '<div class="mkt-card">' +
+          '<div class="plugin-ico"><svg viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"></path></svg></div>' +
+          '<div class="mkt-card-info">' +
+            '<div class="mkt-card-name">' + esc(p.name || '') +
+              '<span class="chip chip-prio">v' + esc(p.version || '') + '</span>' +
+              (installed ? '<span class="chip" style="background:rgba(56,224,200,.14);color:#38e0c8">Installed</span>' : '') +
+            '</div>' +
+            (p.authorUsername ? '<div class="mkt-card-meta">by ' + esc(p.authorUsername) + (p.license ? ' &middot; ' + esc(p.license) : '') + '</div>' : '') +
+            (p.description ? '<div class="mkt-card-desc">' + esc(p.description) + '</div>' : '') +
+          '</div>' +
+          '<div class="mkt-card-actions">' +
+            (installed
+              ? '<div class="mkt-installed-tag">' + CHECK + ' Installed</div>'
+              : '<button class="mkt-install-btn" data-mkt-name="' + esc(p.name) + '" data-mkt-ver="' + esc(p.version || '') + '">Install</button>') +
+          '</div>' +
+        '</div>';
+      }).join('');
+      grid.querySelectorAll('.mkt-install-btn').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          var name = btn.getAttribute('data-mkt-name');
+          var ver = btn.getAttribute('data-mkt-ver');
+          if (!window.confirm('"' + name + '" is a community plugin (not the official team). It will run SANDBOXED — no file system, network, or Node APIs.\nThe bot downloads and verifies it on next start.\n\nInstall it?')) return;
+          btn.disabled = true;
+          btn.textContent = 'Installing…';
+          try {
+            var r = await fetch('/api/plugins/install', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:name, version:ver})});
+            if (r.ok) {
+              var card = btn.closest('.mkt-card');
+              card.querySelector('.mkt-card-actions').innerHTML = '<div class="mkt-installed-tag">' + CHECK + ' Installed</div>';
+              var nameEl = card.querySelector('.mkt-card-name');
+              if (nameEl && !nameEl.querySelector('[style]')) nameEl.innerHTML += '<span class="chip" style="background:rgba(56,224,200,.14);color:#38e0c8">Installed</span>';
+              loadPlugins();
+            } else {
+              var msg = await r.text();
+              btn.disabled = false; btn.textContent = 'Install';
+              alert('Could not install "' + name + '": ' + (msg || 'Unknown error'));
+            }
+          } catch(e) {
+            btn.disabled = false; btn.textContent = 'Install';
+            alert('Install failed: ' + e.message);
+          }
         });
       });
     }
@@ -4713,6 +4837,39 @@ const server = http.createServer((req, res) => {
         })
         return
     }
+    if (req.method === 'GET' && (req.url === '/api/marketplace-catalog' || req.url.startsWith('/api/marketplace-catalog?'))) {
+        const catalogPath = path.join(ROOT, 'plugins', 'marketplace.json')
+        const forceRefresh = req.url.includes('refresh=1')
+        let catalog = null
+        if (!forceRefresh) {
+            try { catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8')) } catch {}
+        }
+        if (catalog) {
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ catalog, source: 'disk' }))
+            return
+        }
+        const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL
+        if (!catalogUrl) {
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ catalog: null, source: 'none' }))
+            return
+        }
+        const { fetchSignedCatalog } = require('./marketplace-fetch')
+        fetchSignedCatalog(catalogUrl).then(function(result) {
+            let parsed = null
+            try { parsed = JSON.parse(result.catalog) } catch {}
+            if (parsed) {
+                try { fs.mkdirSync(path.join(ROOT, 'plugins'), { recursive: true }); fs.writeFileSync(catalogPath, result.catalog, 'utf8') } catch {}
+            }
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ catalog: parsed, source: parsed ? 'live' : 'none' }))
+        }).catch(function(e) {
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ catalog: null, source: 'none', error: e.message }))
+        })
+        return
+    }
     if (req.method === 'GET' && req.url === '/api/plugins') {
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ plugins: readPluginsList(), hasCoreLicense: state.deskLicense.tier === 'premium' }))
@@ -4729,6 +4886,21 @@ const server = http.createServer((req, res) => {
                 res.writeHead(204); res.end()
             }
             catch (e) { res.writeHead(500); res.end(String(e.message)) }
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/plugins/install') {
+        readApiBody(req, res, body => {
+            const data = parseJson(body, null)
+            if (!data || typeof data.name !== 'string' || typeof data.version !== 'string') {
+                res.writeHead(400); res.end('Missing name or version'); return
+            }
+            try {
+                addMarketplacePlugin(data.name, data.version)
+                res.writeHead(204); res.end()
+            } catch(e) {
+                res.writeHead(400); res.end(String(e.message))
+            }
         })
         return
     }

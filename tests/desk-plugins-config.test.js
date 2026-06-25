@@ -85,3 +85,23 @@ test('setPluginTrust replaces an existing trust value', () => {
 test('setPluginTrust rejects an invalid level', () => {
     assert.throws(() => pc.setPluginTrust('my-plugin', 'root'), /Invalid trust level/)
 })
+
+test('addMarketplacePlugin appends a new marketplace entry to plugins.jsonc', () => {
+    assert.equal(pc.addMarketplacePlugin('cool-plugin', '1.0.0'), true)
+    const cfg = pc.readPluginsConfig()
+    assert.ok(cfg['cool-plugin'], 'entry must exist')
+    assert.equal(cfg['cool-plugin'].enabled, true)
+    assert.equal(cfg['cool-plugin'].source, 'marketplace')
+    assert.equal(cfg['cool-plugin'].version, '1.0.0')
+    // existing entries untouched
+    assert.equal(cfg.core.priority, 10)
+})
+
+test('addMarketplacePlugin throws when the plugin is already in plugins.jsonc', () => {
+    assert.throws(() => pc.addMarketplacePlugin('cool-plugin', '1.0.1'), /Already in plugins\.jsonc/)
+})
+
+test('addMarketplacePlugin rejects invalid name or version', () => {
+    assert.throws(() => pc.addMarketplacePlugin('BAD NAME!', '1.0.0'), /Invalid plugin name/)
+    assert.throws(() => pc.addMarketplacePlugin('valid-name', 'not-a-version'), /Invalid version/)
+})

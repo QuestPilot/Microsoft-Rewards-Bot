@@ -29,6 +29,7 @@
         "core:sign": "node ./scripts/sign-core-manifest.js",
         "core:release-check": "node ./scripts/check-core-release-artifact.js",
         "marketplace:sign": "node ./scripts/sign-marketplace-catalog.js",
+        "marketplace:list": "node ./scripts/marketplace-list.js",
         "ts-start": "ts-node ./src/index.ts",
         "predev": "node ./scripts/check-node-version.js",
         "dev": "ts-node ./src/index.ts -dev",

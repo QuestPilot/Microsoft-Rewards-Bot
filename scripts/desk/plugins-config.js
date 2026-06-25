@@ -107,7 +107,26 @@ function createPluginsConfig({ root, atomicWriteText }) {
         return true
     }
 
-    return { PLUGINS_JSONC, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust }
+    // Add a marketplace plugin entry to plugins.jsonc (does not download — the bot
+    // fetches & verifies on next start via the auto-install pipeline).
+    function addMarketplacePlugin(name, version) {
+        if (!/^[a-z0-9][a-z0-9._-]{1,48}$/.test(name)) throw new Error('Invalid plugin name: ' + name)
+        if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error('Invalid version: ' + version)
+        const cfg = readPluginsConfig()
+        if (cfg[name]) throw new Error('Already in plugins.jsonc: ' + name)
+        let src
+        try { src = fs.readFileSync(PLUGINS_JSONC, 'utf8') } catch { src = '{\n}' }
+        const trimmed = src.trimEnd()
+        const closingBrace = trimmed.lastIndexOf('}')
+        if (closingBrace < 0) throw new Error('Malformed plugins.jsonc')
+        const hasEntries = Object.keys(cfg).length > 0
+        const entry = '  "' + name + '": {\n    "enabled": true,\n    "source": "marketplace",\n    "version": "' + version + '"\n  }'
+        const newSrc = trimmed.slice(0, closingBrace) + (hasEntries ? ',\n' : '\n') + entry + '\n}'
+        atomicWriteText(PLUGINS_JSONC, newSrc)
+        return true
+    }
+
+    return { PLUGINS_JSONC, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin }
 }
 
 module.exports = { createPluginsConfig }
