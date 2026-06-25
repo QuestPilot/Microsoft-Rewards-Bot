@@ -16,18 +16,6 @@ function createPluginsConfig({ root, atomicWriteText }) {
         'core': {
             official: true,
             description: 'Official premium plugin: auto-claim points, coupons, double-search, app rewards, read-to-earn, streak protection, punchcards & the remote dashboard. Requires a valid Core license.'
-        },
-        'run-summary': {
-            official: false,
-            description: 'Writes per-account run summaries to diagnostics/run-summary after each run.'
-        },
-        'run-health': {
-            official: false,
-            description: 'Tracks recent failures, zero-point runs, and account duration without storing credentials.'
-        },
-        'session-health': {
-            official: false,
-            description: 'Checks the official sessions directory for missing, empty, or stale browser sessions.'
         }
     }
 

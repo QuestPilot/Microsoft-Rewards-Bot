@@ -37,44 +37,20 @@
         //   "tursoAuthToken": "<database token>",
         //   "licensePublicKey": "<optional response verification public key>"
         // }
-    },
-
-    // ───────────────────────────────────────────────────────────────
-    // Free Plugin: Run Summary
-    // ───────────────────────────────────────────────────────────────
-    // Writes local account result summaries to data/run-summary.
-    // Disabled by default so users can choose whether they want extra files.
-
-    "run-summary": {
-        "enabled": false,
-        "priority": 40,
-        "config": {
-            "outputDir": "data/run-summary",
-            "includeEmails": false,
-            "writeMarkdown": true
-        }
-    },
-
-    // Tracks recent failures, zero-point runs, and account duration locally.
-    "run-health": {
-        "enabled": false,
-        "priority": 30,
-        "config": {
-            "historyLimit": 50,
-            "warnOnZeroPoints": true,
-            "outputDir": "data/run-health"
-        }
-    },
-
-    // Checks whether saved browser sessions are missing, empty, or stale.
-    "session-health": {
-        "enabled": false,
-        "priority": 20,
-        "config": {
-            "sessionPath": "sessions",
-            "staleDays": 30
-        }
     }
+
+    // ───────────────────────────────────────────────────────────────
+    // Install plugins from the cloud marketplace
+    // ───────────────────────────────────────────────────────────────
+    // Browse them in Rewards Desk → Plugins → Marketplace (or run
+    // `npm run marketplace:list`). Add an entry with "source": "marketplace"
+    // and the bot downloads, verifies, and sandboxes it on the next start:
+    //
+    // "cool-plugin": {
+    //   "enabled": true,
+    //   "source": "marketplace",
+    //   "version": "1.2.0"
+    // }
 
     // ───────────────────────────────────────────────────────────────
     // Add your own plugins here!

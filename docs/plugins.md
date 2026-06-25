@@ -33,34 +33,25 @@ Public plugins cannot register official premium Core tasks or unlock premium ent
 
 The official web dashboard is also outside the public plugin contract. It is started by the verified Core bytecode only and is not available to third-party plugins.
 
-## Built-in Free Plugins
+## Free and Community Plugins
 
-The source-available public release can ship optional free plugins beside Core. These plugins are normal public plugins, so users can inspect them, disable them, modify them privately, or use them as examples.
-
-| Plugin | Default | Purpose |
-| --- | --- | --- |
-| `run-summary` | Disabled | Writes local account result summaries to `diagnostics/run-summary/` after each account finishes. |
-| `run-health` | Disabled | Tracks repeated failures, zero-point completions, and account duration using masked local history. |
-| `session-health` | Disabled | Reports missing, empty, or stale directories under the official `sessions/` path without reading cookies. |
-
-Enable one in `plugins/plugins.jsonc` or from the **Plugins** page in Rewards Desk.
+The bot ships with just the official Core plugin. Every other plugin — free or paid — is installed from the **[plugin marketplace](./plugin-marketplace.md)**: enable it and the bot downloads, verifies, and runs it **sandboxed** on the next start. Browse and install them from the **Plugins → Marketplace** tab in Rewards Desk, or list the catalog from a terminal with `npm run marketplace:list`.
 
 ### Example Activation
 
+A marketplace plugin is declared with `source: "marketplace"`:
+
 ```jsonc
 {
-  "run-summary": {
+  "cool-plugin": {
     "enabled": true,
-    "priority": 10,
-    "config": {
-      "includeEmails": false,
-      "writeMarkdown": true
-    }
+    "source": "marketplace",
+    "version": "1.2.0"
   }
 }
 ```
 
-These plugins write or inspect local diagnostics only. They do not send account data to a remote service.
+The bot fetches it from the signed catalog, verifies its signature and checksum, and runs it in a V8 sandbox. See [Plugin marketplace](./plugin-marketplace.md).
 
 ## Managing Plugins
 
