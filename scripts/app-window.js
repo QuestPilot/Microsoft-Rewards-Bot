@@ -4043,6 +4043,7 @@ function html() {
           mrow += '<label class="pmanage-trust"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted Mode (full access)</label>';
           if (!p.pinned) mrow += '<label class="pmanage-au"><input type="checkbox" data-autoupdate="' + escAttr(p.name) + '"' + (p.autoUpdate !== false ? ' checked' : '') + '> Auto-update</label>';
         }
+        if (p.source === 'marketplace') mrow += '<button class="plink" data-report="' + escAttr(p.name) + '" data-rv="' + escAttr(p.installedVersion || p.version) + '"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Report</button>';
         mrow += '<button class="plink danger" data-remove="' + escAttr(p.name) + '"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>';
         manage = '<div class="pcard-manage">' + mrow + '</div>';
       }
@@ -4150,6 +4151,19 @@ function html() {
             if (r.ok) { loadPluginsCatalog(false); }
             else { var msg = await r.text(); alert('Could not remove "' + name + '": ' + (msg || 'Unknown error')); }
           } catch(e) { alert('Remove failed: ' + e.message); }
+        });
+      });
+      wrap.querySelectorAll('button[data-report]').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          var name = btn.getAttribute('data-report');
+          var ver = btn.getAttribute('data-rv');
+          var reason = window.prompt('Report "' + name + '" to the maintainers. What is the problem? (malware, abuse, broken, impersonation, etc.)');
+          if (!reason || reason.trim().length < 3) return;
+          try {
+            var r = await fetch('/api/plugins/report', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, version:ver, reason:reason})});
+            if (r.ok) { alert('Thanks — your report was sent to the maintainers.'); }
+            else { var msg = await r.text(); alert('Could not send the report: ' + (msg || 'Unknown error')); }
+          } catch(e) { alert('Report failed: ' + e.message); }
         });
       });
     }
@@ -5035,6 +5049,31 @@ const server = http.createServer((req, res) => {
         } catch(e) {
             res.writeHead(500); res.end(String(e.message))
         }
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/plugins/report') {
+        readApiBody(req, res, async body => {
+            const data = parseJson(body, null)
+            if (!data || typeof data.name !== 'string' || typeof data.reason !== 'string' || data.reason.trim().length < 3) {
+                res.writeHead(400); res.end('Missing name or reason'); return
+            }
+            // Forward to core-api server-to-server (no browser CORS). The report URL is
+            // derived from the configured catalog URL (.../catalog -> .../report).
+            const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL
+            if (!catalogUrl) { res.writeHead(503); res.end('Marketplace not configured'); return }
+            const reportUrl = catalogUrl.replace(/\/catalog(\?.*)?$/, '/report')
+            try {
+                const r = await fetch(reportUrl, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ name: data.name, version: data.version, reason: String(data.reason).slice(0, 500) })
+                })
+                if (r.ok) { res.writeHead(204); res.end() }
+                else { res.writeHead(r.status); res.end((await r.text()).slice(0, 300)) }
+            } catch (e) {
+                res.writeHead(502); res.end(String(e.message))
+            }
+        })
         return
     }
     if (req.method === 'POST' && req.url === '/api/terminal-mode') {
