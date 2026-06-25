@@ -129,6 +129,12 @@ async function ensureMarketplacePlugin(o) {
         ? latest.version
         : undefined
 
+    // Multi-file plugin: the signed catalog carries a files[] manifest — fetch + verify
+    // every file and install the whole tree. Single-file plugins keep the path below.
+    if (Array.isArray(entry.files) && entry.files.length > 0) {
+        return ensureTree({ targetDir, name, entry, fetcher, now, updateAvailable, installedVersion })
+    }
+
     // Already installed at the target version + verified on disk?
     if (fs.existsSync(indexPath) && fs.existsSync(markerPath)) {
         try {
@@ -169,6 +175,91 @@ async function ensureMarketplacePlugin(o) {
     const wasUpdate = Boolean(installedVersion && installedVersion !== entry.version)
     atomicWrite(indexPath, bytes)
     atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, installedAt: now || null }, null, 2))
+    return { installed: true, reason: wasUpdate ? 'updated' : 'installed', version: entry.version, updateAvailable }
+}
+
+// ── multi-file (tree) install ─────────────────────────────────────────────────
+// A relative path that cannot escape the plugin directory, or null if unsafe.
+function safeTreePath(rel) {
+    if (typeof rel !== 'string' || !rel) return null
+    if (rel.includes('..') || path.isAbsolute(rel) || /^[\\/]/.test(rel)) return null
+    return rel.replace(/\\/g, '/')
+}
+
+// True when every manifest file exists under `dir` with a matching sha256.
+function treeMatches(dir, manifest) {
+    for (const file of manifest) {
+        try {
+            if (sha256(fs.readFileSync(path.join(dir, file.path))) !== file.sha256) return false
+        } catch {
+            return false
+        }
+    }
+    return true
+}
+
+/**
+ * Install a multi-file marketplace plugin: fetch + verify EVERY file in the signed
+ * manifest, stage them in a temp dir, then swap into plugins/<name>/. Fail closed —
+ * nothing is written unless all files match their pinned sha256.
+ */
+async function ensureTree({ targetDir, name, entry, fetcher, now, updateAvailable, installedVersion }) {
+    const base = String(entry.installUrl || '')
+    const manifest = []
+    for (const file of entry.files) {
+        const rel = safeTreePath(file && file.path)
+        if (!rel || typeof (file && file.sha256) !== 'string') return { installed: false, reason: 'bad-manifest' }
+        manifest.push({ path: rel, sha256: String(file.sha256).toLowerCase() })
+    }
+    if (!manifest.some(file => file.path === 'index.js')) return { installed: false, reason: 'no-entry-file' }
+    const markerPath = path.join(targetDir, '.installed.json')
+
+    // Up-to-date? marker matches the manifest AND every file verifies on disk.
+    try {
+        const marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'))
+        if (marker.version === entry.version && marker.manifestSha256 === entry.manifestSha256 && treeMatches(targetDir, manifest)) {
+            return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
+        }
+    } catch {
+        // fall through to (re)install
+    }
+    // Self-heal: a correct tree is already on disk (marker lost / verified manual drop).
+    if (fs.existsSync(path.join(targetDir, 'index.js')) && treeMatches(targetDir, manifest)) {
+        atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, manifestSha256: entry.manifestSha256, files: manifest, installedAt: now || null }, null, 2))
+        return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
+    }
+
+    if (typeof fetcher !== 'function') return { installed: false, reason: 'no-fetcher' }
+
+    // Fetch + verify EVERY file into memory before touching disk (fail closed).
+    const fetched = []
+    for (const file of manifest) {
+        const raw = await fetcher(base + file.path)
+        const bytes = Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+        if (sha256(bytes) !== file.sha256) return { installed: false, reason: 'sha-mismatch' }
+        fetched.push({ path: file.path, bytes })
+    }
+
+    // Stage in a temp dir, then swap into place (replacing any older version).
+    const tmpDir = targetDir + '.tmp-' + crypto.randomBytes(4).toString('hex')
+    try {
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+        for (const file of fetched) {
+            const dest = path.join(tmpDir, file.path)
+            fs.mkdirSync(path.dirname(dest), { recursive: true })
+            fs.writeFileSync(dest, file.bytes)
+        }
+        fs.writeFileSync(
+            path.join(tmpDir, '.installed.json'),
+            JSON.stringify({ name, version: entry.version, manifestSha256: entry.manifestSha256, files: manifest, installedAt: now || null }, null, 2)
+        )
+        fs.rmSync(targetDir, { recursive: true, force: true })
+        fs.renameSync(tmpDir, targetDir)
+    } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+
+    const wasUpdate = Boolean(installedVersion && installedVersion !== entry.version)
     return { installed: true, reason: wasUpdate ? 'updated' : 'installed', version: entry.version, updateAvailable }
 }
 

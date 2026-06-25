@@ -841,7 +841,7 @@ export class PluginManager {
                 catalog?: unknown
                 expired?: boolean
             }
-            findEntry(catalog: unknown, name: string, version?: string): { sha256?: string; version?: string } | undefined
+            findEntry(catalog: unknown, name: string, version?: string): { sha256?: string; version?: string; files?: Array<{ path?: string; sha256?: string }>; manifestSha256?: string } | undefined
             isRevoked(catalog: unknown, opts: { name?: string; version?: string; sha256?: string }): boolean
         }
 
@@ -859,9 +859,34 @@ export class PluginManager {
         if (!entry || !entry.sha256) {
             throw new Error(`"${entryName}" is not pinned in the signed marketplace catalog`)
         }
-        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
-        if (fileHash.toLowerCase() !== String(entry.sha256).toLowerCase()) {
-            throw new Error(`"${entryName}" sha256 does not match the signed marketplace catalog`)
+        if (Array.isArray(entry.files) && entry.files.length > 0) {
+            // Multi-file plugin: every file in the SIGNED manifest must match on disk
+            // (its sha256), and there must be an index.js entry point. Fail closed.
+            const pluginDir = path.dirname(filePath)
+            if (!entry.files.some(file => file && file.path === 'index.js')) {
+                throw new Error(`"${entryName}" manifest has no index.js entry point`)
+            }
+            for (const file of entry.files) {
+                if (!file || typeof file.path !== 'string' || typeof file.sha256 !== 'string') {
+                    throw new Error(`"${entryName}" has a malformed manifest entry`)
+                }
+                if (file.path.includes('..') || path.isAbsolute(file.path) || /^[\\/]/.test(file.path)) {
+                    throw new Error(`"${entryName}" manifest path is unsafe: ${file.path}`)
+                }
+                const onDisk = path.join(pluginDir, file.path)
+                if (onDisk !== pluginDir && !onDisk.startsWith(pluginDir + path.sep)) {
+                    throw new Error(`"${entryName}" manifest path escapes the plugin directory: ${file.path}`)
+                }
+                const fileHash = crypto.createHash('sha256').update(fs.readFileSync(onDisk)).digest('hex')
+                if (fileHash.toLowerCase() !== file.sha256.toLowerCase()) {
+                    throw new Error(`"${entryName}" file "${file.path}" sha256 does not match the signed marketplace catalog`)
+                }
+            }
+        } else {
+            const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+            if (fileHash.toLowerCase() !== String(entry.sha256).toLowerCase()) {
+                throw new Error(`"${entryName}" sha256 does not match the signed marketplace catalog`)
+            }
         }
         if (mp.isRevoked(result.catalog, { name: entryName, version: entry.version, sha256: entry.sha256 })) {
             throw new Error(`"${entryName}" is revoked by the marketplace catalog`)
