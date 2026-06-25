@@ -85,6 +85,20 @@ type CreatePluginSandbox = (options: {
     timeoutMs?: number
 }) => Promise<SandboxedPluginHandle>
 
+/** Downloads a marketplace plugin's raw source by its catalog `installUrl`. */
+type MarketplaceFetcher = (url: string) => Promise<Buffer | Uint8Array | string>
+
+/** Pulls the signed catalog { catalog, signature } from core-api. */
+type CatalogFetcher = (url: string) => Promise<{ catalog: string; signature: string }>
+
+/** Optional injection seam — tests pass local fetchers; runtime uses HTTPS. */
+export interface PluginManagerOptions {
+    marketplaceFetcher?: MarketplaceFetcher
+    /** Where to pull the signed catalog from (defaults to env MSRB_MARKETPLACE_CATALOG_URL). */
+    marketplaceCatalogUrl?: string
+    catalogFetcher?: CatalogFetcher
+}
+
 export class PluginManager {
     private bot: MicrosoftRewardsBot
     private plugins: IPlugin[] = []
@@ -92,14 +106,20 @@ export class PluginManager {
     private officialCorePlugins = new WeakSet<IPlugin>()
     private sandboxedPlugins = new WeakSet<IPlugin>()
     private readonly sandboxAccountKey = crypto.randomBytes(32)
+    private readonly marketplaceFetcher?: MarketplaceFetcher
+    private readonly marketplaceCatalogUrl?: string
+    private readonly catalogFetcher?: CatalogFetcher
     private registeredTasks: Partial<PremiumTaskMap> = {}
     private registeredSelectors: Record<string, Record<string, unknown>> = {}
     private diagnosticsProviders: PluginDiagnosticsProvider[] = []
     private notificationSinks: PluginNotificationSink[] = []
     private officialCoreEntitlement = false
 
-    constructor(bot: MicrosoftRewardsBot) {
+    constructor(bot: MicrosoftRewardsBot, options: PluginManagerOptions = {}) {
         this.bot = bot
+        this.marketplaceFetcher = options.marketplaceFetcher
+        this.marketplaceCatalogUrl = options.marketplaceCatalogUrl
+        this.catalogFetcher = options.catalogFetcher
     }
 
     /**
@@ -125,6 +145,14 @@ export class PluginManager {
                 'PLUGIN-MANAGER',
                 'MSRB_DISABLE_PLUGINS=1 set — loading only verified Core; all other plugins are disabled'
             )
+        }
+
+        // Materialize any marketplace-sourced plugins declared in plugins.jsonc
+        // BEFORE the directory scan, so a freshly downloaded plugin is picked up in
+        // this same run. Primary-only (workers load what the primary installs); the
+        // MSRB_DISABLE_PLUGINS panic switch skips it entirely.
+        if (!thirdPartyDisabled && cluster.isPrimary) {
+            await this.installMarketplacePlugins(pluginConfig)
         }
 
         const ignoredFiles = new Set([
@@ -203,6 +231,194 @@ export class PluginManager {
             )
         } else {
             this.bot.logger.debug('main', 'PLUGIN-MANAGER', 'No plugins loaded - running core only')
+        }
+    }
+
+    /**
+     * Download + verify + install any `source: 'marketplace'` plugin declared in
+     * plugins.jsonc whose source isn't already present (or is outdated) on disk.
+     * Self-healing: runs every startup and re-materializes a plugin that an
+     * auto-update or the user may have removed (plugins.jsonc itself is preserved
+     * across updates, so the intent to keep the plugin survives). Fail-closed — the
+     * signed catalog must verify before anything is fetched, and each plugin's bytes
+     * must match the catalog's pinned sha256 (enforced by ensureMarketplacePlugin).
+     */
+    private async installMarketplacePlugins(pluginConfig: Record<string, PluginConfigEntry>): Promise<void> {
+        const marketplaceEntries = Object.entries(pluginConfig).filter(
+            ([, entry]) => entry && entry.source === 'marketplace' && entry.enabled !== false
+        )
+        if (marketplaceEntries.length === 0) return
+
+        // Refresh the signed catalog from core-api first (best-effort): cache it to
+        // plugins/marketplace.json(+.sig) so a new publish reaches the bot without a
+        // bot update. Offline / failure -> fall back to the cached copy (fail-closed
+        // happens later in verify). Only runs when a catalog URL is configured, so
+        // tests stay offline.
+        const catalogUrl = this.marketplaceCatalogUrl ?? process.env.MSRB_MARKETPLACE_CATALOG_URL
+        if (catalogUrl) {
+            try {
+                await this.syncMarketplaceCatalog(catalogUrl)
+            } catch (error) {
+                this.bot.logger.warn(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Could not refresh the marketplace catalog from ${catalogUrl}; using the cached copy: ${error instanceof Error ? error.message : String(error)}`
+                )
+            }
+        }
+
+        // Lazy-require the network-free verifier + installer (kept off the hot path).
+        let mp: {
+            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string }): {
+                ok: boolean
+                reason?: string
+                catalog?: unknown
+                expired?: boolean
+            }
+        }
+        let installer: {
+            ensureMarketplacePlugin(options: {
+                root: string
+                name: string
+                requestedVersion?: string
+                catalog: unknown
+                fetcher: MarketplaceFetcher
+                botVersion?: string
+                apiVersion?: string
+                now?: string
+            }): Promise<{ installed: boolean; reason: string; version?: string }>
+        }
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            mp = require('../../scripts/security/marketplace-catalog')
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            installer = require('../../scripts/plugin-installer')
+        } catch (error) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Marketplace installer unavailable; ${marketplaceEntries.length} marketplace plugin(s) will not be installed: ${error instanceof Error ? error.message : String(error)}`
+            )
+            return
+        }
+
+        const verification = mp.verifyMarketplaceCatalog({
+            root: process.cwd(),
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined
+        })
+        if (!verification.ok) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Marketplace catalog unavailable (${verification.reason}); ${marketplaceEntries.length} marketplace plugin(s) will not be installed`
+            )
+            return
+        }
+        if (verification.expired) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                'Marketplace catalog is stale; skipping marketplace plugin installation until it refreshes'
+            )
+            return
+        }
+
+        const fetcher = this.marketplaceFetcher ?? this.defaultMarketplaceFetcher()
+        if (!fetcher) {
+            this.bot.logger.warn('main', 'PLUGIN-MANAGER', 'Marketplace fetcher unavailable; cannot download marketplace plugins')
+            return
+        }
+
+        const botVersion = this.readBotVersion()
+        for (const [name, entry] of marketplaceEntries) {
+            try {
+                const result = await installer.ensureMarketplacePlugin({
+                    root: process.cwd(),
+                    name,
+                    requestedVersion: entry.version,
+                    catalog: verification.catalog,
+                    fetcher,
+                    botVersion,
+                    apiVersion: PLUGIN_API_VERSION,
+                    now: new Date().toISOString()
+                })
+                this.logMarketplaceInstall(name, result)
+            } catch (error) {
+                this.bot.logger.error(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Marketplace install failed for "${name}": ${error instanceof Error ? error.message : String(error)}`
+                )
+            }
+        }
+    }
+
+    /** Real runtime fetcher: a hardened HTTPS GET (scripts/marketplace-fetch.js). */
+    private defaultMarketplaceFetcher(): MarketplaceFetcher | undefined {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { fetchMarketplaceAsset } = require('../../scripts/marketplace-fetch') as {
+                fetchMarketplaceAsset: (url: string) => Promise<Buffer>
+            }
+            return (url: string) => fetchMarketplaceAsset(url)
+        } catch {
+            return undefined
+        }
+    }
+
+    /** Pull the signed catalog from core-api and cache it to plugins/marketplace.json(+.sig). */
+    private async syncMarketplaceCatalog(url: string): Promise<void> {
+        const fetchCatalog = this.catalogFetcher ?? this.defaultCatalogFetcher()
+        if (!fetchCatalog) throw new Error('no catalog fetcher available')
+        const { catalog, signature } = await fetchCatalog(url)
+        if (typeof catalog !== 'string' || typeof signature !== 'string') {
+            throw new Error('catalog response must be { catalog, signature }')
+        }
+        const dir = path.resolve(process.cwd(), 'plugins')
+        fs.mkdirSync(dir, { recursive: true })
+        this.atomicWriteFile(path.join(dir, 'marketplace.json'), catalog)
+        this.atomicWriteFile(path.join(dir, 'marketplace.sig'), `${signature.trim()}\n`)
+    }
+
+    private defaultCatalogFetcher(): CatalogFetcher | undefined {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { fetchSignedCatalog } = require('../../scripts/marketplace-fetch') as {
+                fetchSignedCatalog: (url: string) => Promise<{ catalog: string; signature: string }>
+            }
+            return (url: string) => fetchSignedCatalog(url)
+        } catch {
+            return undefined
+        }
+    }
+
+    private atomicWriteFile(filePath: string, data: string): void {
+        const tmp = `${filePath}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`
+        fs.writeFileSync(tmp, data)
+        fs.renameSync(tmp, filePath)
+    }
+
+    private readBotVersion(): string | undefined {
+        try {
+            const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')) as { version?: string }
+            return typeof pkg.version === 'string' ? pkg.version : undefined
+        } catch {
+            return undefined
+        }
+    }
+
+    /** Append every install attempt to .plugins-marketplace.log + surface notable outcomes. */
+    private logMarketplaceInstall(name: string, result: { installed: boolean; reason: string; version?: string }): void {
+        const line = `${new Date().toISOString()} ${name} installed=${result.installed} reason=${result.reason}${result.version ? ` version=${result.version}` : ''}\n`
+        try {
+            fs.appendFileSync(path.resolve(process.cwd(), '.plugins-marketplace.log'), line)
+        } catch {
+            // logging is best-effort
+        }
+        if (result.installed && result.reason === 'installed') {
+            this.bot.logger.info('main', 'PLUGIN-MANAGER', `Installed marketplace plugin: ${name}@${result.version}`)
+        } else if (!result.installed) {
+            this.bot.logger.warn('main', 'PLUGIN-MANAGER', `Marketplace plugin "${name}" not installed (${result.reason})`)
         }
     }
 
@@ -376,9 +592,31 @@ export class PluginManager {
         // Enforce the catalog.json sha256 for third-party plugins (fail closed on mismatch)
         if (!isOfficialCore) this.assertCatalogHash(entryName, filePath)
 
+        // A marketplace plugin is ALWAYS vouched for by the signed catalog (signature +
+        // pinned sha256 + not revoked + not stale) — whether it runs sandboxed OR was
+        // locally elevated to Trusted Mode. Trusted Mode skips the sandbox, so verifying
+        // here (before any of its code runs) is what keeps an elevated marketplace plugin
+        // honest. Fail closed.
+        if (!isOfficialCore && entryConfig?.source === 'marketplace') {
+            this.assertMarketplaceTrust(entryName, filePath, entryConfig)
+        }
+
+        const trust = this.resolvePluginTrust(isOfficialCore, entryConfig)
+
+        // Loud, unmissable warning when a COMMUNITY (marketplace) plugin has been granted
+        // full in-process access. It is an explicit local opt-in, so surface it on every
+        // run — including headless/CLI, where there is no Desk prompt to remind you.
+        if (trust === 'trusted' && entryConfig?.source === 'marketplace' && cluster.isPrimary) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `⚠ Community plugin "${entryName}" is running in TRUSTED MODE (full access, NOT sandboxed). Only keep this on for plugins you fully trust.`
+            )
+        }
+
         // Untrusted third-party plugins run in a V8 isolate with no Node APIs.
         // Core and trusted/first-party plugins keep the in-process require() path.
-        if (this.resolvePluginTrust(isOfficialCore, entryConfig) === 'sandboxed') {
+        if (trust === 'sandboxed') {
             return this.loadSandboxedPlugin(entryName, filePath, entryConfig)
         }
 
@@ -471,11 +709,9 @@ export class PluginManager {
             throw new Error(`Sandboxed plugin "${entryName}" must ship JavaScript source (.js), not bytecode (.jsc)`)
         }
 
-        // Marketplace-sourced plugins must be vouched for by the SIGNED catalog
-        // (signature + pinned sha256 + not revoked + not stale). Fail closed.
-        if (entryConfig?.source === 'marketplace') {
-            this.assertMarketplaceTrust(entryName, filePath, entryConfig)
-        }
+        // Marketplace-sourced plugins are vouched for by the SIGNED catalog up in
+        // loadPluginFile (before this runs), so both the sandboxed and Trusted-Mode
+        // paths are covered by the same fail-closed check.
 
         let createPluginSandbox: CreatePluginSandbox
         try {

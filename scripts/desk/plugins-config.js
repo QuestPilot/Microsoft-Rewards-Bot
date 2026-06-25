@@ -60,6 +60,8 @@ function createPluginsConfig({ root, atomicWriteText }) {
                 name,
                 enabled: v.enabled !== false,
                 priority: typeof v.priority === 'number' ? v.priority : 0,
+                source: v.source === 'marketplace' ? 'marketplace' : 'local',
+                trust: v.trust === 'full' ? 'full' : '',
                 official: (PLUGIN_META[name] && PLUGIN_META[name].official) || false,
                 description: (PLUGIN_META[name] && PLUGIN_META[name].description) || 'Custom plugin.'
             }))
@@ -79,7 +81,33 @@ function createPluginsConfig({ root, atomicWriteText }) {
         return true
     }
 
-    return { PLUGINS_JSONC, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, setPluginEnabled }
+    // Set a plugin's isolation/trust level ('full' = Trusted Mode / in-process,
+    // 'sandbox' = isolated). Comment-preserving: replaces an existing "trust" value
+    // or inserts the field, scoped to this plugin's own { } object via brace matching.
+    function setPluginTrust(name, trust) {
+        if (trust !== 'full' && trust !== 'sandbox') throw new Error('Invalid trust level: ' + trust)
+        let src = fs.readFileSync(PLUGINS_JSONC, 'utf8')
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const keyIdx = src.search(new RegExp('"' + escaped + '"\\s*:\\s*\\{'))
+        if (keyIdx < 0) throw new Error('Plugin not found: ' + name)
+        const braceIdx = src.indexOf('{', keyIdx)
+        let depth = 0
+        let endIdx = -1
+        for (let i = braceIdx; i < src.length; i++) {
+            if (src[i] === '{') depth++
+            else if (src[i] === '}') { depth--; if (depth === 0) { endIdx = i; break } }
+        }
+        if (endIdx < 0) throw new Error('Malformed plugin entry: ' + name)
+        const objText = src.slice(braceIdx, endIdx + 1)
+        const newObjText = /"trust"\s*:\s*"(full|sandbox)"/.test(objText)
+            ? objText.replace(/("trust"\s*:\s*")(full|sandbox)(")/, '$1' + trust + '$3')
+            : objText.replace(/^\{/, '{\n        "trust": "' + trust + '",')
+        src = src.slice(0, braceIdx) + newObjText + src.slice(endIdx + 1)
+        atomicWriteText(PLUGINS_JSONC, src)
+        return true
+    }
+
+    return { PLUGINS_JSONC, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust }
 }
 
 module.exports = { createPluginsConfig }

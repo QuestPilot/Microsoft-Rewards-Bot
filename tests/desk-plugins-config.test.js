@@ -67,3 +67,21 @@ test('setPluginEnabled flips the flag AND preserves comments', () => {
 test('setPluginEnabled throws for an unknown plugin', () => {
     assert.throws(() => pc.setPluginEnabled('ghost', true), /Plugin not found/)
 })
+
+test('setPluginTrust inserts a trust field when absent (preserving comments)', () => {
+    assert.equal(pc.setPluginTrust('my-plugin', 'full'), true)
+    const raw = fs.readFileSync(path.join(root, 'plugins', 'plugins.jsonc'), 'utf8')
+    assert.ok(raw.includes('// the official core plugin'), 'comments must survive')
+    assert.equal(pc.readPluginsConfig()['my-plugin'].trust, 'full')
+    assert.equal(pc.readPluginsConfig()['my-plugin'].enabled, true, 'other fields untouched')
+})
+
+test('setPluginTrust replaces an existing trust value', () => {
+    pc.setPluginTrust('my-plugin', 'full')
+    assert.equal(pc.setPluginTrust('my-plugin', 'sandbox'), true)
+    assert.equal(pc.readPluginsConfig()['my-plugin'].trust, 'sandbox')
+})
+
+test('setPluginTrust rejects an invalid level', () => {
+    assert.throws(() => pc.setPluginTrust('my-plugin', 'root'), /Invalid trust level/)
+})

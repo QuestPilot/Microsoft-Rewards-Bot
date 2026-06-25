@@ -101,6 +101,19 @@ async function ensureMarketplacePlugin(o) {
         }
     }
 
+    // Correct bytes already on disk (marker lost, or a verified manual drop):
+    // adopt them, refresh the marker, and skip the download (self-heal without network).
+    if (fs.existsSync(indexPath)) {
+        try {
+            if (sha256(fs.readFileSync(indexPath)) === expected) {
+                atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, installedAt: now || null }, null, 2))
+                return { installed: true, reason: 'up-to-date', version: entry.version }
+            }
+        } catch {
+            // fall through to (re)download
+        }
+    }
+
     if (typeof fetcher !== 'function') return { installed: false, reason: 'no-fetcher' }
 
     const fetched = await fetcher(entry.installUrl)

@@ -4,82 +4,114 @@
 
 ---
 
-# Publishing a Plugin
+# Plugin Marketplace
 
 Navigation: [Documentation index](./README.md) → [Plugin system overview](./plugins.md) → [Create a plugin](./create-plugin.md) → [Plugin API reference](./plugin-api.md)
 
-Once your plugin works locally, you can share it so other people can install it. Plugins are plain folders, so distribution is simple: ship the folder, tell people where to drop it, and be honest about what it does.
+The marketplace lets community developers publish plugins that anyone can install. Every published plugin is **cryptographically signed**, **content‑pinned**, and **sandboxed by default** — so installing one is safe even though it was written by someone else.
+
+```
+Author → publishes on the website (Discord login, no Core license)
+      → the maintainer reviews it
+      → it is stored + the signed catalog is updated
+Bot   → fetches the signed catalog → verifies → installs → runs the plugin SANDBOXED
+```
 
 ---
 
-## 1. Package the folder
+## Publishing a plugin (authors)
 
-A distributable plugin should contain:
+You do **not** need a Core license to publish — making plugins is free and separate from Core.
 
-- `index.js` (or a compiled `index.jsc`)
-- `package.json` with `name`, `version`, `description`, and `license`
-- `README.md` documenting every config key and what the plugin does
-- `LICENSE` if you have specific terms
-- a checksum (SHA-256) of the released archive so users can verify it
+1. Go to **`https://bot.lgtw.tf/?view=developers`**.
+2. **Sign in with Discord.** This only identifies you as the author; it does not touch any license.
+3. Fill in the form: **name**, **version** (`x.y.z`), a short **description**, and your **`index.js`** (paste it or pick the file).
+4. Submit. Your plugin is now **pending review**.
+5. The maintainer reviews the code and **approves or rejects** it. You can see the status (and any rejection reason) under **My plugins**.
 
-Zip the folder, or publish it to a public Git repository — whatever is easiest for your users.
+Once approved, your plugin is committed to the official storage repository and added to the signed catalog. From that moment any bot can install it.
 
-## 2. How users install it
+**Rules**
 
-Users install a third-party plugin by:
+- A plugin **name is owned by its first author** — nobody else can publish under a name you already use.
+- To ship a fix, **bump the version** and submit again (an already‑approved version is immutable).
+- Marketplace plugins ship a **single `index.js`** and run **sandboxed**, so write to the public plugin API only (no `require`, `fs`, `process`, network, …). See [Create a plugin](./create-plugin.md).
+- Be honest about what your plugin does and **never claim official Core capabilities** — only the verified Core plugin can grant premium entitlement.
 
-1. placing the plugin folder inside `plugins/`
-2. adding an entry for it in `plugins/plugins.jsonc` (or toggling it from the **Plugins** page in Rewards Desk)
-3. restarting the bot
+---
 
-That's it — the bot loads every enabled plugin listed in `plugins.jsonc` at startup.
+## Installing a marketplace plugin (users)
 
-## 3. Listing it in the catalog (optional)
+A marketplace plugin is declared in `plugins/plugins.jsonc` with `source: "marketplace"`:
 
-The bot keeps an integrity catalog at `plugins/catalog.json`. Adding an entry lets the bot match a plugin against a known checksum and refuse to load a tampered copy.
-
-```json
+```jsonc
 {
-  "plugins": [
-    {
-      "name": "summary",
-      "version": "1.0.0",
-      "description": "Account run summaries.",
-      "license": "MIT",
-      "price": "free",
-      "botVersionRange": ">=4.0.0",
-      "installUrl": "https://example.com/summary.zip",
-      "supportUrl": "https://discord.gg/example",
-      "purchaseUrl": "https://discord.gg/example",
-      "sha256": "expected-release-checksum"
-    }
-  ]
+  "cool-plugin": {
+    "enabled": true,
+    "source": "marketplace",
+    "version": "1.2.0"
+  }
 }
 ```
 
-Paid plugins use an external link (`purchaseUrl`) for payment — the bot does not handle money, commissions, or license issuance for third-party plugins.
+On the next start the bot **downloads it from the catalog, verifies the signature + checksum, installs it, and runs it sandboxed** — no manual file copying. This works on a normal desktop and **headless/CLI** alike. You can also flip a marketplace plugin on/off from the **Plugins** page in [Rewards Desk](./rewards-desk.md).
 
-### The signed marketplace catalog
+If an update or anything else removes the plugin folder, the bot simply **re‑downloads it** on the next run (your `plugins.jsonc` intent is preserved across updates).
 
-Beyond the local integrity catalog, the marketplace is anchored by a **signed** catalog (`plugins/marketplace.json` + `plugins/marketplace.sig`): an Ed25519 signature, verified by the bot against the trusted public key(s) in `scripts/security/marketplace-keys/`. It pins each plugin's `sha256`, carries a monotonic `sequence` (rollback protection) and a freshness TTL, and lists `revoked` plugins plus a global `killSwitch`. The bot verifies it before installing or loading any `source: "marketplace"` plugin and **fails closed** if it is missing, unsigned, stale, or revoked. The private signing key lives only on the server (core-api) — never on a client.
+---
 
-> **How third-party plugins run — the trust model.** A plugin installed from the marketplace (`source: "marketplace"` in `plugins.jsonc`) runs **sandboxed**: inside a V8 isolate with **no** Node APIs — no `fs`, `process`, `child_process`, network, the OS credential vault, or the bot object. It sees only the public plugin API over a JSON bridge, and account emails are tokenized before they cross the boundary. A plugin that genuinely needs full access (e.g. to read the accounts file) must be granted **Trusted Mode** (`trust: "full"`) — an explicit, local, opt-in decision the marketplace can never make for you. A plain plugin folder you drop into `plugins/` yourself still runs **in-process** by default; set `trust: "sandbox"` on its entry to isolate it too. Either way, only install plugins from authors you trust.
+## Permissions & trust
 
-## Publishing rules
+> Only install plugins from authors you trust. The marketplace makes that safe by default, but **you** are always in control of how much access a plugin gets.
 
-- **Be clear about the license.** Say whether the plugin is free, paid, open source, or proprietary.
-- **Never present a plugin license as the bot license.** They are separate.
-- **State supported versions** with `botVersionRange`.
-- **Provide a support or contact link** so users can reach you.
-- **Don't claim official Core capabilities.** Only the official Core plugin can grant premium entitlement; third-party plugins use the public API only.
+- **Sandboxed (default).** Every `source: "marketplace"` plugin runs inside a V8 isolate with **no Node APIs** — no `fs`, `process`, `child_process`, network, the OS credential vault, or the bot object. It sees only the public plugin API over a JSON bridge, and account emails are tokenized before they cross the boundary. A repeatedly‑failing sandboxed plugin is automatically disabled by a circuit breaker.
+- **Trusted Mode (opt‑in, `trust: "full"`).** A plugin that genuinely needs full in‑process access must be granted Trusted Mode — an **explicit, local** decision the marketplace can never make for you. In Rewards Desk this is a per‑plugin **“Trusted Mode”** checkbox that pops a clear warning first; without the Desk, set `"trust": "full"` on the entry in `plugins.jsonc`. Either way the bot prints a loud warning on every run while a community plugin is trusted.
+- **Always verified.** Whether sandboxed or trusted, a marketplace plugin is checked against the signed catalog (signature + pinned `sha256` + not revoked + not stale) **before any of its code runs**. If the check fails, it does not load (fail‑closed).
+- **Community warning.** Enabling a community plugin in the Desk shows a “made by the community, not the official team” notice, so it is never silent.
 
-## The official Core plugin
+---
 
-The Core plugin ships preinstalled in `plugins/core`. Its bytecode checksum is pinned by `plugins/official-core.json`; if the bytecode doesn't match, the bot refuses to grant premium entitlement. Third-party plugins can't impersonate it.
+## The trust model (how the signing works)
+
+The marketplace is anchored by a **signed catalog** the bot fetches from core‑api (`/api/marketplace/catalog`) and caches locally (`plugins/marketplace.json` + `plugins/marketplace.sig`):
+
+- An **Ed25519** detached signature over the raw catalog bytes, verified against the trusted public key(s) in `scripts/security/marketplace-keys/`. This is a **separate** trust root from the official Core key — marketplace trust never grants Core entitlement.
+- Each plugin is **pinned by `sha256`**; a download whose bytes don’t match is rejected regardless of where it came from.
+- A monotonic **`sequence`** (anti‑rollback) and a freshness **TTL** (fail‑closed once too stale), plus per‑plugin **`revoked`** entries and a global **`killSwitch`**.
+- The **private signing key lives only on the server** (core‑api), never on a client.
+
+Plugins are stored in a **public** GitHub repository and served by **jsDelivr** (pinned to the exact commit), so the install URL is immutable. The repo must stay public for jsDelivr to serve it; integrity comes from the signature + checksum, not from secrecy.
+
+---
+
+## Security & moderation
+
+- **Nothing goes live without review.** Submissions sit as *pending* until the maintainer approves them; the maintainer can read the full source before approving.
+- **Author gating.** Logins/submissions are checked server‑side (Redis): abusive accounts can be banned, and an optional invite‑only allowlist can restrict who may publish. A per‑author cap limits pending spam.
+- **No impersonation.** Authors are bound to their Discord identity; nobody can publish under another author’s plugin name; commits to the storage repo are made by the server under a **neutral marketplace identity**, never the maintainer’s personal account.
+- **Hardened API.** Author sessions are sealed (AES‑GCM) `HttpOnly; Secure; SameSite=Lax` cookies; CORS is pinned to the app origin; all database access is parameterized; names/versions are validated (no path traversal).
+
+---
+
+## For maintainers (running the marketplace)
+
+Server‑side (core‑api / Vercel env):
+
+- `MARKETPLACE_SIGNING_PRIVATE_KEY` — the Ed25519 private key whose public half ships in `scripts/security/marketplace-keys/`.
+- `MARKETPLACE_GH_TOKEN` — a GitHub token with **Contents: write** on the storage repo (a fine‑grained token scoped to just that repo is recommended; a classic `repo` token also works). `MARKETPLACE_GH_REPO` defaults to `QuestPilot/marketplace-plugins`.
+- Optional: `MARKETPLACE_REQUIRE_ALLOWLIST=1` (invite‑only), `MARKETPLACE_GIT_NAME`/`MARKETPLACE_GIT_EMAIL` (commit identity).
+
+Bot‑side:
+
+- `MSRB_MARKETPLACE_CATALOG_URL=https://bot.lgtw.tf/api/marketplace/catalog` so the bot pulls the latest signed catalog.
+- Ship the trusted **public** key in `scripts/security/marketplace-keys/` (commit it upstream so it survives auto‑updates). Sign locally with `npm run marketplace:sign` only for offline/testing — production signs on the server.
+
+Approve/reject and ban from the dashboard **Admin → Marketplace** section.
 
 ## Related pages
 
 - [Plugin system overview](./plugins.md)
 - [Create a plugin](./create-plugin.md)
 - [Plugin API reference](./plugin-api.md)
+- [Rewards Desk](./rewards-desk.md)
 - [Official Core plugin](./core-plugin.md)

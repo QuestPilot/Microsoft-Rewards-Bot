@@ -68,7 +68,10 @@ Open **Rewards Desk** (it launches automatically on `npm start`) and go to the *
 
 - see every plugin listed in `plugins/plugins.jsonc`
 - toggle each plugin on or off (the change is written straight back to `plugins.jsonc`)
+- install plugins from the **marketplace** — add a `source: "marketplace"` entry and the bot downloads, verifies, and installs it on the next run (see [Plugin marketplace](./plugin-marketplace.md))
+- grant a marketplace plugin **Trusted Mode** (full access) with an explicit per-plugin checkbox — a clear warning is shown first, and enabling a community plugin always warns that it is community-made
 - spot the official Core plugin and whether your license unlocks it
+- **Publish a plugin** — opens the developer site where you sign in with Discord (no Core license needed) and upload your own plugin
 - jump to the guide for building your own plugin
 
 You can also edit `plugins/plugins.jsonc` by hand if you prefer. The bot still verifies the Core bytecode checksum against `plugins/official-core.json` and any catalog checksums in `plugins/catalog.json` at startup.

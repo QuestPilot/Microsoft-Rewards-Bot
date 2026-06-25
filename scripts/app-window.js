@@ -508,7 +508,7 @@ function enrichAccountsWithVariant(accounts) {
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 // Extracted to ./desk/plugins-config.js (behavior identical).
 const { createPluginsConfig } = require('./desk/plugins-config')
-const { isPluginEnabled, readPluginsList, setPluginEnabled } = createPluginsConfig({ root: ROOT, atomicWriteText })
+const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust } = createPluginsConfig({ root: ROOT, atomicWriteText })
 
 function atomicWriteText(filePath, content) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -2224,7 +2224,8 @@ function html() {
           <h3>Build your own plugin</h3>
           <p>Add custom tasks to the bot with the public plugin API. Full guide and examples on GitHub.</p>
         </div>
-        <button class="btn btn-primary btn-sm" id="plugins-doc-btn">Read the plugin guide →</button>
+        <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish a plugin →</button>
+        <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Read the plugin guide →</button>
       </div>
     </div>
 
@@ -3597,6 +3598,7 @@ function html() {
     G('plugins-back').addEventListener('click', function() { setView('dash'); });
     G('docs-back').addEventListener('click', function() { setView('dash'); });
     G('plugins-doc-btn').addEventListener('click', function() { window.open(PLUGIN_DOC_URL); });
+    G('plugins-publish-btn').addEventListener('click', function() { window.open('https://bot.lgtw.tf/?view=developers'); });
     G('docs-github').addEventListener('click', function() { window.open(DOCS_GITHUB_URL); });
     // Terminal / developer mode
     G('btn-terminal-mode').addEventListener('click', async function() {
@@ -3913,6 +3915,7 @@ function html() {
         var locked = isCore && !data.hasCoreLicense;
         var chips = '';
         if (p.official) chips += '<span class="chip chip-official">Official</span>';
+        if (p.source === 'marketplace') chips += '<span class="chip" style="background:rgba(56,224,200,.16);color:#38e0c8">Marketplace</span>';
         chips += '<span class="chip chip-prio">priority ' + (p.priority != null ? p.priority : 0) + '</span>';
         var icon = isCore
           ? '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>'
@@ -3921,15 +3924,33 @@ function html() {
           '<div class="plugin-ico"><svg viewBox="0 0 24 24">'+icon+'</svg></div>' +
           '<div class="plugin-info"><div class="plugin-name">'+esc(p.name)+chips+'</div>' +
           '<div class="plugin-desc">'+esc(p.description||'Custom plugin.')+'</div>' +
+          (p.source==='marketplace'?'<label class="plugin-trust" style="display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:#ffb27a;cursor:pointer"><input type="checkbox" data-trust="'+esc(p.name)+'"'+(p.trust==='full'?' checked':'')+'> Trusted Mode — full access (only for plugins you fully trust)</label>':'') +
           (locked?'<div class="plugin-locked"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Requires a valid Core license to load</div>':'') +
           '</div>' +
-          '<label class="toggle"><input type="checkbox" data-plugin="'+esc(p.name)+'"'+(p.enabled?' checked':'')+'><span class="toggle-slider"></span></label>' +
+          '<label class="toggle"><input type="checkbox" data-plugin="'+esc(p.name)+'" data-source="'+esc(p.source||'local')+'"'+(p.enabled?' checked':'')+'><span class="toggle-slider"></span></label>' +
           '</div>';
       }).join('');
       list.querySelectorAll('input[data-plugin]').forEach(function(inp) {
         inp.addEventListener('change', function() {
           var name = inp.getAttribute('data-plugin');
+          var source = inp.getAttribute('data-source');
+          if (inp.checked && source === 'marketplace') {
+            if (!window.confirm('"'+name+'" is a community plugin — made by the community, NOT the official team. It runs sandboxed with limited access. Enable it?')) {
+              inp.checked = false; return;
+            }
+          }
           fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, enabled:inp.checked})}).catch(function(){});
+        });
+      });
+      list.querySelectorAll('input[data-trust]').forEach(function(inp) {
+        inp.addEventListener('change', function() {
+          var name = inp.getAttribute('data-trust');
+          if (inp.checked) {
+            if (!window.confirm('⚠ Trusted Mode gives "'+name+'" FULL access to your computer (files, network, etc.) — it will NO LONGER be sandboxed. Only do this for a community plugin you fully trust. Continue?')) {
+              inp.checked = false; return;
+            }
+          }
+          fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, trust: inp.checked ? 'full' : 'sandbox'})}).catch(function(){});
         });
       });
     }
@@ -4700,8 +4721,13 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/api/plugins') {
         readApiBody(req, res, body => {
             const data = parseJson(body, null)
-            if (!data || typeof data.name !== 'string' || typeof data.enabled !== 'boolean') { res.writeHead(400); res.end(); return }
-            try { setPluginEnabled(data.name, data.enabled); res.writeHead(204); res.end() }
+            if (!data || typeof data.name !== 'string') { res.writeHead(400); res.end(); return }
+            try {
+                if (typeof data.enabled === 'boolean') setPluginEnabled(data.name, data.enabled)
+                else if (data.trust === 'full' || data.trust === 'sandbox') setPluginTrust(data.name, data.trust)
+                else { res.writeHead(400); res.end(); return }
+                res.writeHead(204); res.end()
+            }
             catch (e) { res.writeHead(500); res.end(String(e.message)) }
         })
         return

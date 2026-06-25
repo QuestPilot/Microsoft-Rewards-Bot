@@ -34,7 +34,7 @@ The Desk window opens on its own once the bot is ready. The first time you start
 | **Accounts** | Add, edit, enable, or disable your Microsoft accounts. Your sign-in details stay on your computer. |
 | **Console** | The live bot log. Scroll up freely — it only auto-follows when you're at the bottom. Copy the whole log with one click. |
 | **Settings** | Turn tasks, notifications, headless mode, the scheduler, and Core features on or off. Free open-source tasks and premium Core tasks are clearly separated. |
-| **Plugins** | See every plugin listed in `plugins/plugins.jsonc` and switch each one on or off. Includes a link to the guide for building your own. |
+| **Plugins** | See, enable/disable, and install plugins — including from the community **marketplace** (verified + sandboxed). Grant a plugin **Trusted Mode** (with a warning), **Publish** your own plugin on the developer site, or open the build guide. |
 | **Core** | Before activation: what the premium Core plugin adds. After activation: an estimate of the extra points Core is earning you. |
 | **Docs** | This documentation, shown right inside the app — the same pages you're reading here. |
 
