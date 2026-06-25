@@ -4055,7 +4055,7 @@ function html() {
         btn.addEventListener('click', async function() {
           var name = btn.getAttribute('data-mkt-name');
           var ver = btn.getAttribute('data-mkt-ver');
-          if (!window.confirm('"' + name + '" is a community plugin (not the official team). It will run SANDBOXED — no file system, network, or Node APIs.\nThe bot downloads and verifies it on next start.\n\nInstall it?')) return;
+          if (!window.confirm('"' + name + '" is a community plugin (not the official team). It will run SANDBOXED — no file system, network, or Node APIs.\\nThe bot downloads and verifies it on next start.\\n\\nInstall it?')) return;
           btn.disabled = true;
           btn.textContent = 'Installing…';
           try {
