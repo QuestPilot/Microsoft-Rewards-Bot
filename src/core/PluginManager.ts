@@ -274,12 +274,14 @@ export class PluginManager {
                 root: string
                 name: string
                 requestedVersion?: string
+                autoUpdate?: boolean
+                trust?: 'full' | 'sandbox'
                 catalog: unknown
                 fetcher: MarketplaceFetcher
                 botVersion?: string
                 apiVersion?: string
                 now?: string
-            }): Promise<{ installed: boolean; reason: string; version?: string }>
+            }): Promise<{ installed: boolean; reason: string; version?: string; updateAvailable?: string }>
         }
         try {
             // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -329,6 +331,8 @@ export class PluginManager {
                     root: process.cwd(),
                     name,
                     requestedVersion: entry.version,
+                    autoUpdate: entry.autoUpdate,
+                    trust: entry.trust,
                     catalog: verification.catalog,
                     fetcher,
                     botVersion,
@@ -401,8 +405,11 @@ export class PluginManager {
     }
 
     /** Append every install attempt to .plugins-marketplace.log + surface notable outcomes. */
-    private logMarketplaceInstall(name: string, result: { installed: boolean; reason: string; version?: string }): void {
-        const line = `${new Date().toISOString()} ${name} installed=${result.installed} reason=${result.reason}${result.version ? ` version=${result.version}` : ''}\n`
+    private logMarketplaceInstall(
+        name: string,
+        result: { installed: boolean; reason: string; version?: string; updateAvailable?: string }
+    ): void {
+        const line = `${new Date().toISOString()} ${name} installed=${result.installed} reason=${result.reason}${result.version ? ` version=${result.version}` : ''}${result.updateAvailable ? ` updateAvailable=${result.updateAvailable}` : ''}\n`
         try {
             fs.appendFileSync(path.resolve(process.cwd(), '.plugins-marketplace.log'), line)
         } catch {
@@ -410,8 +417,24 @@ export class PluginManager {
         }
         if (result.installed && result.reason === 'installed') {
             this.bot.logger.info('main', 'PLUGIN-MANAGER', `Installed marketplace plugin: ${name}@${result.version}`)
+        } else if (result.installed && result.reason === 'updated') {
+            this.bot.logger.info('main', 'PLUGIN-MANAGER', `Auto-updated marketplace plugin: ${name}@${result.version}`)
+        } else if (result.reason === 'revoked' || result.reason === 'kill-switch') {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Marketplace plugin "${name}" was ${result.reason === 'kill-switch' ? 'disabled by the marketplace kill switch' : 'revoked'} — its downloaded files were removed`
+            )
         } else if (!result.installed) {
             this.bot.logger.warn('main', 'PLUGIN-MANAGER', `Marketplace plugin "${name}" not installed (${result.reason})`)
+        }
+        // A held/pinned plugin sitting on an older version than the latest approved one.
+        if (result.installed && result.updateAvailable && result.updateAvailable !== result.version) {
+            this.bot.logger.info(
+                'main',
+                'PLUGIN-MANAGER',
+                `Update available for "${name}": v${result.updateAvailable} (held — apply it from the Desk Plugins page)`
+            )
         }
     }
 

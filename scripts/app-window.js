@@ -508,7 +508,7 @@ function enrichAccountsWithVariant(accounts) {
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 // Extracted to ./desk/plugins-config.js (behavior identical).
 const { createPluginsConfig } = require('./desk/plugins-config')
-const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion } = createPluginsConfig({ root: ROOT, atomicWriteText })
+const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion, setPluginAutoUpdate } = createPluginsConfig({ root: ROOT, atomicWriteText })
 
 function atomicWriteText(filePath, content) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -1562,6 +1562,8 @@ function html() {
     .pcard-manage{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:9px}
     .pmanage-trust{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#ffae7a;cursor:pointer}
     .pmanage-trust input{accent-color:#ff8c5a}
+    .pmanage-au{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer}
+    .pmanage-au input{accent-color:var(--cyan)}
     .plink{font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px;transition:color .15s}
     .plink:hover{color:var(--text)}
     .plink.danger:hover{color:var(--rose)}
@@ -3982,7 +3984,9 @@ function html() {
         m.enabled = p.enabled;
         m.source = p.source;
         m.trust = p.trust;
-        m.installedVersion = p.version || '';
+        m.installedVersion = p.installedVersion || p.version || '';
+        m.pinned = !!p.version;
+        m.autoUpdate = p.autoUpdate;
         if (!m.description && p.description) m.description = p.description;
         byName[p.name] = m;
       });
@@ -4011,13 +4015,14 @@ function html() {
     function pluginCardHtml(p) {
       var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"></path>';
       var updatable = p.installed && p.inCatalog && p.installedVersion && p.latest && cmpVer(p.latest, p.installedVersion) > 0;
+      var held = p.installed && (p.pinned || p.autoUpdate === false || p.trust === 'full');
       var chips = '';
       if (p.installedVersion || p.version) chips += '<span class="pchip pchip-ver">v' + esc(p.installedVersion || p.version) + '</span>';
       if (p.installed) chips += '<span class="pchip pchip-installed">Installed</span>';
       else if (p.inCatalog) chips += '<span class="pchip pchip-mkt">Marketplace</span>';
       if (p.installed && p.trust === 'full') chips += '<span class="pchip pchip-trusted">Trusted</span>';
       if (p.installed && !p.enabled) chips += '<span class="pchip pchip-off">Off</span>';
-      if (updatable) chips += '<span class="pchip pchip-update">Update v' + esc(p.latest) + '</span>';
+      if (updatable) chips += '<span class="pchip pchip-update">' + (held ? 'Update v' + esc(p.latest) : 'Auto-updates to v' + esc(p.latest)) + '</span>';
       var meta = [];
       if (p.author) meta.push('by ' + esc(p.author));
       if (p.license) meta.push(esc(p.license));
@@ -4028,13 +4033,16 @@ function html() {
         actions = '<button class="pbtn pbtn-install" data-install="' + escAttr(p.name) + '" data-ver="' + escAttr(p.version) + '">Install</button>';
       } else {
         actions = '<label class="toggle"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>';
-        if (updatable) actions += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
+        if (held && updatable) actions += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
       }
 
       var manage = '';
       if (p.installed) {
         var mrow = '';
-        if (p.source === 'marketplace') mrow += '<label class="pmanage-trust"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted Mode (full access)</label>';
+        if (p.source === 'marketplace') {
+          mrow += '<label class="pmanage-trust"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted Mode (full access)</label>';
+          if (!p.pinned) mrow += '<label class="pmanage-au"><input type="checkbox" data-autoupdate="' + escAttr(p.name) + '"' + (p.autoUpdate !== false ? ' checked' : '') + '> Auto-update</label>';
+        }
         mrow += '<button class="plink danger" data-remove="' + escAttr(p.name) + '"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>';
         manage = '<div class="pcard-manage">' + mrow + '</div>';
       }
@@ -4100,6 +4108,12 @@ function html() {
             if (!window.confirm('⚠ Trusted Mode gives "' + name + '" FULL access to your computer (files, network, etc.) — it will NO LONGER be sandboxed. Only do this for a plugin you fully trust. Continue?')) { inp.checked = false; return; }
           }
           fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, trust: inp.checked ? 'full' : 'sandbox'})}).catch(function(){});
+        });
+      });
+      wrap.querySelectorAll('input[data-autoupdate]').forEach(function(inp) {
+        inp.addEventListener('change', function() {
+          var name = inp.getAttribute('data-autoupdate');
+          fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, autoUpdate: inp.checked})}).catch(function(){});
         });
       });
       wrap.querySelectorAll('button[data-install]').forEach(function(btn) {
@@ -4935,8 +4949,17 @@ const server = http.createServer((req, res) => {
         return
     }
     if (req.method === 'GET' && req.url === '/api/plugins') {
+        const list = readPluginsList()
+        // Enrich each plugin with the on-disk installed version (.installed.json) so the
+        // catalog shows accurate "update available" even for unpinned/auto-updating plugins.
+        for (const p of list) {
+            try {
+                const marker = JSON.parse(fs.readFileSync(path.join(ROOT, 'plugins', p.name, '.installed.json'), 'utf8'))
+                if (marker && typeof marker.version === 'string') p.installedVersion = marker.version
+            } catch {}
+        }
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ plugins: readPluginsList(), hasCoreLicense: state.deskLicense.tier === 'premium' }))
+        res.end(JSON.stringify({ plugins: list, hasCoreLicense: state.deskLicense.tier === 'premium' }))
         return
     }
     if (req.method === 'POST' && req.url === '/api/plugins') {
@@ -4946,6 +4969,7 @@ const server = http.createServer((req, res) => {
             try {
                 if (typeof data.enabled === 'boolean') setPluginEnabled(data.name, data.enabled)
                 else if (data.trust === 'full' || data.trust === 'sandbox') setPluginTrust(data.name, data.trust)
+                else if (typeof data.autoUpdate === 'boolean') setPluginAutoUpdate(data.name, data.autoUpdate)
                 else { res.writeHead(400); res.end(); return }
                 res.writeHead(204); res.end()
             }

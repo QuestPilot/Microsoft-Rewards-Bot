@@ -102,7 +102,7 @@ test('re-installs when the catalog version changes', async () => {
         const cat2 = { format: 'msrb-marketplace', version: 1, sequence: 2, plugins: [{ name: 'mkt', version: '2.0.0', sha256: sha2, installUrl: 'x' }], revoked: [] }
         await ensureMarketplacePlugin({ root: dir, name: 'mkt', catalog: cat1, fetcher: async () => Buffer.from(v1), botVersion: '4.5.15', apiVersion: '1.0.0' })
         const r = await ensureMarketplacePlugin({ root: dir, name: 'mkt', catalog: cat2, fetcher: async () => Buffer.from(v2), botVersion: '4.5.15', apiVersion: '1.0.0' })
-        assert.equal(r.reason, 'installed')
+        assert.equal(r.reason, 'updated')
         assert.equal(r.version, '2.0.0')
         assert.equal(fs.readFileSync(path.join(dir, 'plugins', 'mkt', 'index.js'), 'utf8'), v2)
     } finally {

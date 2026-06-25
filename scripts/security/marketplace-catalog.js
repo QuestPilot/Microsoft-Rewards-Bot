@@ -115,6 +115,33 @@ function findEntry(catalog, name, version) {
     return catalog.plugins.find(entry => entry && entry.name === name && (version === undefined || entry.version === version))
 }
 
+/** Numeric dotted version compare (lenient): 1 if a>b, -1 if a<b, 0 if equal. */
+function cmpVersion(a, b) {
+    const pa = String(a || '').split(/[.\-+]/)
+    const pb = String(b || '').split(/[.\-+]/)
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const na = parseInt(pa[i], 10)
+        const nb = parseInt(pb[i], 10)
+        if (Number.isNaN(na) && Number.isNaN(nb)) continue
+        if (Number.isNaN(na)) return -1
+        if (Number.isNaN(nb)) return 1
+        if (na > nb) return 1
+        if (na < nb) return -1
+    }
+    return 0
+}
+
+/** The highest-version catalog entry for `name` (the "latest approved"), or undefined. */
+function findLatestEntry(catalog, name) {
+    if (!catalog || !Array.isArray(catalog.plugins)) return undefined
+    let best
+    for (const entry of catalog.plugins) {
+        if (!entry || entry.name !== name) continue
+        if (!best || cmpVersion(entry.version, best.version) > 0) best = entry
+    }
+    return best
+}
+
 /**
  * True if the plugin is revoked by the signed catalog — either the global kill
  * switch is on, or a `revoked` entry matches by name(+version) or by sha256.
@@ -133,4 +160,4 @@ function isRevoked(catalog, { name, version, sha256 } = {}) {
     })
 }
 
-module.exports = { verifyMarketplaceCatalog, loadTrustedKeys, findEntry, isRevoked, FORMAT, DEFAULT_KEYS_DIR }
+module.exports = { verifyMarketplaceCatalog, loadTrustedKeys, findEntry, findLatestEntry, cmpVersion, isRevoked, FORMAT, DEFAULT_KEYS_DIR }

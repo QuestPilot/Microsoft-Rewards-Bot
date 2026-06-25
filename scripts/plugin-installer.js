@@ -15,7 +15,7 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const semver = require('semver')
-const { findEntry, isRevoked } = require('./security/marketplace-catalog')
+const { findEntry, findLatestEntry, cmpVersion, isRevoked } = require('./security/marketplace-catalog')
 
 function sha256(buffer) {
     return crypto.createHash('sha256').update(buffer).digest('hex')
@@ -51,13 +51,23 @@ function apiCompatible(required, current) {
 
 /**
  * Ensure a marketplace plugin is installed and current. Returns
- * { installed: boolean, reason, version? }. Never throws for policy rejections
- * (returns a reason); only unexpected I/O errors propagate.
+ * { installed: boolean, reason, version?, updateAvailable? }. Never throws for
+ * policy rejections (returns a reason); only unexpected I/O errors propagate.
+ *
+ * Version resolution:
+ *   - pinned (`requestedVersion`): that exact version, never auto-updated.
+ *   - unpinned + (`autoUpdate === false` OR Trusted Mode `trust === 'full'`): HELD
+ *     at the installed version — no silent update (a first install still takes the
+ *     latest). Trusted plugins are held so new full-access code is never run without
+ *     an explicit manual update.
+ *   - unpinned otherwise: the latest approved version (auto-update, default on).
  *
  * @param {object} o
  * @param {string} o.root              project root (plugins/ lives here)
  * @param {string} o.name              plugin entry name
  * @param {string} [o.requestedVersion] pin from plugins.jsonc (optional)
+ * @param {boolean} [o.autoUpdate]     false to hold an unpinned plugin (default true)
+ * @param {string} [o.trust]           'full' holds the plugin back from silent updates
  * @param {object} o.catalog           VERIFIED signed catalog object
  * @param {(url: string) => Promise<Buffer|Uint8Array|string>} o.fetcher
  * @param {string} [o.botVersion]      for botVersionRange gating
@@ -65,12 +75,44 @@ function apiCompatible(required, current) {
  * @param {string} [o.now]            timestamp string for the install marker
  */
 async function ensureMarketplacePlugin(o) {
-    const { root, name, requestedVersion, catalog, fetcher, botVersion, apiVersion, now } = o
+    const { root, name, requestedVersion, catalog, fetcher, botVersion, apiVersion, now, autoUpdate, trust } = o
 
-    const entry = findEntry(catalog, name, requestedVersion)
+    const targetDir = path.join(root, 'plugins', name)
+    const indexPath = path.join(targetDir, 'index.js')
+    const markerPath = path.join(targetDir, '.installed.json')
+
+    // Global kill switch — purge the plugin from disk and refuse.
+    if (catalog && catalog.killSwitch === true) {
+        try { fs.rmSync(targetDir, { recursive: true, force: true }) } catch {}
+        return { installed: false, reason: 'kill-switch' }
+    }
+
+    // What's installed on disk right now (drives held / update-available decisions).
+    let installedVersion
+    try { installedVersion = JSON.parse(fs.readFileSync(markerPath, 'utf8')).version } catch {}
+
+    const latest = findLatestEntry(catalog, name)
+    const held = autoUpdate === false || trust === 'full'
+
+    let entry
+    if (requestedVersion) {
+        entry = findEntry(catalog, name, requestedVersion)
+    } else if (held && installedVersion) {
+        entry = findEntry(catalog, name, installedVersion)
+        if (!entry) {
+            // Installed version is no longer published. Keep the on-disk bytes — the
+            // load-time trust gate re-verifies them against the catalog and refuses if
+            // it has been pulled; surface that a newer version exists.
+            return { installed: true, reason: 'held', version: installedVersion, updateAvailable: latest ? latest.version : undefined }
+        }
+    } else {
+        entry = latest
+    }
+
     if (!entry) return { installed: false, reason: 'not-in-catalog' }
     if (!entry.sha256) return { installed: false, reason: 'unpinned' }
     if (isRevoked(catalog, { name, version: entry.version, sha256: entry.sha256 })) {
+        try { fs.rmSync(targetDir, { recursive: true, force: true }) } catch {}
         return { installed: false, reason: 'revoked' }
     }
     if (entry.botVersionRange && botVersion && !semver.satisfies(semver.coerce(botVersion) || '0.0.0', entry.botVersionRange)) {
@@ -81,11 +123,13 @@ async function ensureMarketplacePlugin(o) {
     }
 
     const expected = String(entry.sha256).toLowerCase()
-    const targetDir = path.join(root, 'plugins', name)
-    const indexPath = path.join(targetDir, 'index.js')
-    const markerPath = path.join(targetDir, '.installed.json')
+    // Surfaced to the Desk: a newer approved version than the one we're installing
+    // (true for held / pinned plugins sitting on an older version).
+    const updateAvailable = (latest && latest.version !== entry.version && cmpVersion(latest.version, entry.version) > 0)
+        ? latest.version
+        : undefined
 
-    // Already installed at the right version + verified on disk?
+    // Already installed at the target version + verified on disk?
     if (fs.existsSync(indexPath) && fs.existsSync(markerPath)) {
         try {
             const marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'))
@@ -94,7 +138,7 @@ async function ensureMarketplacePlugin(o) {
                 String(marker.sha256).toLowerCase() === expected &&
                 sha256(fs.readFileSync(indexPath)) === expected
             ) {
-                return { installed: true, reason: 'up-to-date', version: entry.version }
+                return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
             }
         } catch {
             // fall through to reinstall
@@ -107,7 +151,7 @@ async function ensureMarketplacePlugin(o) {
         try {
             if (sha256(fs.readFileSync(indexPath)) === expected) {
                 atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, installedAt: now || null }, null, 2))
-                return { installed: true, reason: 'up-to-date', version: entry.version }
+                return { installed: true, reason: 'up-to-date', version: entry.version, updateAvailable }
             }
         } catch {
             // fall through to (re)download
@@ -122,9 +166,10 @@ async function ensureMarketplacePlugin(o) {
         return { installed: false, reason: 'sha-mismatch' }
     }
 
+    const wasUpdate = Boolean(installedVersion && installedVersion !== entry.version)
     atomicWrite(indexPath, bytes)
     atomicWrite(markerPath, JSON.stringify({ name, version: entry.version, sha256: expected, installedAt: now || null }, null, 2))
-    return { installed: true, reason: 'installed', version: entry.version }
+    return { installed: true, reason: wasUpdate ? 'updated' : 'installed', version: entry.version, updateAvailable }
 }
 
 module.exports = { ensureMarketplacePlugin, sha256, apiCompatible }

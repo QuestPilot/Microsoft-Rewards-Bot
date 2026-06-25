@@ -99,6 +99,13 @@ export interface PluginConfigEntry {
     source?: 'local' | 'marketplace'
     /** Pinned version for a marketplace plugin (matched against the signed catalog). */
     version?: string
+    /**
+     * Auto-update policy for an UNPINNED marketplace plugin. Default (omitted/true):
+     * the bot installs the latest approved version on each start. `false` holds it at
+     * the installed version. A pinned `version` always wins (never auto-updates), and
+     * Trusted-Mode (`trust: 'full'`) plugins are held back regardless (manual update only).
+     */
+    autoUpdate?: boolean
 }
 
 export interface PluginDiagnostic {
