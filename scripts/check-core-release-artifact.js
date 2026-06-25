@@ -7,7 +7,6 @@ const CORE_DIR = path.join(ROOT, 'plugins', 'core')
 const OFFICIAL_CORE_PATH = path.join(ROOT, 'plugins', 'official-core.json')
 const OFFICIAL_CORE_SIGNATURE_PATH = path.join(ROOT, 'plugins', 'official-core.sig')
 const CORE_PUBLIC_KEY_PATH = path.join(ROOT, 'scripts', 'security', 'core-public-key.pem')
-const CATALOG_PATH = path.join(ROOT, 'plugins', 'catalog.json')
 const CORE_API_POLICY_PATH = path.resolve(ROOT, '..', 'Core-API', 'config', 'core-version-policy.json')
 
 const FORBIDDEN_EXTENSIONS = new Set(['.ts', '.tsx', '.map', '.env', '.pem', '.key'])
@@ -140,13 +139,10 @@ function main() {
         fail('plugins/official-core.json signature verification failed')
     }
     const officialCore = JSON.parse(manifestPayload.toString('utf8'))
-    const catalog = readJson(CATALOG_PATH)
-    const catalogCore = Array.isArray(catalog.plugins) ? catalog.plugins.find(plugin => plugin.name === 'core') : null
     const targets = officialCore.targets || corePackage.msrb?.targets || null
     const coreVersion = corePackage.version
 
     assertSameVersion('plugins/official-core.json', officialCore.version, coreVersion)
-    assertSameVersion('plugins/catalog.json core', catalogCore?.version, coreVersion)
 
     if (fs.existsSync(CORE_API_POLICY_PATH)) {
         const policy = readJson(CORE_API_POLICY_PATH)
@@ -161,14 +157,9 @@ function main() {
     }
 
     if (targets && typeof targets === 'object') {
-        if (!catalogCore?.targets || typeof catalogCore.targets !== 'object') {
-            fail('plugins/catalog.json core targets metadata is missing')
-        }
         const packageTargets = corePackage.msrb?.targets || {}
-        const catalogTargets = catalogCore?.targets || {}
         assertTargetSet('plugins/official-core.json', officialCore.targets)
         assertTargetSet('plugins/core/package.json', packageTargets)
-        assertTargetSet('plugins/catalog.json', catalogTargets)
         for (const [targetId, target] of Object.entries(targets)) {
             const indexJsc = path.join(CORE_DIR, 'targets', targetId, 'index.jsc')
             if (!fs.existsSync(indexJsc)) {
@@ -177,7 +168,6 @@ function main() {
             }
             assertTargetMetadata(targetId, target, 'plugins/official-core.json')
             assertTargetMetadata(targetId, packageTargets[targetId] || {}, 'plugins/core/package.json')
-            assertTargetMetadata(targetId, catalogTargets[targetId] || {}, 'plugins/catalog.json')
             assertNoForbiddenBytecodeMarkers(indexJsc, `plugins/core/targets/${targetId}/index.jsc`)
             const actualHash = sha256(indexJsc)
             if (target.indexSha256 !== actualHash) {
@@ -185,9 +175,6 @@ function main() {
             }
             if (packageTargets[targetId]?.indexSha256 !== actualHash) {
                 fail(`plugins/core/package.json ${targetId} indexSha256 does not match the target bytecode`)
-            }
-            if (catalogTargets[targetId]?.indexSha256 !== actualHash) {
-                fail(`plugins/catalog.json ${targetId} indexSha256 does not match the target bytecode`)
             }
             if (!target.bytecodeTarget?.node || !target.bytecodeTarget?.platform || !target.bytecodeTarget?.arch) {
                 fail(`plugins/official-core.json ${targetId} bytecodeTarget metadata is incomplete`)
@@ -200,9 +187,6 @@ function main() {
         }
         if (packageTargets[DARWIN_COMPAT_TARGET]?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
             fail(`plugins/core/package.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
-        }
-        if (catalogTargets[DARWIN_COMPAT_TARGET]?.compatibleArtifactSource !== DARWIN_COMPAT_SOURCE) {
-            fail(`plugins/catalog.json ${DARWIN_COMPAT_TARGET} must declare ${DARWIN_COMPAT_SOURCE} as its compatibility source`)
         }
         if (darwinTarget?.indexSha256 !== linuxSource?.indexSha256) {
             fail(`macOS compatibility target must remain byte-for-byte identical to ${DARWIN_COMPAT_SOURCE}`)
@@ -223,9 +207,6 @@ function main() {
         }
         if (corePackage.msrb?.indexSha256 !== actualHash) {
             fail('plugins/core/package.json msrb.indexSha256 does not match plugins/core/index.jsc')
-        }
-        if (catalogCore?.sha256 !== actualHash) {
-            fail('plugins/catalog.json core sha256 does not match plugins/core/index.jsc')
         }
 
         const target = officialCore.bytecodeTarget || corePackage.msrb?.bytecodeTarget

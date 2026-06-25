@@ -74,7 +74,7 @@ Open **Rewards Desk** (it launches automatically on `npm start`) and go to the *
 - **Publish a plugin** — opens the developer site where you sign in with Discord (no Core license needed) and upload your own plugin
 - jump to the guide for building your own plugin
 
-You can also edit `plugins/plugins.jsonc` by hand if you prefer. The bot still verifies the Core bytecode checksum against `plugins/official-core.json` and any catalog checksums in `plugins/catalog.json` at startup.
+You can also edit `plugins/plugins.jsonc` by hand if you prefer. The bot still verifies the Core bytecode checksum against `plugins/official-core.json` at startup, and every marketplace plugin against the signed `plugins/marketplace.json` catalog.
 
 ## How to Learn More
 

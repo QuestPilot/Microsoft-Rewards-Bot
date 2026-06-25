@@ -463,13 +463,13 @@ test('applying release preserves user files and removes obsolete managed files',
     fs.writeFileSync(path.join(root, 'src', 'accounts.enc.json'), '{"encrypted":"user-data"}')
     fs.writeFileSync(path.join(root, 'src', 'old.ts'), 'old')
     fs.writeFileSync(path.join(root, 'plugins', 'plugins.jsonc'), '{"core":{"enabled":true}}')
+    fs.writeFileSync(path.join(root, 'plugins', 'catalog.json'), '{"plugins":[]}')
     fs.mkdirSync(path.join(root, 'sessions'), { recursive: true })
     fs.writeFileSync(path.join(root, 'sessions', 'keep.txt'), 'session')
 
     fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ version: '2.0.0' }))
     fs.writeFileSync(path.join(source, 'src', 'new.ts'), 'new')
     fs.writeFileSync(path.join(source, 'src', 'config.example.json'), '{}')
-    fs.writeFileSync(path.join(source, 'plugins', 'catalog.json'), '{"plugins":[]}')
 
     const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
     updater.applyFromSourceRoot(source, backup)
@@ -479,6 +479,7 @@ test('applying release preserves user files and removes obsolete managed files',
     assert.equal(fs.readFileSync(path.join(root, 'plugins', 'plugins.jsonc'), 'utf8'), '{"core":{"enabled":true}}')
     assert.equal(fs.readFileSync(path.join(root, 'sessions', 'keep.txt'), 'utf8'), 'session')
     assert.equal(fs.existsSync(path.join(root, 'src', 'old.ts')), false)
+    assert.equal(fs.existsSync(path.join(root, 'plugins', 'catalog.json')), false, 'obsolete plugins/catalog.json must be removed on update')
     assert.equal(fs.readFileSync(path.join(root, 'src', 'new.ts'), 'utf8'), 'new')
 })
 

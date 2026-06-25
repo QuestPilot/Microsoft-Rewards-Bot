@@ -105,17 +105,13 @@ function actionForUpdateResult(result) {
     return 'Review updater output above.'
 }
 
-function verifyCoreArtifact(officialCore, catalog) {
+function verifyCoreArtifact(officialCore) {
     verifySignedBytes(
         fs.readFileSync(path.join(ROOT, 'plugins', 'official-core.json')),
         fs.readFileSync(path.join(ROOT, 'plugins', 'official-core.sig'), 'utf8'),
         readPublicKey(path.join(ROOT, 'scripts', 'security', 'core-public-key.pem'))
     )
-    const catalogCore = catalog.plugins.find(plugin => plugin.name === 'core')
     if (officialCore.targets) {
-        if (!catalogCore?.targets) {
-            throw new Error('plugins/catalog.json core targets metadata is missing')
-        }
         for (const [targetId, target] of Object.entries(officialCore.targets)) {
             const relativePath = `plugins/core/targets/${targetId}/index.jsc`
             const coreHash = sha256(relativePath)
@@ -123,9 +119,6 @@ function verifyCoreArtifact(officialCore, catalog) {
             console.log(`[UPDATE-DOCTOR] actual Core ${targetId}: ${coreHash}`)
             if (target.indexSha256 !== coreHash) {
                 throw new Error(`plugins/official-core.json does not match ${relativePath}`)
-            }
-            if (catalogCore.targets[targetId]?.indexSha256 !== coreHash) {
-                throw new Error(`plugins/catalog.json does not match ${relativePath}`)
             }
         }
         return
@@ -138,15 +131,11 @@ function verifyCoreArtifact(officialCore, catalog) {
     if (officialCore.indexSha256 !== coreHash) {
         throw new Error('plugins/official-core.json does not match plugins/core/index.jsc')
     }
-    if (catalogCore?.sha256 !== coreHash) {
-        throw new Error('plugins/catalog.json does not match plugins/core/index.jsc')
-    }
 }
 
 async function main() {
     const packageJson = readJson('package.json')
     const officialCore = readJson('plugins/official-core.json')
-    const catalog = readJson('plugins/catalog.json')
     const corePackage = readOptionalJson('plugins/core/package.json')
     const pluginConfig = readPluginConfig()
     const updater = new UpdateManager({ root: ROOT })
@@ -169,7 +158,7 @@ async function main() {
     )
 
     try {
-        verifyCoreArtifact(officialCore, catalog)
+        verifyCoreArtifact(officialCore)
     } catch (error) {
         console.error(`[UPDATE-DOCTOR] Core artifact check failed: ${error.message}`)
         process.exitCode = 1

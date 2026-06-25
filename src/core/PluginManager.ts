@@ -43,13 +43,6 @@ interface OfficialCoreTarget {
     }
 }
 
-interface PluginCatalog {
-    plugins?: Array<{
-        name?: string
-        sha256?: string
-    }>
-}
-
 interface PluginPackageManifest {
     engines?: {
         node?: string
@@ -589,9 +582,6 @@ export class PluginManager {
         // Verify the official Core plugin BEFORE loading its bytecode
         const isOfficialCore = this.isVerifiedOfficialCore(entryName, filePath)
 
-        // Enforce the catalog.json sha256 for third-party plugins (fail closed on mismatch)
-        if (!isOfficialCore) this.assertCatalogHash(entryName, filePath)
-
         // A marketplace plugin is ALWAYS vouched for by the signed catalog (signature +
         // pinned sha256 + not revoked + not stale) — whether it runs sandboxed OR was
         // locally elevated to Trusted Mode. Trusted Mode skips the sandbox, so verifying
@@ -908,28 +898,6 @@ export class PluginManager {
         }
 
         return true
-    }
-
-    /**
-     * Enforce the catalog.json sha256 pin for non-official (third-party) plugins.
-     * Fails closed: if the catalog entry has a sha256 that does not match the file,
-     * this throws and the plugin is skipped by the caller's catch. If the plugin is
-     * absent from the catalog or has no sha256, this is permissive (local/dev plugins).
-     */
-    private assertCatalogHash(entryName: string, filePath: string): void {
-        const catalogPath = path.resolve(process.cwd(), 'plugins', 'catalog.json')
-        const catalog = this.readJsonFile<PluginCatalog>(catalogPath)
-        const entry = catalog?.plugins?.find(plugin => plugin?.name === entryName)
-        const expected = entry?.sha256
-        if (!expected) {
-            // Not catalogued or no pinned hash — treat as a local/dev plugin (permissive).
-            return
-        }
-
-        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
-        if (fileHash.toLowerCase() !== expected.toLowerCase()) {
-            throw new Error(`Plugin "${entryName}" checksum mismatch against plugins/catalog.json`)
-        }
     }
 
     private assertBytecodeTarget(entryName: string, filePath: string): void {
