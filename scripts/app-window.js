@@ -4168,7 +4168,7 @@ function html() {
       var txt = _consoleLogs.map(function(l) {
         var ts = new Date(l.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
         return '[' + ts + '] ' + l.message;
-      }).join('\n');
+      }).join('\\n');
       navigator.clipboard.writeText(txt).then(function(){
         var b = G('console-copy'); var o = b.textContent; b.textContent = 'Copied ✓';
         setTimeout(function(){ b.textContent = o; }, 1400);
