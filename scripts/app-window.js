@@ -2886,18 +2886,21 @@ function html() {
     var PLUGIN_DOC_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/main/docs/create-plugin.md';
     var DOCS_GITHUB_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/main/docs';
 
-    var _ctxMenu = G('ctx-menu');
+    var _ctxMenu = null;
     document.addEventListener('contextmenu', function(e) {
       if (e.target && e.target.closest && e.target.closest('#console-box')) return;
       e.preventDefault();
+      if (!_ctxMenu) _ctxMenu = G('ctx-menu');
+      if (!_ctxMenu) return;
       _ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 210) + 'px';
       _ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 60) + 'px';
       _ctxMenu.classList.add('open');
     });
-    document.addEventListener('click', function() { _ctxMenu.classList.remove('open'); });
-    G('ctx-open-folder').addEventListener('click', function() {
-      _ctxMenu.classList.remove('open');
-      fetch('/api/open-folder', {method:'POST'}).catch(function(){});
+    document.addEventListener('click', function(e) {
+      if (_ctxMenu) _ctxMenu.classList.remove('open');
+      if (e.target && e.target.closest && e.target.closest('#ctx-open-folder')) {
+        fetch('/api/open-folder', {method:'POST'}).catch(function(){});
+      }
     });
     document.addEventListener('dragstart', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
