@@ -22,8 +22,8 @@ const source = (() => {
 
 test('app window runs as a desktop-style launcher instead of the old browser page', () => {
     assert.match(source, /--app=\$\{url\}/)
-    assert.match(source, /APP_WINDOW_WIDTH = 1500/)
-    assert.match(source, /APP_WINDOW_HEIGHT = 900/)
+    assert.match(source, /APP_WINDOW_WIDTH = 1600/)
+    assert.match(source, /APP_WINDOW_HEIGHT = 950/)
     assert.match(source, /--window-size=/)
     assert.match(source, /windowsHide:\s*true/)
     assert.match(source, /assets', 'logo\.png'/)

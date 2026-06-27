@@ -15,7 +15,9 @@ import PageController from './automation/PageController'
 import { loadAccounts, loadConfig } from './helpers/ConfigLoader'
 import { runDataCleanup } from './helpers/DataManager'
 import Helpers from './helpers/Helpers'
-import { recordAccountRun, recordRunComplete, recordAccountBan, readAccountSummary } from './helpers/StatsRecorder'
+import { readAccountSummary, recordAccountBan, recordAccountRun, recordRunComplete } from './helpers/StatsRecorder'
+import { AvatarFetcher } from './helpers/AvatarFetcher'
+
 import { getPackageMetadata } from './helpers/PackageMetadata'
 import { checkNodeVersion } from './helpers/SchemaValidator'
 import { IpcLog, LogService } from './notifications/LogService'
@@ -141,7 +143,13 @@ export class MicrosoftRewardsBot {
     public config
     public utils: Helpers
     public activities: ActivityRunner = new ActivityRunner(this)
-    public pluginManager: PluginManager = new PluginManager(this)
+    public pluginManager: PluginManager = new PluginManager(this, {
+        // Real runs pull the signed catalog from production by default so a published
+        // plugin reaches the bot automatically (no env var needed). Overridable for
+        // local/staging via MSRB_MARKETPLACE_CATALOG_URL. Tests construct their own
+        // PluginManager without this, so they stay offline.
+        marketplaceCatalogUrl: process.env.MSRB_MARKETPLACE_CATALOG_URL || 'https://bot.lgtw.tf/api/marketplace/catalog'
+    })
     public browser: { func: PageController; utils: AutomationUtils }
 
     public mainMobilePage!: Page
@@ -1061,6 +1069,10 @@ export class MicrosoftRewardsBot {
                 this.fingerprint = mobileSession.fingerprint
 
                 this.userData.starBonus = undefined
+                
+                // Fetch profile avatar in the background
+                AvatarFetcher.fetchAvatarIfNeeded(initialContext, account).catch(() => {})
+
                 const data: DashboardData = await this.browser.func.getDashboardData()
                 const appData: AppDashboardData = await this.browser.func.getAppDashboardData()
 
@@ -1296,7 +1308,8 @@ async function main(): Promise<void> {
     console.log(' |  _ <  __/\\ V  V / (_| | | | (_| \\__ \\ | |_) | (_) | |_ ')
     console.log(' |_| \\_\\___| \\_/\\_/ \\__,_|_|  \\__,_|___/ |____/ \\___/ \\__|')
     console.log('\x1b[0m') // Reset color
-    console.log(`\x1b[2m v${pkg.version} - Open Source Edition\x1b[0m\n`)
+    console.log(`\x1b[2m v${pkg.version} - Open Source Edition\x1b[0m`)
+    console.log(`\x1b[33m ⭐ Support us with a Star on GitHub: \x1b[0m\x1b[36mhttps://github.com/QuestPilot/Microsoft-Rewards-Bot\x1b[0m\n`)
 
     // Check before doing anything
     checkNodeVersion()
