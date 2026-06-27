@@ -30,6 +30,50 @@ function readVersion() {
 }
 const APP_VERSION = readVersion()
 
+// Reads the bot's locally-recorded stats (written by StatsRecorder to data/stats/)
+// so the Desk can show REAL collected numbers instead of estimates. All best-effort:
+// missing files just yield zeros + hasData:false.
+function readBotStats() {
+    const statsDir = path.join(ROOT, 'data', 'stats')
+    const out = {
+        hasData: false, totalPoints: 0, totalRuns: 0, totalAccountRuns: 0, successfulAccountRuns: 0,
+        successRate: null, claimedPoints: 0, couponsApplied: 0, couponPointsSaved: 0,
+        last7Points: 0, last30Points: 0, firstRunAt: null, lastRunAt: null, accountsTracked: 0
+    }
+    try {
+        const g = JSON.parse(fs.readFileSync(path.join(statsDir, 'global.json'), 'utf8'))
+        out.hasData = true
+        out.totalPoints = g.totalPointsCollected || 0
+        out.totalRuns = g.totalRuns || 0
+        out.totalAccountRuns = g.totalAccountRuns || 0
+        out.successfulAccountRuns = g.totalSuccessfulAccountRuns || 0
+        out.successRate = out.totalAccountRuns > 0 ? Math.round((out.successfulAccountRuns / out.totalAccountRuns) * 100) : null
+        out.claimedPoints = g.totalClaimedPoints || 0
+        out.couponsApplied = g.totalCouponsApplied || 0
+        out.couponPointsSaved = g.totalCouponPointsSaved || 0
+        out.firstRunAt = g.firstRunAt || null
+        out.lastRunAt = g.lastRunAt || null
+    } catch { /* no global stats yet */ }
+    try {
+        const dailyDir = path.join(statsDir, 'daily')
+        const now = Date.now()
+        for (const f of fs.readdirSync(dailyDir)) {
+            if (!f.endsWith('.json')) continue
+            const t = Date.parse(f.slice(0, -5))
+            if (Number.isNaN(t)) continue
+            const ageDays = (now - t) / 86400000
+            let pts = 0
+            try { pts = JSON.parse(fs.readFileSync(path.join(dailyDir, f), 'utf8')).totalPointsCollected || 0 } catch {}
+            if (ageDays <= 7) out.last7Points += pts
+            if (ageDays <= 30) out.last30Points += pts
+        }
+    } catch { /* no daily stats yet */ }
+    try {
+        out.accountsTracked = fs.readdirSync(path.join(statsDir, 'accounts')).filter(f => f.endsWith('.json')).length
+    } catch { /* no per-account stats yet */ }
+    return out
+}
+
 // ─── TEMPORARY: announcement notice (disposable) ──────────────────────────
 // A one-time notice shown once in the Desk, then never again. The dismissal is
 // persisted server-side (NOTICE_STORE) on purpose: the Desk window now uses a
@@ -1669,6 +1713,17 @@ function html() {
     .core-active-title{font-size:2rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
     .core-active-title span{color:var(--green)}
     .core-active-sub{font-size:13.5px;color:var(--muted);max-width:560px;line-height:1.6}
+    .core-real-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px 22px}
+    .core-real-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px}
+    .core-real-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text)}
+    .core-real-since{font-size:11.5px;color:var(--muted)}
+    .core-real-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .core-real-stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:13px 14px}
+    .core-real-val{font-size:1.5rem;font-weight:800;color:var(--text);line-height:1.1;letter-spacing:-.5px}
+    .core-real-stat:first-child .core-real-val{color:var(--gold)}
+    .core-real-lbl{font-size:11px;color:var(--muted);margin-top:3px}
+    .core-real-empty{color:var(--muted);font-size:13px;padding:10px 2px 2px;line-height:1.5}
+    @media (max-width:560px){.core-real-grid{grid-template-columns:repeat(2,1fr)}}
     .core-est-card{
       background:linear-gradient(135deg,rgba(247,200,92,.1),rgba(247,200,92,.03));
       border:1px solid rgba(247,200,92,.28);border-radius:16px;padding:26px 30px;
@@ -2123,6 +2178,21 @@ function html() {
             <div class="core-expiry-sub">Renew before <span id="core-expiry-date">—</span> to keep your streak protected &amp; all features active</div>
           </div>
           <button class="core-expiry-btn" onclick="window.open('https://discord.gg/JWhCkhSYtg')">Renew on Discord →</button>
+        </div>
+        <div class="core-real-card" id="core-real-card">
+          <div class="core-real-head">
+            <div class="core-real-title">Your actual results</div>
+            <div class="core-real-since" id="cr-since"></div>
+          </div>
+          <div class="core-real-grid">
+            <div class="core-real-stat"><div class="core-real-val" id="cr-points">—</div><div class="core-real-lbl">Points collected</div></div>
+            <div class="core-real-stat"><div class="core-real-val" id="cr-7d">—</div><div class="core-real-lbl">Last 7 days</div></div>
+            <div class="core-real-stat"><div class="core-real-val" id="cr-runs">—</div><div class="core-real-lbl">Runs completed</div></div>
+            <div class="core-real-stat"><div class="core-real-val" id="cr-success">—</div><div class="core-real-lbl">Account success</div></div>
+            <div class="core-real-stat"><div class="core-real-val" id="cr-claimed">—</div><div class="core-real-lbl">Claimed points</div></div>
+            <div class="core-real-stat"><div class="core-real-val" id="cr-coupons">—</div><div class="core-real-lbl">Coupons applied</div></div>
+          </div>
+          <div class="core-real-empty" id="cr-empty" style="display:none">No runs recorded yet — run the bot once and your real numbers will appear here.</div>
         </div>
         <div class="core-est-card">
           <div class="core-est-label">Estimated extra points / month</div>
@@ -3898,12 +3968,36 @@ function html() {
       streakProtection: { pts: 320, name: 'Streak protection',   d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
       temporaryPunchcards:{pts:240, name: 'Temporary punchcards',d: 'M12 2 15 8l7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z' }
     };
+    async function loadCoreRealStats() {
+      var card = G('core-real-card'); if (!card) return;
+      var s; try { s = await fetch('/api/stats').then(function(r){return r.json();}); } catch(e) { return; }
+      var empty = G('cr-empty'), grid = card.querySelector('.core-real-grid');
+      if (!s || !s.hasData || !s.totalRuns) {
+        if (empty) empty.style.display = 'block';
+        if (grid) grid.style.display = 'none';
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+      if (grid) grid.style.display = '';
+      function fmt(n){ return (n == null ? 0 : n).toLocaleString(); }
+      function setTxt(id, v){ var el = G(id); if (el) el.textContent = v; }
+      setTxt('cr-points', '+' + fmt(s.totalPoints));
+      setTxt('cr-7d', '+' + fmt(s.last7Points));
+      setTxt('cr-runs', fmt(s.totalRuns));
+      setTxt('cr-success', s.successRate == null ? '—' : s.successRate + '%');
+      setTxt('cr-claimed', '+' + fmt(s.claimedPoints));
+      setTxt('cr-coupons', fmt(s.couponsApplied));
+      var since = G('cr-since');
+      if (since && s.firstRunAt) { try { since.textContent = 'since ' + new Date(s.firstRunAt).toLocaleDateString(); } catch(e) {} }
+    }
+
     async function renderCoreView() {
       var active = _coreData && _coreData.tier === 'premium';
       var mk = G('core-view-market'), ac = G('core-view-active');
       if (mk) mk.style.display = active ? 'none' : 'flex';
       if (ac) ac.style.display = active ? 'flex' : 'none';
       if (!active) return;
+      void loadCoreRealStats();
       var settings = {}, accounts = 1, acctList = [];
       try { settings = await fetch('/api/settings').then(function(r){return r.json();}); } catch(e) {}
       try { var st = await fetch('/api/state').then(function(r){return r.json();}); acctList = (st.accounts||[]).filter(function(a){return a.enabled!==false;}); accounts = Math.max(1, acctList.length || 1); } catch(e) {}
@@ -4860,6 +4954,10 @@ const server = http.createServer((req, res) => {
             webhook: cfg.webhook || {},
             hasCoreLicense: state.deskLicense.tier === 'premium'
         }))
+        return
+    }
+    if (req.method === 'GET' && req.url === '/api/stats') {
+        jsonResponse(res, 200, readBotStats())
         return
     }
     if (req.method === 'GET' && req.url === '/api/startup') {
