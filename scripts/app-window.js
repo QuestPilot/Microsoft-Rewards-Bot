@@ -956,18 +956,18 @@ function html() {
     .star-banner-btn { flex-shrink:0; padding: 8px clamp(12px,1.2vw,20px); border-radius: 100px; background: rgba(247,200,92,0.15); color: var(--gold); font-size: clamp(11.5px,.88vw,13.5px); font-weight: 600; border: 1px solid rgba(247,200,92,0.3); transition: background 0.2s; pointer-events: none; }
     .star-banner:hover .star-banner-btn { background: rgba(247,200,92,0.25); }
     .info-banner{
-      display:flex;align-items:center;gap:13px;padding:clamp(10px,1.2vh,16px) clamp(14px,1.6vw,22px);
-      border-radius:14px;border:1px solid rgba(46,232,255,.18);
-      background:rgba(10,30,50,.55);backdrop-filter:blur(18px);
+      display:flex;align-items:center;gap:10px;padding:clamp(6px,.75vh,9px) clamp(12px,1.3vw,16px);
+      border-radius:11px;border:1px solid rgba(46,232,255,.15);
+      background:rgba(10,30,50,.5);backdrop-filter:blur(18px);
       cursor:pointer;transition:border-color .2s,background .2s;
     }
-    .info-banner:hover{background:rgba(14,38,62,.65);border-color:rgba(46,232,255,.32)}
-    .info-banner-icon{width:36px;height:36px;border-radius:10px;background:rgba(46,232,255,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .info-banner-icon svg{width:18px;height:18px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .info-banner:hover{background:rgba(14,38,62,.6);border-color:rgba(46,232,255,.28)}
+    .info-banner-icon{width:26px;height:26px;border-radius:7px;background:rgba(46,232,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .info-banner-icon svg{width:13px;height:13px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .info-banner-text{flex:1;min-width:0}
-    .info-banner-title{font-size:clamp(12px,.95vw,13.5px);font-weight:700;color:var(--text)}
-    .info-banner-sub{font-size:clamp(11px,.85vw,12.5px);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .info-banner-arrow{color:var(--muted);font-size:14px;flex-shrink:0}
+    .info-banner-title{font-size:clamp(11px,.88vw,12.5px);font-weight:700;color:var(--text)}
+    .info-banner-sub{font-size:clamp(10px,.78vw,11.5px);color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .info-banner-arrow{color:var(--muted);font-size:13px;flex-shrink:0}
     .ctx-menu{
       position:fixed;z-index:9000;min-width:190px;padding:5px;
       background:rgba(10,20,36,.92);backdrop-filter:blur(22px);
@@ -1007,12 +1007,12 @@ function html() {
 
     /* Points card */
     .pts-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3px}
-    .pts-val{font-size:44px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px}
-    .pts-label{font-size:12px;color:var(--muted);margin-top:3px}
-    .mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+    .pts-val{font-size:36px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px}
+    .pts-label{font-size:11px;color:var(--muted);margin-top:3px}
+    .mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
     .mini{
       background:rgba(255,255,255,.035);border:1px solid var(--border);
-      border-radius:10px;padding:11px 9px;text-align:center;
+      border-radius:9px;padding:8px 7px;text-align:center;
     }
     .mini-val{font-size:12px;font-weight:800;transition:color .3s}
     .mini-lbl{font-size:10px;color:var(--muted);margin-top:3px}
@@ -1037,7 +1037,7 @@ function html() {
     .acc-info{flex:1;min-width:0}
     .acc-email{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .acc-st{font-size:11px;color:var(--muted);margin-top:1px}
-    .acc-pts-badge{font-size:11px;font-weight:700;color:var(--gold);background:rgba(247,200,92,.1);border:1px solid rgba(247,200,92,.2);border-radius:6px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
+    .acc-pts-badge{font-size:11px;font-weight:700;color:var(--green);background:rgba(47,210,125,.1);border:1px solid rgba(47,210,125,.2);border-radius:6px;padding:1px 6px;flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:center;gap:2px}
     .acc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
     .dot-ready{background:var(--muted)}
     .dot-run{background:var(--blue);animation:pulse 1.3s infinite}
@@ -1458,7 +1458,7 @@ function html() {
     .modal-pw-toggle svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .acc-modal{width:min(560px,96vw);max-height:92vh;overflow-y:auto;background:none;border:none;padding:0;border-radius:24px}
     .acc-modal-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-    .acc-modal-avatar{width:46px;height:46px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#04101e;background:linear-gradient(145deg,var(--blue),var(--cyan));box-shadow:0 8px 22px rgba(30,155,255,.28)}
+    .acc-modal-avatar{width:46px;height:46px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#04101e;background:linear-gradient(145deg,var(--blue),var(--cyan));box-shadow:0 8px 22px rgba(30,155,255,.28);overflow:hidden}
     .acc-modal-head h2{font-size:20px;font-weight:800;margin:0}
     .acc-modal-sub{font-size:12.5px;color:var(--muted);margin:2px 0 0}
     .lbl-opt{opacity:.55;font-weight:400;text-transform:none;letter-spacing:0}
@@ -2528,7 +2528,7 @@ function html() {
     </div>
 
   <!-- Dedicated Account Edit Page -->
-  <div class="view-full" id="view-accedit" style="display:flex;flex-direction:column;overflow:hidden">
+  <div class="view-full" id="view-accedit">
     <!-- Page header -->
     <div style="display:flex;align-items:center;gap:14px;padding:clamp(12px,1.5vh,18px) clamp(18px,2vw,30px);border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;background:rgba(4,10,20,.5)">
       <button id="acc-modal-cancel" class="btn-icon" title="Back to Accounts">
@@ -3147,7 +3147,7 @@ function html() {
         var isActive = active && a.email && a.email.indexOf(active.slice(0,5)) === 0;
         var disabled = !a.enabled;
         var pts = ptsMap && a.email ? ptsMap[a.email] : 0;
-        var badge = pts > 0 ? '<span class="acc-pts-badge">+' + pts.toLocaleString() + '</span>' : '';
+        var badge = pts > 0 ? '<span class="acc-pts-badge"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>+' + pts.toLocaleString() + '</span>' : '';
         return '<div class="acc-row' + (isActive?' is-active':'') + (disabled?' is-disabled':'') + '">' +
           '<div class="acc-avatar"><img src="/avatars/' + encodeURIComponent(a.email||'') + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block"></div>' +
           '<div class="acc-info"><div class="acc-email">' + esc(a.email||'') + '</div>' +
@@ -3483,7 +3483,7 @@ function html() {
             metaInfo += '<span title="Geo locale" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.07);color:#9aa3b2">' + esc(String(a.geoLocale).toUpperCase()) + '</span>';
           }
           var accPts = _accPtsMap[maskEmailClient(a.email || '')] || 0;
-          var ptsBadge = accPts > 0 ? '<span class="acc-pts-badge">+' + accPts.toLocaleString() + '</span>' : '';
+          var ptsBadge = accPts > 0 ? '<span class="acc-pts-badge"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>+' + accPts.toLocaleString() + '</span>' : '';
 
           return '<div class="' + rowClass + '" data-email="' + esc(a.email||'') + '">' +
             '<div class="acc-avatar' + (isRunning ? ' running' : '') + '"><img src="/avatars/' + encodeURIComponent(a.email||'') + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block"></div>' +
@@ -3672,8 +3672,13 @@ function html() {
       G('acc-fp-mobile').checked = !!fp.mobile;
       G('acc-dashboard-mode').value = a.dashboardMode || 'auto';
       var av = G('acc-modal-avatar');
-      var ini = String(a.email || '').split('@')[0].slice(0,2).toUpperCase();
-      if (av) av.textContent = ini || '+';
+      if (av) {
+        if (a.email) {
+          av.innerHTML = '<img src="/avatars/' + encodeURIComponent(a.email) + '" style="width:100%;height:100%;object-fit:cover;display:block">';
+        } else {
+          av.textContent = '+';
+        }
+      }
       var adv = document.querySelector('.acc-adv');
       if (adv) adv.open = false;
       G('acc-modal-msg').textContent = '';
