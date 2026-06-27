@@ -19,6 +19,14 @@ test('public example config starts with user-friendly Core-ready workers enabled
     assert.equal(Object.hasOwn(config, 'redeemGoal'), false)
     assert.equal(Object.hasOwn(config, 'safetyAdvisory'), false)
     assert.equal(config.terminal.enabled, false)
+
+    // Analytics must be enabled by default (opt-out, not opt-in)
+    assert.equal(config.analytics.enabled, true)
+
+    // Personal Discord report webhooks have been replaced by analytics — must not exist
+    assert.equal(Object.hasOwn(config.webhook, 'autoReport'), false)
+    assert.equal(Object.hasOwn(config.webhook, 'runSummary'), false)
+    assert.equal(Object.hasOwn(config.webhook, 'errorReporting'), false)
 })
 
 test('open-source premium fallbacks show concise Core hints', () => {

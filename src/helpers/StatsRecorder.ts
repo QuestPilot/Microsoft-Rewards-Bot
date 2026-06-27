@@ -76,6 +76,9 @@ interface AccountFile {
     totalClaimedPoints: number
     totalCouponsApplied: number
     lastKnownPoints: number
+    banned?: boolean
+    bannedAt?: string
+    banReason?: string
     history: AccountHistoryEntry[]
 }
 
@@ -86,6 +89,7 @@ function globalStatsPath(): string { return path.join(statsRoot(), 'global.json'
 function dailyStatsPath(date: string): string { return path.join(statsRoot(), 'daily', `${date}.json`) }
 function accountFilePath(key: string): string { return path.join(statsRoot(), 'accounts', `${key}.json`) }
 function searchesPath(date: string): string { return path.join(statsRoot(), 'searches', `${date}.jsonl`) }
+function bansPath(date: string): string { return path.join(statsRoot(), 'bans', `${date}.jsonl`) }
 
 function toEmailKey(email: string): string {
     return crypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 16)
@@ -232,7 +236,90 @@ export async function recordSearchQuery(
     }
 }
 
+export interface AccountBanInput {
+    email: string
+    /** Detection reason, e.g. 'service_abuse'. */
+    reason: string
+    isMobile: boolean
+    hasProxy: boolean
+    hasCore: boolean
+    /** Optional redacted extra detail (never raw secrets). */
+    detail?: string
+}
+
+/**
+ * Records an account ban/lock: appends to today's ban log and marks the
+ * per-account file as banned. Fire-and-forget — never throws.
+ */
+export async function recordAccountBan(input: AccountBanInput): Promise<void> {
+    try {
+        const date = todayDateString()
+        const filePath = bansPath(date)
+        await fs.mkdir(path.dirname(filePath), { recursive: true })
+        const key = toEmailKey(input.email)
+        const line = JSON.stringify({
+            bannedAt: new Date().toISOString(),
+            emailKey: key,
+            maskedEmail: maskEmail(input.email),
+            reason: input.reason,
+            device: input.isMobile ? 'mobile' : 'desktop',
+            hasProxy: input.hasProxy,
+            hasCore: input.hasCore,
+            ...(input.detail ? { detail: input.detail } : {})
+        })
+        await fs.appendFile(filePath, `${line}\n`, 'utf8')
+        await markAccountBanned(key, input.reason)
+    } catch {
+        // non-critical
+    }
+}
+
+export interface AccountStatsSummary {
+    totalRuns: number
+    totalSuccessfulRuns: number
+    totalFailedRuns: number
+    firstSeenAt: string
+    lastKnownPoints: number
+    banned: boolean
+}
+
+/**
+ * Reads the persisted summary for one account (run history depth, lifetime
+ * outcomes, last balance). Returns null when no history exists yet. Used to
+ * enrich ban/error telemetry with "how long this account had been running".
+ */
+export async function readAccountSummary(email: string): Promise<AccountStatsSummary | null> {
+    try {
+        const raw = JSON.parse(await fs.readFile(accountFilePath(toEmailKey(email)), 'utf8')) as AccountFile
+        if (raw.version !== 1) return null
+        return {
+            totalRuns: raw.totalRuns,
+            totalSuccessfulRuns: raw.totalSuccessfulRuns,
+            totalFailedRuns: raw.totalFailedRuns,
+            firstSeenAt: raw.firstSeenAt,
+            lastKnownPoints: raw.lastKnownPoints,
+            banned: raw.banned === true
+        }
+    } catch {
+        return null
+    }
+}
+
 // ─── Internal helpers ──────────────────────────────────────────────────────────
+
+async function markAccountBanned(key: string, reason: string): Promise<void> {
+    try {
+        const filePath = accountFilePath(key)
+        const account = JSON.parse(await fs.readFile(filePath, 'utf8')) as AccountFile
+        if (account.version !== 1) return
+        account.banned = true
+        account.bannedAt = new Date().toISOString()
+        account.banReason = reason
+        await writeJsonAtomic(filePath, account)
+    } catch {
+        // Account file may not exist yet (ban on first run) — the ban log still captured it.
+    }
+}
 
 function makeEmptyAccountFile(key: string, email: string): AccountFile {
     const now = new Date().toISOString()

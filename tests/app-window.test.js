@@ -94,7 +94,9 @@ test('Rewards Desk exposes visible protection, Core deactivation, and desktop in
     assert.doesNotMatch(source, /install-reveal|install-status-taskbar|Create or repair shortcuts/)
     assert.match(source, /\/api\/desktop-install/)
     assert.match(source, /data\.complete === true/)
-    assert.match(source, /webhook\.runSummary\.discordUrl/)
+    // runSummary Discord webhook has been removed; analytics.enabled replaces it
+    assert.doesNotMatch(source, /webhook\.runSummary\.discordUrl/)
+    assert.match(source, /analytics\.enabled/)
     assert.doesNotMatch(source, /Include Core upgrade pitch/)
 })
 

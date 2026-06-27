@@ -63,7 +63,7 @@ const SafetyAdvisorySchema = z.object({
     blockedBehavior: z.enum(['prompt', 'continue', 'stop']).default('prompt')
 })
 
-// Webhook
+// Webhook — user notification channels only (Discord log lines, ntfy push)
 const WebhookSchema = z.object({
     discord: z
         .object({
@@ -82,15 +82,7 @@ const WebhookSchema = z.object({
             priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional()
         })
         .optional(),
-    webhookLogFilter: LogFilterSchema,
-    runSummary: z
-        .object({
-            enabled: z.boolean().default(false),
-            discordUrl: z.string().default(''),
-            includeCoreComparison: z.boolean().optional(),
-            includeCorePitch: z.boolean().optional()
-        })
-        .optional()
+    webhookLogFilter: LogFilterSchema
 })
 
 // Config
@@ -133,6 +125,10 @@ export const ConfigSchema = z.object({
     }),
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
+    /** All anonymous telemetry. Default on; disabling also disables error reporting. */
+    analytics: z.object({
+        enabled: z.boolean().default(true)
+    }).default({ enabled: true }),
     backgroundAgent: BackgroundAgentSchema.optional(),
     terminal: TerminalSchema.optional(),
     scheduler: SchedulerSchema.optional(),

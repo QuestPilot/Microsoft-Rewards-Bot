@@ -1896,8 +1896,8 @@ function html() {
         <button class="btn btn-secondary btn-sm" id="settings-back">← Back</button>
       </div>
       <div class="settings-section">
-        <h3>Search &amp; Tasks</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">These tasks ship with the free open-source bot and always run. Premium tasks with the same names live in the <b>Core Premium</b> section below — those only run with a valid Core license.</div>
+        <h3>Tasks</h3>
+        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">What the bot collects each run. These free tasks always run. Premium versions live in <b>Core Premium</b> lower down and only run with a valid license.</div>
         <div class="toggle-grid">
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily Set</div><div class="toggle-sub">Complete the daily activity set</div></div><label class="toggle"><input type="checkbox" id="tog-doDailySet"><span class="toggle-slider"></span></label></div>
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Desktop Search</div><div class="toggle-sub">Bing PC search points</div></div><label class="toggle"><input type="checkbox" id="tog-doDesktopSearch"><span class="toggle-slider"></span></label></div>
@@ -1908,35 +1908,19 @@ function html() {
         </div>
       </div>
       <div class="settings-section">
-        <h3>Options</h3>
+        <h3>How it runs</h3>
+        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Browser and run behaviour applied to every account.</div>
         <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Headless mode</div><div class="toggle-sub">Run browser in background</div></div><label class="toggle"><input type="checkbox" id="tog-headless"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Run on zero points</div><div class="toggle-sub">Run even if no points left</div></div><label class="toggle"><input type="checkbox" id="tog-runOnZero"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Headless mode</div><div class="toggle-sub">Run the browser hidden in the background</div></div><label class="toggle"><input type="checkbox" id="tog-headless"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Run on zero points</div><div class="toggle-sub">Keep running even when no points are left to earn</div></div><label class="toggle"><input type="checkbox" id="tog-runOnZero"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Search on Bing local queries</div><div class="toggle-sub">Use local search-history suggestions as Bing queries</div></div><label class="toggle"><input type="checkbox" id="tog-searchOnBing"><span class="toggle-slider"></span></label></div>
+        </div>
+        <div class="acc-grid-2" style="margin-top:12px">
+          <div class="modal-field"><label>Parallel accounts (clusters)</label><input type="number" class="modal-input" id="set-clusters" min="1" max="20" placeholder="1" autocomplete="off"><div class="toggle-sub" style="margin-top:4px">How many accounts run at the same time. Higher = faster but riskier.</div></div>
         </div>
       </div>
       <div class="settings-section">
-        <h3>Notifications</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Free, open-source features. Click <b>Configure</b> to set the destination and details.</div>
-        <div class="toggle-grid-1">
-          <div class="cfg-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">Discord log webhook</div><div class="toggle-sub">Stream filtered console logs to a Discord channel</div></div>
-            <button class="btn-cfg" data-cfg="discord">Configure</button>
-            <label class="toggle"><input type="checkbox" id="tog-wh-discord"><span class="toggle-slider"></span></label>
-          </div>
-          <div class="cfg-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">ntfy push</div><div class="toggle-sub">Send notifications to an ntfy topic / server</div></div>
-            <button class="btn-cfg" data-cfg="ntfy">Configure</button>
-            <label class="toggle"><input type="checkbox" id="tog-wh-ntfy"><span class="toggle-slider"></span></label>
-          </div>
-          <div class="cfg-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">Discord run summary</div><div class="toggle-sub">Send one structured recap to a separate Discord webhook</div></div>
-            <button class="btn-cfg" data-cfg="runSummary">Configure</button>
-            <label class="toggle"><input type="checkbox" id="tog-wh-runSummary"><span class="toggle-slider"></span></label>
-          </div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>Scheduler</h3>
+        <h3>Schedule</h3>
         <div class="toggle-wrap" style="margin-bottom:9px">
           <div class="toggle-wrap-left"><div class="toggle-label">Auto-schedule</div><div class="toggle-sub">Run the bot automatically at a set time each day</div></div>
           <label class="toggle"><input type="checkbox" id="tog-scheduler"><span class="toggle-slider"></span></label>
@@ -2030,9 +2014,47 @@ function html() {
           <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Page Harvester<span class="beta-badge">Diagnostic</span></div><div class="toggle-sub">Snapshots all Rewards pages (HTML + data) into the Page/ folder. Enable once, run the bot — Page/ is rebuilt and the toggle resets automatically. For selector maintenance only, does not earn points.</div></div><label class="toggle"><input type="checkbox" id="tog-core-captureDashboardPages"><span class="toggle-slider"></span></label></div>
         </div>
       </div>
+      <div class="settings-section">
+        <h3>Notifications</h3>
+        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Free, open-source. Click <b>Configure</b> to choose where alerts go.</div>
+        <div class="toggle-grid-1">
+          <div class="cfg-wrap">
+            <div class="toggle-wrap-left"><div class="toggle-label">Discord log webhook</div><div class="toggle-sub">Stream filtered console logs to a Discord channel</div></div>
+            <button class="btn-cfg" data-cfg="discord">Configure</button>
+            <label class="toggle"><input type="checkbox" id="tog-wh-discord"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="cfg-wrap">
+            <div class="toggle-wrap-left"><div class="toggle-label">ntfy push</div><div class="toggle-sub">Send notifications to an ntfy topic / server</div></div>
+            <button class="btn-cfg" data-cfg="ntfy">Configure</button>
+            <label class="toggle"><input type="checkbox" id="tog-wh-ntfy"><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Privacy &amp; data</h3>
+        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Anonymous usage data helps fix bugs and improve the bot. It never includes passwords, emails, cookies or licence keys.</div>
+        <div class="toggle-grid">
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Anonymous telemetry</div><div class="toggle-sub">Send anonymous run stats and error signals to the maintainer</div></div><label class="toggle"><input type="checkbox" id="tog-analytics"><span class="toggle-slider"></span></label></div>
+        </div>
+        <div id="analytics-warning" class="settings-section-note" style="display:none;background:rgba(255,170,0,.06);border-color:rgba(255,170,0,.22);color:#f5c542">⚠ Telemetry disabled — errors are silent and bugs go unreported.</div>
+      </div>
       <details class="settings-section settings-section-advanced adv-collapse" id="settings-advanced">
         <summary>Advanced settings<svg class="adv-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg></summary>
         <div class="advanced-caption">Rarely-needed options — defaults are fine for most setups. Only change these if you know what you are doing.</div>
+        <div class="adv-group">
+        <h3>Developer</h3>
+        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Verbose logging and a raw-terminal run mode for debugging the bot.</div>
+        <div class="toggle-grid">
+          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Debug logs</div><div class="toggle-sub">Print verbose internal logs to the console</div></div><label class="toggle"><input type="checkbox" id="tog-debugLogs"><span class="toggle-slider"></span></label></div>
+        </div>
+        <div class="advanced-block term-row">
+          <div class="toggle-wrap-left">
+            <div class="toggle-label">Developer terminal mode</div>
+            <div class="toggle-sub">Close Rewards Desk and relaunch the bot in PowerShell with live developer logs.</div>
+          </div>
+          <button class="btn btn-secondary" id="btn-terminal-mode" style="flex-shrink:0">Open terminal &amp; run →</button>
+        </div>
+        </div>
         <div class="adv-group">
         <h3>Search tuning</h3>
         <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Fine-tune search behaviour and timing. The defaults are sensible — only change these if you know what you are doing. Delays accept values like <b>3min</b> or <b>8sec</b>.</div>
@@ -2051,7 +2073,7 @@ function html() {
         </div>
         </div>
         <div class="adv-group">
-        <h3>Advanced</h3>
+        <h3>Account protection &amp; maintenance</h3>
         <div class="advanced-block">
           <div class="storage-panel">
             <div class="storage-shield"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3z"/><path d="m9 12 2 2 4-5"/></svg></div>
@@ -2074,13 +2096,6 @@ function html() {
             <button class="btn btn-secondary btn-sm" id="storage-import">Import protected backup</button>
           </div>
         </details>
-        <div class="advanced-block term-row">
-          <div class="toggle-wrap-left">
-            <div class="toggle-label">Developer terminal mode</div>
-            <div class="toggle-sub">Close Rewards Desk and relaunch the bot in PowerShell with live developer logs.</div>
-          </div>
-          <button class="btn btn-secondary" id="btn-terminal-mode" style="flex-shrink:0">Open terminal &amp; run →</button>
-        </div>
         <div class="advanced-block term-row">
           <div class="toggle-wrap-left">
             <div class="toggle-label">Desktop shortcuts</div>
@@ -2647,14 +2662,7 @@ function html() {
           { label:'Priority (1–5)', path:'webhook.ntfy.priority', type:'number', placeholder:'3' }
         ]
       },
-      runSummary: {
-        title: 'Discord run summary', sub: 'Send one structured account recap to a separate Discord channel.',
-        essential: [
-          { label:'Summary webhook URL', path:'webhook.runSummary.discordUrl', type:'text', placeholder:'https://discord.com/api/webhooks/...' },
-          { label:'Include Core impact comparison', path:'webhook.runSummary.includeCoreComparison', type:'checkbox' }
-        ],
-        advanced: []
-      }
+      _runSummaryRemoved: null /* runSummary replaced by analytics — key kept to avoid openCfgModal('runSummary') crash on stale HTML caches */
     };
 
     // Animated number count-up
@@ -3392,9 +3400,14 @@ function html() {
       var wh = s.webhook || {};
       var elWd = G('tog-wh-discord'); if (elWd) elWd.checked = !!(wh.discord && wh.discord.enabled);
       var elWn = G('tog-wh-ntfy'); if (elWn) elWn.checked = !!(wh.ntfy && wh.ntfy.enabled);
-      var elWr = G('tog-wh-runSummary'); if (elWr) elWr.checked = !!(wh.runSummary && wh.runSummary.enabled);
       var h = G('tog-headless'); if (h) h.checked = s.headless === true;
       var rz = G('tog-runOnZero'); if (rz) rz.checked = s.runOnZeroPoints === true;
+      var dl = G('tog-debugLogs'); if (dl) dl.checked = s.debugLogs === true;
+      var sb = G('tog-searchOnBing'); if (sb) sb.checked = s.searchOnBingLocalQueries !== false;
+      var cl = G('set-clusters'); if (cl) cl.value = s.clusters != null ? s.clusters : 1;
+      var analyticsEnabled = s.analytics != null ? s.analytics.enabled !== false : true;
+      var togAn = G('tog-analytics'); if (togAn) togAn.checked = analyticsEnabled;
+      var anWarn = G('analytics-warning'); if (anWarn) anWarn.style.display = analyticsEnabled ? 'none' : 'block';
       // Search tuning (advanced)
       var ss = s.searchSettings || {};
       if (G('tog-parallelSearching')) G('tog-parallelSearching').checked = ss.parallelSearching === true;
@@ -3538,8 +3551,19 @@ function html() {
     if (_whD) _whD.addEventListener('change', function() { saveSetting('webhook.discord.enabled', this.checked); });
     var _whN = G('tog-wh-ntfy');
     if (_whN) _whN.addEventListener('change', function() { saveSetting('webhook.ntfy.enabled', this.checked); });
-    var _whR = G('tog-wh-runSummary');
-    if (_whR) _whR.addEventListener('change', function() { saveSetting('webhook.runSummary.enabled', this.checked); });
+    // Analytics toggle — persist + show/hide warning
+    var _togAn = G('tog-analytics');
+    if (_togAn) _togAn.addEventListener('change', function() {
+      saveSetting('analytics.enabled', this.checked);
+      var w = G('analytics-warning'); if (w) w.style.display = this.checked ? 'none' : 'block';
+    });
+    // Clusters number input — clamp 1-20 then persist
+    var _clEl = G('set-clusters');
+    if (_clEl) _clEl.addEventListener('change', function() {
+      var v = Math.min(20, Math.max(1, parseInt(this.value, 10) || 1));
+      this.value = v;
+      saveSetting('clusters', v);
+    });
     // Configure buttons → open the config modal
     document.querySelectorAll('[data-cfg]').forEach(function(btn) {
       btn.addEventListener('click', function() { openCfgModal(btn.getAttribute('data-cfg')); });
@@ -3579,6 +3603,7 @@ function html() {
       'tog-doMorePromotions':'workers.doMorePromotions','tog-doDesktopSearch':'workers.doDesktopSearch',
       'tog-doMobileSearch':'workers.doMobileSearch','tog-doAppPromotions':'workers.doAppPromotions',
       'tog-headless':'headless','tog-runOnZero':'runOnZeroPoints',
+      'tog-debugLogs':'debugLogs','tog-searchOnBing':'searchOnBingLocalQueries',
       'tog-parallelSearching':'searchSettings.parallelSearching',
       'tog-scrollRandomResults':'searchSettings.scrollRandomResults',
       'tog-clickRandomResults':'searchSettings.clickRandomResults'
@@ -4824,6 +4849,10 @@ const server = http.createServer((req, res) => {
             workers: cfg.workers || {},
             headless: cfg.headless,
             runOnZeroPoints: cfg.runOnZeroPoints,
+            debugLogs: cfg.debugLogs,
+            searchOnBingLocalQueries: cfg.searchOnBingLocalQueries,
+            clusters: cfg.clusters,
+            analytics: cfg.analytics,
             terminal: cfg.terminal || { enabled: false },
             scheduler: cfg.scheduler || {},
             core: cfg.core || {},

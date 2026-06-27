@@ -14,6 +14,23 @@ export class Search extends TaskBase {
     private searchCount = 0
 
     public async doSearch(data: DashboardData, page: Page, isMobile: boolean): Promise<number> {
+        // Wrapper: run the search session, then emit one aggregate `search_completed`
+        // event per platform. `finally` guarantees it fires on every return path of
+        // the inner method (and even if it throws), without touching the hot-path logic.
+        let gained = 0
+        try {
+            gained = await this.doSearchInner(data, page, isMobile)
+            return gained
+        } finally {
+            this.bot.analytics.track('search_completed', this.bot.analytics.withContext({
+                platform: isMobile ? 'mobile' : 'desktop',
+                points_gained: gained,
+                has_core: this.bot.pluginManager.hasOfficialCoreEntitlement()
+            }))
+        }
+    }
+
+    private async doSearchInner(data: DashboardData, page: Page, isMobile: boolean): Promise<number> {
         const startBalance = Number(this.bot.userData.currentPoints ?? 0)
 
         this.bot.logger.info(isMobile, 'SEARCH-BING', `Starting Bing searches | currentPoints=${startBalance}`)

@@ -1,9 +1,12 @@
 {
     "baseURL": "https://rewards.bing.com/dashboard",
     "sessionPath": "sessions",
+    "clusters": 1,
     "headless": false,
     "runOnZeroPoints": false,
-    "clusters": 1,
+    "searchOnBingLocalQueries": true,
+    "globalTimeout": "30sec",
+    "debugLogs": false,
     "errorDiagnostics": false,
     "workers": {
         "doDailySet": true,
@@ -16,12 +19,25 @@
         "doReadToEarn": true,
         "doDailyStreak": true,
         "doDashboardInfo": true,
+        "doPunchCards": true,
         "doClaimPoints": true,
-        "doApplyCoupons": true,
-        "doPunchCards": true
+        "doApplyCoupons": true
     },
-    "searchOnBingLocalQueries": true,
-    "globalTimeout": "30sec",
+    "core": {
+        "doubleSearchPoints": true,
+        "appReward": true,
+        "readToEarn": true,
+        "dailyCheckIn": true,
+        "dailyStreak": true,
+        "setGoal": true,
+        "claimPoints": true,
+        "applyCoupons": true,
+        "temporaryPunchcards": false,
+        "collectDashboardInfo": true,
+        "streakProtection": false,
+        "dashboardSync": false,
+        "captureDashboardPages": false
+    },
     "searchSettings": {
         "scrollRandomResults": true,
         "clickRandomResults": true,
@@ -37,13 +53,15 @@
             "max": "1min"
         }
     },
-    "debugLogs": false,
-    "consoleLogFilter": {
+    "scheduler": {
         "enabled": false,
-        "mode": "whitelist",
-        "levels": ["error", "warn"],
-        "keywords": ["starting account"],
-        "regexPatterns": []
+        "runOnStartup": true,
+        "timezone": "Europe/Paris",
+        "startTime": "08:00",
+        "randomDelay": {
+            "min": "0min",
+            "max": "30min"
+        }
     },
     "proxy": {
         "queryEngine": true
@@ -68,39 +86,17 @@
             "levels": ["error"],
             "keywords": ["starting account", "select number", "collected"],
             "regexPatterns": []
-        },
-        "runSummary": {
-            "enabled": false,
-            "discordUrl": "",
-            "includeCoreComparison": true
-        },
-        "autoReport": {
-            "enabled": false,
-            "discordUrl": "",
-            "channelId": "",
-            "reportRunStart": true,
-            "reportAccountEnd": true,
-            "reportRunSummary": true,
-            "maskEmails": true
-        },
-        "errorReporting": {
-            "enabled": true
         }
     },
-    "core": {
-        "doubleSearchPoints": true,
-        "appReward": true,
-        "readToEarn": true,
-        "dailyCheckIn": true,
-        "dailyStreak": true,
-        "setGoal": true,
-        "claimPoints": true,
-        "applyCoupons": true,
-        "temporaryPunchcards": false,
-        "collectDashboardInfo": true,
-        "streakProtection": false,
-        "dashboardSync": false,
-        "captureDashboardPages": false
+    "consoleLogFilter": {
+        "enabled": false,
+        "mode": "whitelist",
+        "levels": ["error", "warn"],
+        "keywords": ["starting account"],
+        "regexPatterns": []
+    },
+    "analytics": {
+        "enabled": true
     },
     "backgroundAgent": {
         "enabled": false,
@@ -109,15 +105,5 @@
     },
     "terminal": {
         "enabled": false
-    },
-    "scheduler": {
-        "enabled": false,
-        "runOnStartup": true,
-        "timezone": "Europe/Paris",
-        "startTime": "08:00",
-        "randomDelay": {
-            "min": "0min",
-            "max": "30min"
-        }
     }
 }

@@ -5,6 +5,7 @@ import { getCurrentContext } from '../../context/ExecutionContext'
 import { URLS } from '../DashboardSelectors'
 import type { DashboardVariant } from '../../types/Dashboard'
 
+import { AccountLockedError } from './AuthErrors'
 import { CodeStrategy } from './strategies/CodeStrategy'
 import { EmailStrategy } from './strategies/EmailStrategy'
 import { MobileStrategy } from './strategies/MobileStrategy'
@@ -453,7 +454,7 @@ export class AuthManager {
             case 'ACCOUNT_LOCKED': {
                 const msg = 'This account has been locked! Remove from config and restart!'
                 this.bot.logger.error(this.bot.isMobile, 'LOGIN', msg)
-                throw new Error(msg)
+                throw new AccountLockedError(msg, 'service_abuse')
             }
 
             case 'ERROR_ALERT': {

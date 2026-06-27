@@ -13,12 +13,26 @@ export interface Config {
     proxy: ConfigProxy
     consoleLogFilter: LogFilter
     webhook: ConfigWebhook
+    /** Anonymous usage analytics. Default: enabled. Disabling removes ALL telemetry
+     *  including error reporting — not recommended. */
+    analytics?: ConfigAnalytics
     backgroundAgent?: ConfigBackgroundAgent
     terminal?: ConfigTerminal
     plugins?: ConfigPlugins
     scheduler?: ConfigScheduler
     core?: ConfigCore
     safetyAdvisory?: ConfigSafetyAdvisory
+}
+
+/**
+ * Controls all anonymous telemetry sent to the bot maintainer:
+ * run stats, errors, feature usage, plugin events. Never includes passwords,
+ * emails, license keys, cookies, or tokens — only redacted diagnostics.
+ * Enabled by default; disabling removes error reporting too, which means
+ * silent bugs cannot be detected or fixed.
+ */
+export interface ConfigAnalytics {
+    enabled: boolean
 }
 
 export interface ConfigTerminal {
@@ -125,48 +139,11 @@ export interface ConfigWorkers {
     doPunchCards: boolean
 }
 
-// Webhooks
+// Webhooks — user notification channels (Discord log lines, ntfy push)
 export interface ConfigWebhook {
     discord?: WebhookDiscordConfig
     ntfy?: WebhookNtfyConfig
     webhookLogFilter: LogFilter
-    runSummary?: WebhookRunSummaryConfig
-    autoReport?: AutoReportConfig
-    errorReporting?: ErrorReportingConfig
-}
-
-/**
- * Anonymous failure reporting to the bot maintainer's inbox (same relay as the
- * in-app feedback/rating system — NOT a user Discord webhook). Enabled by
- * default; set `enabled: false` to opt out. Only redacted diagnostics are sent
- * (masked email, sanitized error text, bot/Core version, OS/Node) — never
- * passwords, cookies, tokens, or license keys.
- */
-export interface ErrorReportingConfig {
-    enabled?: boolean
-}
-
-export interface AutoReportConfig {
-    enabled: boolean
-    discordUrl: string
-    /**
-     * Optional Discord channel/thread id. When set, reports are routed to that
-     * thread (via the webhook's `thread_id` parameter). The thread must live in
-     * the same channel as the webhook (or be a forum-channel thread).
-     */
-    channelId?: string
-    reportRunStart?: boolean
-    reportAccountEnd?: boolean
-    reportRunSummary?: boolean
-    maskEmails?: boolean
-}
-
-export interface WebhookRunSummaryConfig {
-    enabled: boolean
-    discordUrl: string
-    includeCoreComparison?: boolean
-    /** Legacy name accepted during config migration. */
-    includeCorePitch?: boolean
 }
 
 export interface LogFilter {
