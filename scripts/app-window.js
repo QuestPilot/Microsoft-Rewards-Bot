@@ -13,8 +13,8 @@ const PORT = Number.parseInt(process.env.MSRB_APP_PORT || '0', 10)
 const APP_TITLE = 'Rewards Desk'
 const APP_ICON_PATH = path.join(ROOT, 'assets', 'logo.png')
 const APP_BANNER_PATH = path.join(ROOT, 'assets', 'banner-core.png')
-const APP_WINDOW_WIDTH = 1500
-const APP_WINDOW_HEIGHT = 900
+const APP_WINDOW_WIDTH = 1380
+const APP_WINDOW_HEIGHT = 840
 const API_TOKEN = crypto.randomBytes(32).toString('base64url')
 const MAX_API_BODY_BYTES = 64 * 1024
 const accountStorage = createAccountStorage({ root: ROOT })
@@ -74,45 +74,26 @@ function readBotStats() {
     return out
 }
 
-// ─── TEMPORARY: announcement notice (disposable) ──────────────────────────
-// A one-time notice shown once in the Desk, then never again. The dismissal is
-// persisted server-side (NOTICE_STORE) on purpose: the Desk window now uses a
-// fresh per-process Chrome profile, so browser localStorage does NOT survive a
-// relaunch — only a file on disk can remember "already seen".
-//
-// To RETIRE it: set ACTIVE_NOTICE = null (optionally delete this block, the two
-// `/api/notice` routes, the `#notice-modal` markup, and the `initDeskNotice`
-// client block). To show a DIFFERENT notice later: change `id` + the copy and
-// everyone sees the new one exactly once.
-let ACTIVE_NOTICE = {
-    id: 'netsky-response-2026-06',
-    title: 'Important announcement',
-    body: 'False claims about this project have been going around — pushed by alt accounts, even inside our own server. We wrote down the full story, with the facts straight from the code. Takes two minutes, worth the read.',
-    cta: 'Read the announcement',
-    // Served from Core-API (public/announcement.html, rewritten at /announcement).
-    url: 'https://bot.lgtw.tf/announcement'
-}
-const NOTICE_STORE = path.join(ROOT, '.desk-notices.json')
 
-function readSeenNotices() {
-    try {
-        return JSON.parse(fs.readFileSync(NOTICE_STORE, 'utf8')) || {}
-    } catch {
-        return {}
-    }
-}
+// ─── Desk UI State (replaces multiple .desk-*.json files) ──────────────
+const DATA_STORE = path.join(ROOT, 'data', 'desk-state.json')
+const STAR_GITHUB = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot'
+const STAR_MAX_SHOWS = 2
 
-function markNoticeSeen(id) {
-    if (!id) return
-    try {
-        const seen = readSeenNotices()
-        seen[id] = new Date().toISOString()
-        fs.writeFileSync(NOTICE_STORE, JSON.stringify(seen, null, 2), 'utf8')
-    } catch (error) {
-        pushLog('warn', 'Could not save announcement state: ' + error.message)
-    }
+function readStarState() {
+    try { return JSON.parse(fs.readFileSync(DATA_STORE, 'utf8')).star || {} } catch { return {} }
 }
-// ──────────────────────────────────────────────────────────────────────────
+function saveStarState(obj) {
+    try {
+        const dataDir = path.dirname(DATA_STORE);
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
+        let data = {}
+        try { data = JSON.parse(fs.readFileSync(DATA_STORE, 'utf8')) } catch {}
+        data.star = obj
+        fs.writeFileSync(DATA_STORE, JSON.stringify(data, null, 2), 'utf8')
+    } catch {}
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const state = {
     status: 'Preparing',
@@ -687,6 +668,12 @@ function openAccountsFile() {
     return true
 }
 
+function openDefaultBrowser(url) {
+    const command = process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open'
+    const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url]
+    childProcess.spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+}
+
 function openDiscord() {
     openDefaultBrowser('https://discord.gg/JWhCkhSYtg')
 }
@@ -698,6 +685,16 @@ function serveStaticImage(res, filePath) {
         return
     }
     res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=3600' })
+    fs.createReadStream(filePath).pipe(res)
+}
+
+function serveStaticGif(res, filePath) {
+    if (!fs.existsSync(filePath)) {
+        res.writeHead(404)
+        res.end('Not found')
+        return
+    }
+    res.writeHead(200, { 'content-type': 'image/gif', 'cache-control': 'public, max-age=3600' })
     fs.createReadStream(filePath).pipe(res)
 }
 
@@ -774,21 +771,23 @@ function html() {
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:rgba(30,155,255,.22);border-radius:99px}
 
+
     /* ── Sidebar ── */
     .sidebar{
-      width:220px;flex-shrink:0;display:flex;flex-direction:column;
-      padding:22px 14px;border-right:1px solid var(--border);
+      width:clamp(180px,16vw,220px);flex-shrink:0;display:flex;flex-direction:column;
+      padding:clamp(14px,1.6vh,22px) clamp(10px,1vw,14px);
+      border-right:1px solid var(--border);
       background:linear-gradient(180deg,rgba(7,17,31,.97) 0%,rgba(3,8,15,.98) 100%);
     }
-    .brand{display:flex;align-items:center;gap:11px;padding-bottom:20px;border-bottom:1px solid var(--border);margin-bottom:16px}
-    .brand img{width:40px;height:40px;border-radius:12px;box-shadow:0 0 18px rgba(30,155,255,.32)}
-    .brand-name{font-size:14px;font-weight:700;line-height:1.2}
-    .brand-sub{font-size:11px;color:var(--muted);margin-top:1px}
+    .brand{display:flex;align-items:center;gap:11px;padding-bottom:clamp(12px,1.5vh,20px);border-bottom:1px solid var(--border);margin-bottom:clamp(10px,1.4vh,16px)}
+    .brand img{width:clamp(32px,2.8vw,40px);height:clamp(32px,2.8vw,40px);border-radius:12px;box-shadow:0 0 18px rgba(30,155,255,.32)}
+    .brand-name{font-size:clamp(12px,1vw,14px);font-weight:700;line-height:1.2}
+    .brand-sub{font-size:clamp(10px,.85vw,11px);color:var(--muted);margin-top:1px}
     nav{display:flex;flex-direction:column;gap:3px;flex:1}
     .nav-item{
-      display:flex;align-items:center;gap:10px;padding:10px 11px;
+      display:flex;align-items:center;gap:10px;padding:clamp(7px,.9vh,10px) 11px;
       border-radius:10px;color:var(--muted);cursor:pointer;
-      transition:all .16s ease;font-size:13.5px;font-weight:500;
+      transition:all .16s ease;font-size:clamp(12px,.95vw,13.5px);font-weight:500;
       user-select:none;border:1px solid transparent;
     }
     .nav-item:hover{color:var(--text);background:rgba(30,155,255,.09)}
@@ -803,19 +802,19 @@ function html() {
     .nav-item-core:hover{background:rgba(247,200,92,.1) !important}
     .nav-item-core.active{background:linear-gradient(90deg,rgba(247,200,92,.2),rgba(247,200,92,.06)) !important;border-color:rgba(247,200,92,.22) !important}
     .core-nav-badge{margin-left:auto;font-size:9px;font-weight:800;letter-spacing:.07em;padding:1px 5px;border-radius:4px;background:rgba(247,200,92,.2);color:var(--gold);border:1px solid rgba(247,200,92,.3)}
-    .sidebar-bottom{margin-top:auto;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+    .sidebar-bottom{margin-top:auto;padding-top:clamp(10px,1.4vh,16px);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
     .discord-btn{
       display:flex;align-items:center;justify-content:center;gap:8px;
-      padding:9px 12px;border-radius:10px;border:1px solid rgba(88,101,242,.3);
-      background:rgba(88,101,242,.14);color:#bcc3ff;font-size:12.5px;
+      padding:clamp(6px,.8vh,9px) 12px;border-radius:10px;border:1px solid rgba(88,101,242,.3);
+      background:rgba(88,101,242,.14);color:#bcc3ff;font-size:clamp(11px,.9vw,12.5px);
       font-weight:600;cursor:pointer;transition:all .16s ease;
     }
     .discord-btn:hover{background:rgba(88,101,242,.28);color:#fff;border-color:rgba(88,101,242,.5)}
     .discord-btn svg{width:15px;height:15px;flex-shrink:0}
     .install-btn{
       display:flex;align-items:center;justify-content:center;gap:8px;
-      padding:9px 12px;border-radius:10px;border:1px solid rgba(47,210,125,.28);
-      background:rgba(47,210,125,.1);color:#8ce9b7;font-size:12.5px;
+      padding:clamp(6px,.8vh,9px) 12px;border-radius:10px;border:1px solid rgba(47,210,125,.28);
+      background:rgba(47,210,125,.1);color:#8ce9b7;font-size:clamp(11px,.9vw,12.5px);
       font-weight:650;cursor:pointer;transition:all .16s ease;
     }
     .install-btn:hover{background:rgba(47,210,125,.2);color:#d8ffea;border-color:rgba(47,210,125,.5)}
@@ -826,7 +825,7 @@ function html() {
     .main{
       flex:1;min-width:0;display:grid;
       grid-template-rows:auto 1fr 34px;
-      padding:18px 22px 12px;gap:14px;overflow:hidden;
+      padding:clamp(12px,1.4vh,18px) clamp(14px,1.6vw,22px) 12px;gap:clamp(8px,1vh,14px);overflow:hidden;
     }
 
     /* ── Hero ── */
@@ -896,25 +895,40 @@ function html() {
 
     /* ── Cards grid ── */
     .cards{
-      display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:13px;
-      min-height:0;overflow:hidden;
+      display:grid;grid-template-columns:1fr 1fr;gap:clamp(12px,1.4vw,20px);
+      flex-shrink:0; min-height:clamp(160px,22vh,220px);
     }
     .card{
-      background:linear-gradient(180deg,rgba(10,22,40,.96) 0%,rgba(5,12,24,.97) 100%);
-      border:1px solid var(--border);border-radius:var(--r);
-      padding:18px;display:flex;flex-direction:column;overflow:hidden;
-      transition:border-color .2s;
-      animation:slideUp .3s ease-out both;
+      background:rgba(10,14,25,0.6);backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.05);border-radius:20px;
+      padding:clamp(16px,2vw,28px);display:flex;flex-direction:column;overflow:hidden;
+      transition:transform 0.4s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.4s, border-color 0.4s;
+      box-shadow:0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+      animation:slideUp .3s ease-out both; min-height:0;
     }
     .card:nth-child(2){animation-delay:.05s}
     .card:nth-child(3){animation-delay:.1s}
-    .card:hover{border-color:rgba(30,155,255,.22)}
-    .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-    .card-label{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+    .card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);border-color:rgba(30,155,255,.22)}
+
+    .star-banner {
+      position: relative; overflow: hidden; border-radius: 18px;
+      cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(247,200,92,0.2);
+    }
+    .star-banner:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(247,200,92,0.1); }
+    .star-banner-bg { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(247,200,92,0.15) 0%, rgba(2,7,16,0.8) 100%); }
+    .star-banner-content { position: relative; z-index: 1; padding: clamp(12px,1.4vh,20px) clamp(14px,1.6vw,24px); display: flex; align-items: center; gap: 14px; }
+    .star-banner-content svg { width: 26px; height: 26px; color: var(--gold); filter: drop-shadow(0 0 10px rgba(247,200,92,0.5)); flex-shrink:0; }
+    .star-banner-text { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width:0; }
+    .star-banner-title { font-size: clamp(13px,1vw,16px); font-weight: 700; color: #fff; }
+    .star-banner-sub { font-size: clamp(11.5px,.88vw,13.5px); color: rgba(255,255,255,0.6); white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .star-banner-btn { flex-shrink:0; padding: 8px clamp(12px,1.2vw,20px); border-radius: 100px; background: rgba(247,200,92,0.15); color: var(--gold); font-size: clamp(11.5px,.88vw,13.5px); font-weight: 600; border: 1px solid rgba(247,200,92,0.3); transition: background 0.2s; pointer-events: none; }
+    .star-banner:hover .star-banner-btn { background: rgba(247,200,92,0.25); }
+    .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:clamp(8px,1.2vh,14px)}
+    .card-label{font-size:clamp(10px,.85vw,11.5px);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
 
     /* Status card */
-    .st-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center}
-    .ring-wrap{position:relative;width:92px;height:92px}
+    .st-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(5px,.8vh,9px);text-align:center}
+    .ring-wrap{position:relative;width:clamp(62px,7vh,92px);height:clamp(62px,7vh,92px)}
     .ring-svg{width:100%;height:100%;transform:rotate(-90deg)}
     .ring-track{fill:none;stroke:rgba(30,155,255,.1);stroke-width:7}
     .ring-fill{
@@ -923,12 +937,12 @@ function html() {
       transition:stroke-dashoffset .75s cubic-bezier(.4,0,.2,1);
     }
     .ring-icon{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-    .ring-icon svg{width:24px;height:24px;fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .ring-icon svg{width:clamp(16px,1.8vh,24px);height:clamp(16px,1.8vh,24px);fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .ring-wrap.run{border-radius:50%;animation:glowPulse 2.2s ease-in-out infinite}
     .ring-wrap.run .ring-icon svg{animation:beat 1.4s ease-in-out infinite}
     @keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
-    .st-text{font-size:17px;font-weight:800}
-    .st-detail{font-size:12px;color:var(--muted);line-height:1.5;max-width:160px}
+    .st-text{font-size:clamp(13px,1.3vh,17px);font-weight:800}
+    .st-detail{font-size:clamp(10px,.95vh,12px);color:var(--muted);line-height:1.5;max-width:160px}
     .st-next{margin-top:4px;font-size:11px;font-weight:600;color:var(--cyan);display:none;align-items:center;gap:5px;justify-content:center}
     .st-next:before{content:'';width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
 
@@ -975,13 +989,55 @@ function html() {
     .acc-empty p{font-size:13px;color:var(--muted)}
 
     /* Full accounts view */
-    .view-full{display:none;flex-direction:column;gap:13px;min-height:0;overflow:hidden}
+    .view-full{display:none;flex-direction:column;gap:0;min-height:0;overflow:hidden}
     .view-full.vis{display:flex}
-    .full-card{
-      flex:1;background:linear-gradient(180deg,rgba(10,22,40,.96),rgba(5,12,24,.97));
-      border:1px solid var(--border);border-radius:var(--r);padding:18px;
-      display:flex;flex-direction:column;overflow:hidden;
+
+    /* Accounts page layout */
+    .acc-page-header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:clamp(14px,1.6vh,22px) clamp(14px,1.6vw,22px);
+      border-bottom:1px solid var(--border);
+      background:rgba(10,14,25,0.5);backdrop-filter:blur(12px);
+      flex-shrink:0;
     }
+    .acc-page-title-wrap{display:flex;flex-direction:column;gap:2px}
+    .acc-page-title{font-size:clamp(17px,1.5vw,22px);font-weight:800;color:var(--text);letter-spacing:-.02em}
+    .acc-page-sub{font-size:clamp(11px,.9vw,13px);color:var(--muted)}
+    .acc-page-stats{display:flex;align-items:center;gap:clamp(10px,1.4vw,20px)}
+    .acc-stat{
+      display:flex;flex-direction:column;align-items:center;gap:2px;
+      padding:8px clamp(12px,1.2vw,18px);border-radius:14px;
+      background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);
+    }
+    .acc-stat-val{font-size:clamp(18px,1.6vw,24px);font-weight:800;color:var(--text);line-height:1}
+    .acc-stat-lbl{font-size:clamp(9px,.75vw,11px);color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+    .acc-page-actions{display:flex;gap:8px;align-items:center}
+    .acc-page-body{flex:1;overflow-y:auto;padding:clamp(14px,1.6vw,20px);display:flex;flex-direction:column;gap:8px}
+
+    /* Account rows - premium */
+    .acc-editor-row{
+      display:grid;grid-template-columns:auto 1fr auto;
+      align-items:center;gap:14px;padding:clamp(10px,1.2vh,14px) clamp(12px,1.2vw,16px);
+      border-radius:16px;background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.05);
+      transition:all .2s ease;cursor:default;
+    }
+    .acc-editor-row:hover{background:rgba(30,155,255,.06);border-color:rgba(30,155,255,.2);transform:translateX(2px)}
+    .acc-editor-row.is-active{border-color:rgba(46,232,255,.25);background:rgba(46,232,255,.04)}
+    .acc-editor-row.is-active:hover{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.07)}
+    .acc-editor-row.is-disabled{opacity:.5}
+    .acc-avatar{
+      width:clamp(34px,3.5vw,42px);height:clamp(34px,3.5vw,42px);border-radius:50%;
+      background:linear-gradient(135deg,rgba(30,155,255,.25),rgba(46,232,255,.1));
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+      font-size:clamp(13px,1.2vw,16px);font-weight:700;color:var(--cyan);
+      border:1px solid rgba(46,232,255,.2);
+    }
+    .acc-avatar.running{background:linear-gradient(135deg,rgba(47,210,125,.25),rgba(46,232,255,.1));color:var(--green);border-color:rgba(47,210,125,.3);animation:glowPulse 2s ease-in-out infinite}
+    .acc-info{display:flex;flex-direction:column;gap:3px;min-width:0}
+    .acc-email{font-size:clamp(12px,.95vw,14px);font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .acc-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .acc-actions-cell{display:flex;gap:6px;flex-shrink:0}
 
     /* Console view */
     .console-wrap{display:none;flex-direction:column;gap:12px;min-height:0;overflow:hidden}
@@ -1044,16 +1100,7 @@ function html() {
       backdrop-filter:blur(10px);
     }
     .modal-icon svg{width:24px;height:24px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-    /* Temporary announcement notice (disposable — see initDeskNotice) */
-    .notice-modal{width:min(470px,100%);text-align:left}
-    .notice-modal h2{font-size:21px}
-    .notice-modal p{color:var(--muted);font-size:14px;line-height:1.66;margin-bottom:0}
-    .notice-modal-icon{
-      background:linear-gradient(145deg,rgba(255,176,32,.22),rgba(255,92,92,.18));
-      border-color:rgba(255,176,32,.42);
-      box-shadow:0 10px 28px rgba(255,140,30,.28);
-    }
-    .notice-modal-icon svg{stroke:#ffd27a}
+
     .modal h2{font-size:24px;font-weight:800;margin-bottom:8px;background:linear-gradient(to right,#fff,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
     .modal p{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:24px}
     .modal-input{
@@ -1085,17 +1132,45 @@ function html() {
       border:1px solid rgba(255,255,255,.08);
     }
     .btn-secondary:hover:not(:disabled){background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);}
-    
+
+    /* ── GitHub Star modal ── */
+    .star-modal-gif{
+      width:100%;max-width:280px;height:auto;object-fit:cover;
+      border-radius:12px;margin:0 auto 20px;display:block;
+      box-shadow:0 8px 24px rgba(0,0,0,.4);
+      border:1px solid rgba(255,255,255,.05);
+    }
+    .star-modal-content h2{
+      font-size:24px;font-weight:800;margin-bottom:12px;
+      background:linear-gradient(to right,#fff,#ffd700);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .star-modal-content p{
+      color:rgba(180,200,230,.8);font-size:14.5px;line-height:1.6;margin-bottom:28px;
+    }
+    .btn-star{
+      background:linear-gradient(135deg,#e6ac00,#f5c518 60%,#e6ac00);
+      color:#0a0800;font-weight:800;border:none;
+      box-shadow:0 6px 20px rgba(230,172,0,.3);
+    }
+    .btn-star:hover:not(:disabled){
+      background:linear-gradient(135deg,#f5c518,#ffdb4d 60%,#f5c518);
+      box-shadow:0 8px 24px rgba(230,172,0,.4);
+    }
+    .btn-star svg{width:18px;height:18px;fill:#0a0800;flex-shrink:0;}
+    /* ── end GitHub Star modal ── */
+
     /* Toast Notification */
     .toast {
-      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
-      background: linear-gradient(180deg, rgba(6,14,30,.95), rgba(2,7,18,.95));
+      position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(100px);
+      background: rgba(10,14,25,0.85); backdrop-filter: blur(24px);
       border: 1px solid rgba(46,232,255,.3); border-radius: 100px;
-      padding: 12px 24px; color: #fff; font-size: 14px; font-weight: 600;
-      box-shadow: 0 20px 40px rgba(0,0,0,.5), 0 0 20px rgba(46,232,255,.2);
+      padding: 14px 28px; color: #fff; font-size: 14px; font-weight: 600;
+      box-shadow: 0 20px 40px rgba(0,0,0,.5), 0 0 20px rgba(46,232,255,.15);
       opacity: 0; pointer-events: none; transition: all .4s cubic-bezier(.22,.68,0,1.08);
-      z-index: 10000; display: flex; align-items: center; gap: 10px;
+      z-index: 10000; display: flex; align-items: center; gap: 12px;
     }
+    .toast.error { border-color: rgba(255,107,138,.4); box-shadow: 0 20px 40px rgba(0,0,0,.5), 0 0 20px rgba(255,107,138,.15); }
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     
     .modal-msg{min-height:17px;font-size:12px;color:var(--cyan);margin-top:9px}
@@ -1752,11 +1827,26 @@ function html() {
     .core-compare .c-vs b{color:var(--rose)}
 
     /* Feedback Modal */
-    .rating-stars { display: flex; gap: 8px; justify-content: center; margin: 15px 0; }
-    .rating-star { font-size: 32px; color: rgba(110,146,184,.4); cursor: pointer; transition: transform .1s, color .15s; }
-    .rating-star:hover, .rating-star.active { color: var(--gold); transform: scale(1.15); }
-    .fb-textarea { width: 100%; height: 80px; background: rgba(2,7,16,.7); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; color: var(--text); font: inherit; font-size: 13.5px; outline: none; resize: none; margin-bottom: 12px; transition: border-color .15s; }
-    .fb-textarea:focus { border-color: var(--cyan); }
+    .fb-modal-content h2{
+      font-size:24px;font-weight:800;margin-bottom:8px;
+      background:linear-gradient(to right,#fff,var(--cyan));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .rating-stars { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
+    .rating-star { 
+      width:36px;height:36px;color:rgba(110,146,184,.3);
+      cursor:pointer;transition:transform .15s cubic-bezier(.22,.68,0,1.08), color .2s;
+    }
+    .rating-star svg { width:100%;height:100%;fill:currentColor; }
+    .rating-star:hover, .rating-star.active { color: var(--gold); transform: scale(1.18); }
+    .fb-textarea { 
+      width: 100%; height: 90px; background: rgba(2,7,16,.7); border: 1px solid rgba(255,255,255,.08); 
+      border-radius: 12px; padding: 12px 14px; color: var(--text); font: inherit; font-size: 14px; 
+      outline: none; resize: none; margin-bottom: 24px; transition: border-color .2s, box-shadow .2s;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,.2);
+    }
+    .fb-textarea:focus { border-color: var(--cyan); background:rgba(255,255,255,.03); box-shadow:0 0 0 3px rgba(46,232,255,.15), inset 0 2px 6px rgba(0,0,0,.2); }
+    .fb-textarea::placeholder { color:rgba(110,146,184,.4); }
   </style>
 </head>
 <body>
@@ -1777,7 +1867,7 @@ function html() {
     <nav>
       <div class="nav-item active" id="nav-dash">
         <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9 20v-5h6v5"/></svg>
-        Dashboard
+        Home
       </div>
       <div class="nav-item" id="nav-accounts">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg>
@@ -1803,6 +1893,10 @@ function html() {
       <div class="nav-item" id="nav-docs">
         <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         Docs
+      </div>
+      <div class="nav-item" id="btn-general-feedback" style="color:rgba(180,200,230,.65); border:1px solid transparent; transition:all .2s;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        Feedback
       </div>
     </nav>
     <div class="sidebar-actions">
@@ -1833,9 +1927,8 @@ function html() {
         <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         Install Rewards Desk
       </button>
-      <div class="ver" style="display:flex; justify-content:center; gap:8px">
-        <span>v${APP_VERSION}</span>
-        <a id="btn-general-feedback" style="cursor:pointer; text-decoration:underline;">Feedback</a>
+      <div class="ver" style="display:flex; justify-content:center; gap:8px; padding-bottom:10px; margin-top:20px">
+        <span style="font-size:13px; color:rgba(255,255,255,0.4)">v${APP_VERSION}</span>
       </div>
     </div>
   </aside>
@@ -1857,7 +1950,21 @@ function html() {
     </section>
 
     <!-- Dashboard view -->
-    <div class="cards" id="view-dash">
+    <div id="view-dash" style="display:flex;flex-direction:column;gap:20px;flex:1;height:100%;overflow:hidden;padding-right:4px;">
+      <div class="star-banner" onclick="window.open('https://github.com/QuestPilot/Microsoft-Rewards-Bot')">
+        <div class="star-banner-bg"></div>
+        <div class="star-banner-content">
+          <div style="background:rgba(247,200,92,.1);padding:10px;border-radius:12px;display:flex">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
+          <div class="star-banner-text">
+            <span class="star-banner-title">Love Rewards Desk?</span>
+            <span class="star-banner-sub">Support the open-source project by leaving a Star on GitHub!</span>
+          </div>
+          <button class="star-banner-btn">Star Project</button>
+        </div>
+      </div>
+      <div class="cards">
       <!-- Status -->
       <div class="card">
         <div class="card-head"><span class="card-label">Bot Status</span></div>
@@ -1901,9 +2008,10 @@ function html() {
           </div>
         </div>
       </div>
+      </div>
 
       <!-- Accounts -->
-      <div class="card">
+      <div class="card" style="flex:1; min-height:0; display:flex; flex-direction:column">
         <div class="card-head">
           <span class="card-label">Accounts</span>
           <button class="btn btn-secondary btn-sm" id="btn-open-acc">Manage →</button>
@@ -1914,18 +2022,37 @@ function html() {
 
     <!-- Accounts full view (editor) -->
     <div class="view-full" id="view-accounts">
-      <div class="full-card">
-        <div class="card-head">
-          <span class="card-label">Accounts</span>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-secondary btn-sm" id="btn-test-proxies" style="display:none">
-              <svg style="width:12px;height:12px;vertical-align:middle;margin-right:4px;fill:none;stroke:currentColor;stroke-width:2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="23"></line><line x1="1" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="23" y2="12"></line></svg>Test Proxies
-            </button>
-            <button class="btn btn-primary btn-sm" id="btn-add-acc">+ Add account</button>
+      <!-- Premium header with stats -->
+      <div class="acc-page-header">
+        <div class="acc-page-title-wrap">
+          <div class="acc-page-title">Accounts</div>
+          <div class="acc-page-sub" id="acc-page-sub">Manage your Microsoft accounts</div>
+        </div>
+        <div class="acc-page-stats">
+          <div class="acc-stat">
+            <div class="acc-stat-val" id="acc-stat-total">—</div>
+            <div class="acc-stat-lbl">Total</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-val" style="color:var(--green)" id="acc-stat-enabled">—</div>
+            <div class="acc-stat-lbl">Active</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-val" style="color:var(--muted)" id="acc-stat-disabled">—</div>
+            <div class="acc-stat-lbl">Paused</div>
           </div>
         </div>
-        <div id="acc-editor-list" style="overflow-y:auto;flex:1"></div>
+        <div class="acc-page-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-test-proxies" style="display:none">
+            <svg style="width:13px;height:13px;vertical-align:middle;margin-right:5px;fill:none;stroke:currentColor;stroke-width:2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="23"></line><line x1="1" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="23" y2="12"></line></svg>Test Proxies
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-add-acc">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:middle;margin-right:5px;fill:none;stroke:currentColor;stroke-width:2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Add account
+          </button>
+        </div>
       </div>
+      <!-- Scrollable account list -->
+      <div class="acc-page-body" id="acc-editor-list"></div>
     </div>
 
     <!-- Console view -->
@@ -1934,7 +2061,6 @@ function html() {
         <span class="card-label">Console output</span>
         <div class="console-head-actions">
           <button class="btn btn-secondary btn-sm" id="console-copy">Copy</button>
-          <button class="btn btn-secondary btn-sm" id="console-back">← Back</button>
         </div>
       </div>
       <div class="console-box" id="console-box"></div>
@@ -1948,7 +2074,6 @@ function html() {
     <div class="settings-wrap" id="view-settings">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
         <span class="card-label">Settings</span>
-        <button class="btn btn-secondary btn-sm" id="settings-back">← Back</button>
       </div>
       <div class="settings-section">
         <h3>Tasks</h3>
@@ -2170,7 +2295,10 @@ function html() {
           <div class="core-active-badge">Core active</div>
           <h1 class="core-active-title">Core is <span>working for you</span></h1>
           <p class="core-active-sub">Your license is valid and the premium engine is running. Here's a realistic estimate of the points Core adds on top of the free open-source bot — based on typical Microsoft Rewards values across your enabled features and accounts.</p>
-          <button class="btn btn-secondary btn-sm" id="core-manage-license" style="margin-top:14px">Manage this license</button>
+          <div style="display:flex;gap:10px;margin-top:14px;justify-content:center">
+            <button class="btn btn-secondary btn-sm" id="core-manage-license">Manage this license</button>
+            <button class="btn btn-secondary btn-sm" id="core-manual-rate">Rate Core</button>
+          </div>
         </div>
         <div class="core-expiry-band" id="core-expiry-band">
           <div class="core-expiry-left">
@@ -2317,7 +2445,6 @@ function html() {
         </div>
         <div class="plugins-head-actions">
           <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish / Manage my plugins →</button>
-          <button class="btn btn-secondary btn-sm" id="plugins-back">← Back</button>
         </div>
       </div>
       <div class="plugins-toolbar">
@@ -2453,6 +2580,22 @@ function html() {
     </div>
   </div>
 
+  <!-- GitHub Star modal -->
+  <div class="modal-bg" id="star-modal">
+    <div class="modal star-modal-content" style="text-align:center; padding:32px 36px;">
+      <img src="/star.gif" class="star-modal-gif" alt="Star Animation">
+      <h2>Enjoying the bot? ⭐</h2>
+      <p>If Microsoft Rewards Bot has saved you time, a GitHub star goes a long way — it helps the project grow and keeps it free for everyone.</p>
+      <div class="modal-actions" style="grid-template-columns:1fr; gap:10px; margin-top:0;">
+        <button class="btn btn-star" id="star-btn-go">
+          <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Star on GitHub
+        </button>
+        <button class="btn btn-secondary" id="star-btn-later">Maybe later</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Config modal (Notifications / dashboard sync) -->
   <div class="modal-bg" id="cfg-modal">
     <div class="modal">
@@ -2467,51 +2610,59 @@ function html() {
 
     <!-- Feedback Modal -->
     <div class="modal-bg" id="fb-modal">
-      <div class="modal" style="width: min(400px, 100%)">
-        <h2 style="text-align:center" id="fb-title">Rate Core</h2>
-        <p style="text-align:center; color: var(--muted); font-size: 13px; margin-top: 6px" id="fb-desc">How would you rate your experience with Core so far?</p>
-        <div class="rating-stars" id="fb-stars">
-          <div class="rating-star" data-val="1">★</div>
-          <div class="rating-star" data-val="2">★</div>
-          <div class="rating-star" data-val="3">★</div>
-          <div class="rating-star" data-val="4">★</div>
-          <div class="rating-star" data-val="5">★</div>
+      <div class="lic-card" style="width: min(440px, 92%); border-radius:24px; overflow:hidden">
+        <div class="lic-banner-wrap" style="height:110px; flex-shrink:0">
+          <div class="lic-banner-tint"></div>
+          <div class="lic-banner-badges">
+            <svg viewBox="0 0 24 24" style="width:34px;height:34px;color:var(--gold);filter:drop-shadow(0 0 10px rgba(247,200,92,0.5))" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <div>
+              <div class="lic-banner-title" id="fb-title">Rate Core</div>
+              <div class="lic-banner-ver">Your Feedback</div>
+            </div>
+          </div>
         </div>
-        <textarea class="fb-textarea" id="fb-comment" placeholder="Tell us more... (optional)"></textarea>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" id="fb-btn-skip">Skip</button>
-          <button class="btn btn-primary" id="fb-btn-submit" disabled>Submit</button>
+        <div class="lic-body" style="text-align:center; padding:24px 30px 30px">
+          <p style="color:rgba(180,200,230,.8); font-size:14px; line-height:1.6; margin-bottom:18px" id="fb-desc">How would you rate your premium experience so far?</p>
+          <div class="rating-stars" id="fb-stars" style="margin-bottom:20px; justify-content:center">
+            <div class="rating-star" data-val="1"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <div class="rating-star" data-val="2"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <div class="rating-star" data-val="3"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <div class="rating-star" data-val="4"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <div class="rating-star" data-val="5"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+          </div>
+          <textarea class="fb-textarea" id="fb-comment" placeholder="Any suggestions or issues? (optional)" style="background:rgba(2,7,16,.4); border:1px solid rgba(255,255,255,.05); border-radius:14px; padding:16px; font-size:13.5px"></textarea>
+          <div class="lic-actions" style="margin-top:20px; flex-direction:row">
+            <button class="btn-lic-secondary" id="fb-btn-skip" style="flex:1; justify-content:center; border-radius:100px">Maybe later</button>
+            <button class="btn-lic-primary" id="fb-btn-submit" style="flex:1; justify-content:center; border-radius:100px" disabled>Submit</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Comment Modal -->
     <div class="modal-bg" id="comment-modal">
-      <div class="modal" style="width: min(450px, 100%)">
-        <h2 style="text-align:center">Leave a Comment</h2>
-        <p style="text-align:center; color: var(--muted); font-size: 13px; margin-top: 6px">Suggestions, issues, or general feedback.</p>
-        <textarea class="fb-textarea" id="general-comment" placeholder="Describe your thoughts here..." style="height: 120px; margin-top: 15px;"></textarea>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" id="comment-btn-cancel">Cancel</button>
-          <button class="btn btn-primary" id="comment-btn-submit">Submit</button>
+      <div class="lic-card" style="width: min(460px, 92%); border-radius:24px; overflow:hidden">
+        <div class="lic-banner-wrap" style="height:110px; flex-shrink:0">
+          <div class="lic-banner-tint"></div>
+          <div class="lic-banner-badges">
+            <svg viewBox="0 0 24 24" style="width:34px;height:34px;color:rgba(180,200,230,.9)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+            <div>
+              <div class="lic-banner-title">General Feedback</div>
+              <div class="lic-banner-ver">Suggestions & Issues</div>
+            </div>
+          </div>
+        </div>
+        <div class="lic-body" style="text-align:center; padding:24px 30px 30px">
+          <p style="color:rgba(180,200,230,.8); font-size:14px; line-height:1.6; margin-bottom:18px">We're always looking to improve Rewards Desk.</p>
+          <textarea class="fb-textarea" id="general-comment" placeholder="Describe your thoughts here..." style="height:120px; background:rgba(2,7,16,.4); border:1px solid rgba(255,255,255,.05); border-radius:14px; padding:16px; font-size:13.5px"></textarea>
+          <div class="lic-actions" style="margin-top:20px; flex-direction:row">
+            <button class="btn-lic-secondary" id="comment-btn-cancel" style="flex:1; justify-content:center; border-radius:100px">Cancel</button>
+            <button class="btn-lic-primary" id="comment-btn-submit" style="flex:1; justify-content:center; border-radius:100px">Submit</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Temporary announcement notice (disposable — see initDeskNotice / ACTIVE_NOTICE) -->
-    <div class="modal-bg" id="notice-modal">
-      <div class="modal notice-modal">
-        <div class="modal-icon notice-modal-icon">
-          <svg viewBox="0 0 24 24"><path d="M3 11l14-6v14L3 13z"></path><path d="M17 7a4 4 0 0 1 0 8"></path><path d="M6 13v4a2 2 0 0 0 4 0v-2"></path></svg>
-        </div>
-        <h2 id="notice-title">Important announcement</h2>
-        <p id="notice-body"></p>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" id="notice-dismiss">Dismiss</button>
-          <button class="btn btn-primary" id="notice-read">Read more</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Core activation overlay -->
   <div class="lic-overlay" id="lic-overlay">
@@ -2539,6 +2690,7 @@ function html() {
             <div class="lic-feat"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Double search pts</div>
             <div class="lic-feat"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Remote dashboard</div>
           </div>
+          <div class="lic-hint"><a href="https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/main/docs/core-plugin.md" target="_blank">Get a license key →</a></div>
           <div class="lic-actions">
             <button class="btn-lic-primary" id="lic-btn-show-key">Activate Core →</button>
             <button class="btn-lic-secondary" id="lic-btn-skip-welcome">Continue without Core</button>
@@ -2557,7 +2709,7 @@ function html() {
             <button class="btn-lic-primary" id="lic-btn-activate">Activate</button>
             <button class="btn-lic-secondary" id="lic-btn-skip-key">Continue without Core</button>
           </div>
-          <div class="lic-hint"><a href="https://bot.lgtw.tf" target="_blank">Get a license key →</a></div>
+          <div class="lic-hint"><a href="https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/main/docs/core-plugin.md" target="_blank">Get a license key →</a></div>
         </div>
         <!-- Success -->
         <div id="lic-view-success" style="display:none">
@@ -2657,11 +2809,12 @@ function html() {
 
     function showToast(message, isError) {
       var toast = G('toast');
-      toast.textContent = message;
+      var icon = isError ? '<svg viewBox="0 0 24 24" style="width:18px;height:18px;flex-shrink:0;color:var(--rose)" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>' : '<svg viewBox="0 0 24 24" style="width:18px;height:18px;flex-shrink:0;color:var(--cyan)" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+      toast.innerHTML = icon + '<span>' + esc(message) + '</span>';
       toast.classList.toggle('error', !!isError);
       toast.classList.add('show');
       clearTimeout(_toastTimer);
-      _toastTimer = setTimeout(function(){toast.classList.remove('show');}, 3200);
+      _toastTimer = setTimeout(function(){toast.classList.remove('show');}, 3500);
     }
     function releaseBootOverlay() {
       if (_bootOverlayReleased) return;
@@ -3119,9 +3272,21 @@ function html() {
     function renderAccEditor() {
       var list = G('acc-editor-list');
       if (!_raw.length) {
-        list.innerHTML = '<div class="acc-empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg><p>No accounts yet. Click "+ Add account" to get started.</p></div>';
+        list.innerHTML = '<div class="acc-empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg><p>No accounts yet. Click &quot;+ Add account&quot; to get started.</p></div>';
+        if (G('acc-stat-total')) G('acc-stat-total').textContent = '0';
+        if (G('acc-stat-enabled')) G('acc-stat-enabled').textContent = '0';
+        if (G('acc-stat-disabled')) G('acc-stat-disabled').textContent = '0';
         return;
       }
+
+      // Update stat counters
+      var totalCount = _raw.length;
+      var enabledCount = _raw.filter(function(a) { return a.enabled !== false; }).length;
+      var disabledCount = totalCount - enabledCount;
+      if (G('acc-stat-total')) G('acc-stat-total').textContent = totalCount;
+      if (G('acc-stat-enabled')) G('acc-stat-enabled').textContent = enabledCount;
+      if (G('acc-stat-disabled')) G('acc-stat-disabled').textContent = disabledCount;
+      if (G('acc-page-sub')) G('acc-page-sub').textContent = totalCount + ' account' + (totalCount !== 1 ? 's' : '') + ' configured';
 
       var proxyAccs = [];
       var directAccs = [];
@@ -3585,8 +3750,8 @@ function html() {
     G('nav-console').addEventListener('click', function() { setView('console'); });
     G('nav-settings').addEventListener('click', function() { setView('settings'); });
     G('nav-core').addEventListener('click', function() { setView('core'); });
-    G('console-back').addEventListener('click', function() { setView('dash'); });
-    G('settings-back').addEventListener('click', function() { setView('dash'); });
+    if(G('console-back')) G('console-back').addEventListener('click', function() { setView('dash'); });
+    if(G('settings-back')) G('settings-back').addEventListener('click', function() { setView('dash'); });
     // Scheduler toggle shows/hides fields
     G('tog-scheduler').addEventListener('change', function() {
       _updateSchFields(this.checked);
@@ -3704,8 +3869,8 @@ function html() {
     // Nav: Plugins & Docs
     G('nav-plugins').addEventListener('click', function() { setView('plugins'); });
     G('nav-docs').addEventListener('click', function() { setView('docs'); });
-    G('plugins-back').addEventListener('click', function() { setView('dash'); });
-    G('docs-back').addEventListener('click', function() { setView('dash'); });
+    if(G('plugins-back')) G('plugins-back').addEventListener('click', function() { setView('dash'); });
+    if(G('docs-back')) G('docs-back').addEventListener('click', function() { setView('dash'); });
     G('plugins-doc-btn').addEventListener('click', function() { window.open(PLUGIN_DOC_URL); });
     G('plugins-publish-btn').addEventListener('click', function() {
       // Open the developer site in a dedicated Desk-style window (own cookie jar so
@@ -4243,13 +4408,32 @@ function html() {
         btn.addEventListener('click', async function() {
           var name = btn.getAttribute('data-install');
           var ver = btn.getAttribute('data-ver');
-          if (!window.confirm('"' + name + '" is a community plugin (not the official team). It will run SANDBOXED — no file system, network, or Node APIs.\\nThe bot downloads and verifies it on the next start.\\n\\nInstall it?')) return;
+          
+          if (!btn.classList.contains('confirming')) {
+            btn.classList.add('confirming');
+            var oldText = btn.textContent;
+            btn.textContent = 'Confirm Install?';
+            btn.style.background = 'rgba(255,107,138,0.2)';
+            btn.style.color = 'var(--rose)';
+            btn.style.borderColor = 'rgba(255,107,138,0.6)';
+            setTimeout(() => {
+              if (btn && btn.classList.contains('confirming')) {
+                btn.classList.remove('confirming');
+                btn.textContent = oldText;
+                btn.style = '';
+              }
+            }, 3000);
+            return;
+          }
+          
+          btn.classList.remove('confirming');
+          btn.style = '';
           btn.disabled = true; btn.textContent = 'Installing…';
           try {
             var r = await fetch('/api/plugins/install', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, version:ver})});
             if (r.ok) { loadPluginsCatalog(false); }
-            else { var msg = await r.text(); btn.disabled = false; btn.textContent = 'Install'; alert('Could not install "' + name + '": ' + (msg || 'Unknown error')); }
-          } catch(e) { btn.disabled = false; btn.textContent = 'Install'; alert('Install failed: ' + e.message); }
+            else { btn.disabled = false; btn.textContent = 'Failed'; setTimeout(() => btn.textContent = 'Install', 2000); }
+          } catch(e) { btn.disabled = false; btn.textContent = 'Error'; setTimeout(() => btn.textContent = 'Install', 2000); }
         });
       });
       wrap.querySelectorAll('button[data-update]').forEach(function(btn) {
@@ -4509,6 +4693,77 @@ function html() {
       }
     });
 
+    // ── Global external link handler ─────────────────────────────────────────
+    window.open = function(url) {
+      fetch('/api/open-url', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: url })
+      }).catch(function(){});
+    };
+
+    document.addEventListener('click', function(e) {
+      var a = e.target.closest('a');
+      if (a && a.href && /^https?:/.test(a.href)) {
+        e.preventDefault();
+        window.open(a.href);
+      }
+    });
+
+    // ── GitHub Star prompt ──────────────────────────────────────────────────
+    (function initStarPrompt() {
+      var modal = G('star-modal');
+      if (!modal) return;
+
+      function close() { modal.classList.remove('open'); }
+
+      // Check if any other modal/overlay is currently visible
+      function isAnyModalOpen() {
+        var openEls = document.querySelectorAll('.modal-bg.open, .lic-overlay.open, .install-overlay.open');
+        return openEls.length > 0;
+      }
+
+      // Show only if no other modal is in the way; retry every 1.2s until clear
+      function tryShow() {
+        if (isAnyModalOpen()) {
+          setTimeout(tryShow, 1200);
+          return;
+        }
+        modal.classList.add('open');
+      }
+
+      G('star-btn-go').addEventListener('click', function() {
+        window.open('https://github.com/QuestPilot/Microsoft-Rewards-Bot');
+        fetch('/api/star/done', { method: 'POST' }).catch(function(){});
+        
+        var btn = G('star-btn-go');
+        btn.disabled = true;
+        
+        setTimeout(function() {
+          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#0a0800" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Thank you!';
+          G('star-btn-later').textContent = 'Close';
+        }, 1200);
+      });
+      G('star-btn-later').addEventListener('click', function() {
+        fetch('/api/star/later', { method: 'POST' }).catch(function(){});
+        close();
+      });
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          fetch('/api/star/later', { method: 'POST' }).catch(function(){});
+          close();
+        }
+      });
+
+      // Initial delay so boot overlay clears, then wait for any open modal to close
+      setTimeout(function() {
+        fetch('/api/star').then(function(r) { return r.json(); }).then(function(d) {
+          if (d && d.show) tryShow();
+        }).catch(function(){});
+      }, 2800);
+    })();
+    // ── end GitHub Star prompt ──────────────────────────────────────────────
+
     fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
       _schedCache = (s && s.scheduler) || null; updateNextRun();
     }).catch(function(){});
@@ -4520,38 +4775,6 @@ function html() {
     setInterval(refresh, 900);
     refresh();
 
-    // ── TEMPORARY: one-time announcement notice (disposable) ────────────
-    // The server (GET /api/notice) decides whether to show it and remembers
-    // the dismissal (POST /api/notice/seen). Remove this block to retire it.
-    (function initDeskNotice() {
-      var shown = false;
-      function dismiss() {
-        var m = G('notice-modal');
-        if (m) m.classList.remove('open');
-        fetch('/api/notice/seen', { method: 'POST' }).catch(function(){});
-      }
-      function show(notice) {
-        if (shown || !G('notice-modal')) return;
-        shown = true;
-        if (notice.title) G('notice-title').textContent = notice.title;
-        if (notice.body) G('notice-body').textContent = notice.body;
-        var readBtn = G('notice-read');
-        if (notice.cta && readBtn) readBtn.textContent = notice.cta;
-        if (readBtn) readBtn.onclick = function() {
-          if (notice.url) window.open(notice.url);
-          dismiss();
-        };
-        var dismissBtn = G('notice-dismiss');
-        if (dismissBtn) dismissBtn.onclick = dismiss;
-        G('notice-modal').classList.add('open');
-      }
-      // Slight delay so it lands after the boot overlay clears, not during load.
-      setTimeout(function() {
-        fetch('/api/notice').then(function(r){ return r.json(); }).then(function(d){
-          if (d && d.show && d.notice) show(d.notice);
-        }).catch(function(){});
-      }, 2200);
-    })();
 
     // ── Feedback / review prompt (Core users only) ──────────────────────
     // Smart timing so we never nag:
@@ -4594,8 +4817,14 @@ function html() {
         if (st.asks > 0 && (Date.now() - st.lastAskAt) < REASK_COOLDOWN_MS) return false;
         return true;
       }
+      
+      function isAnyModalOpen() {
+        return document.querySelectorAll('.modal-bg.open, .lic-overlay.open, .install-overlay.open').length > 0;
+      }
+
       function openModal() {
         if (modalOpen || !eligible()) return false;
+        if (isAnyModalOpen() && !G('fb-modal').classList.contains('open')) return false;
         if (G('fb-modal').classList.contains('open')) return false;
         modalOpen = true;
         selectedRating = 0;
@@ -4623,8 +4852,21 @@ function html() {
       G('fb-btn-skip').addEventListener('click', function() {
         // Skip = ask again later. Cooldown was already set when the modal opened.
         modalOpen = false;
+        modalOpen = false;
         G('fb-modal').classList.remove('open');
       });
+      
+      if (G('core-manual-rate')) {
+        G('core-manual-rate').addEventListener('click', function() {
+          if (isAnyModalOpen() && !G('fb-modal').classList.contains('open')) return;
+          modalOpen = true;
+          selectedRating = 0;
+          G('fb-btn-submit').disabled = true;
+          document.querySelectorAll('.rating-star').forEach(function(ss) { ss.classList.remove('active'); });
+          if (G('fb-comment')) G('fb-comment').value = '';
+          G('fb-modal').classList.add('open');
+        });
+      }
 
       G('fb-btn-submit').addEventListener('click', function() {
         if (!selectedRating) return;
@@ -4758,6 +5000,10 @@ const server = http.createServer((req, res) => {
         serveStaticImage(res, path.join(ROOT, 'assets', 'core.png'))
         return
     }
+    if (req.method === 'GET' && req.url === '/star.gif') {
+        serveStaticGif(res, path.join(ROOT, 'assets', 'star.gif'))
+        return
+    }
     if (req.method === 'GET' && req.url === '/favicon.ico') {
         serveAppIcon(res)
         return
@@ -4868,6 +5114,26 @@ const server = http.createServer((req, res) => {
         })
         return
     }
+    // ── GitHub Star routes ────────────────────────────────────────────────
+    if (req.method === 'GET' && req.url === '/api/star') {
+        const st = readStarState()
+        const show = !st.done && (st.shows || 0) < STAR_MAX_SHOWS
+        jsonResponse(res, 200, { show })
+        if (show) saveStarState({ ...st, shows: (st.shows || 0) + 1 })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/star/done') {
+        saveStarState({ done: true, shows: STAR_MAX_SHOWS })
+        res.writeHead(204); res.end()
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/star/later') {
+        const st = readStarState()
+        saveStarState({ ...st, shows: st.shows || 0 })
+        res.writeHead(204); res.end()
+        return
+    }
+    // ── end GitHub Star routes ────────────────────────────────────────────
     if (req.method === 'POST' && req.url === '/api/show-browser') {
         // Signal the running bot to reveal its off-screen browser window. The
         // signal is harmless if the run is truly headless (Docker) — nothing to
@@ -4881,25 +5147,24 @@ const server = http.createServer((req, res) => {
         res.end()
         return
     }
+    if (req.method === 'POST' && req.url === '/api/open-url') {
+        readApiBody(req, res, body => {
+            try {
+                const data = JSON.parse(body)
+                if (data.url) openDefaultBrowser(data.url)
+            } catch {}
+            res.writeHead(204)
+            res.end()
+        })
+        return
+    }
     if (req.method === 'POST' && req.url === '/api/close') {
         scheduleShutdown()
         res.writeHead(204)
         res.end()
         return
     }
-    // TEMPORARY: announcement notice (disposable — see ACTIVE_NOTICE).
-    if (req.method === 'GET' && req.url === '/api/notice') {
-        const seen = readSeenNotices()
-        const show = !!ACTIVE_NOTICE && !seen[ACTIVE_NOTICE.id]
-        jsonResponse(res, 200, { show, notice: show ? ACTIVE_NOTICE : null })
-        return
-    }
-    if (req.method === 'POST' && req.url === '/api/notice/seen') {
-        if (ACTIVE_NOTICE) markNoticeSeen(ACTIVE_NOTICE.id)
-        res.writeHead(204)
-        res.end()
-        return
-    }
+
     if (req.method === 'POST' && req.url === '/api/open-accounts') {
         res.writeHead(openAccountsFile() ? 204 : 404)
         res.end()
@@ -5078,8 +5343,15 @@ const server = http.createServer((req, res) => {
         fetchSignedCatalog(catalogUrl).then(function(result) {
             let parsed = null
             try { parsed = JSON.parse(result.catalog) } catch {}
-            if (parsed) {
-                try { fs.mkdirSync(path.join(ROOT, 'plugins'), { recursive: true }); fs.writeFileSync(catalogPath, result.catalog, 'utf8') } catch {}
+            // Cache the catalog ONLY with its signature: the bot's verifier is fail-closed,
+            // so a marketplace.json without a matching marketplace.sig is rejected as
+            // 'absent' and the plugins are skipped. Write both atomically, or neither.
+            if (parsed && result.signature) {
+                try {
+                    fs.mkdirSync(path.join(ROOT, 'plugins'), { recursive: true });
+                    fs.writeFileSync(catalogPath, result.catalog, 'utf8');
+                    fs.writeFileSync(path.join(ROOT, 'plugins', 'marketplace.sig'), String(result.signature).trim() + '\n', 'utf8');
+                } catch {}
             }
             res.writeHead(200, { 'content-type': 'application/json' })
             res.end(JSON.stringify({ catalog: parsed, source: parsed ? 'live' : 'none' }))
