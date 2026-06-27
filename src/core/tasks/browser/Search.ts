@@ -473,31 +473,13 @@ export class Search extends TaskBase {
 
     private async bingSearch(searchPage: Page, query: string, isMobile: boolean) {
         const maxAttempts = 5
-        const refreshThreshold = 10 // Page gets sluggish after x searches?
 
         this.searchCount++
-
-        if (this.searchCount % refreshThreshold === 0) {
-            this.bot.logger.info(
-                isMobile,
-                'SEARCH-BING',
-                `Returning to home page to clear accumulated page context | count=${this.searchCount} | threshold=${refreshThreshold}`
-            )
-
-            this.bot.logger.debug(isMobile, 'SEARCH-BING', `Returning home to refresh state | url=${this.bingHome}`)
-
-            const cvid = randomBytes(16).toString('hex')
-            const url = `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
-
-            await searchPage.goto(url)
-            await searchPage.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
-            await this.bot.browser.utils.tryDismissAllMessages(searchPage)
-        }
 
         this.bot.logger.debug(
             isMobile,
             'SEARCH-BING',
-            `Starting bingSearch | query="${query}" | maxAttempts=${maxAttempts} | searchCount=${this.searchCount} | refreshEvery=${refreshThreshold} | scrollRandomResults=${this.bot.config.searchSettings.scrollRandomResults} | clickRandomResults=${this.bot.config.searchSettings.clickRandomResults}`
+            `Starting bingSearch | query="${query}" | maxAttempts=${maxAttempts} | searchCount=${this.searchCount} | scrollRandomResults=${this.bot.config.searchSettings.scrollRandomResults} | clickRandomResults=${this.bot.config.searchSettings.clickRandomResults}`
         )
 
         for (let i = 0; i < maxAttempts; i++) {
@@ -505,12 +487,32 @@ export class Search extends TaskBase {
                 const searchBar = BING_SEARCH.searchBar
                 const searchBox = searchPage.locator(searchBar)
 
+                // Load the results page for this query directly instead of relying on the
+                // search box already being usable on whatever page the previous step left
+                // behind. On mobile (and some locales) the homepage #sb_form_q is present
+                // in the DOM but collapsed/hidden, so waitFor({ state: 'visible' }) timed
+                // out (15s × maxAttempts) and the whole run earned 0 points. Navigating to
+                // /search guarantees a real results page (mirrors the proven SearchOnBing
+                // flow) and registers the search via the URL even if the human-typing
+                // re-submit below is interrupted. A fresh navigation on each attempt also
+                // recovers a stale/blank page on retry.
+                const cvid = randomBytes(16).toString('hex')
+                const url = `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
+
+                await searchPage.goto(url)
+                await searchPage.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+                await this.bot.browser.utils.tryDismissAllMessages(searchPage)
+
                 // Use string form so the obfuscator cannot inject outer-scope
                 // string-array references inside the evaluate callback body.
                 await searchPage.evaluate('window.scrollTo(0, 0)')
 
                 await searchPage.keyboard.press('Home')
-                await searchBox.waitFor({ state: 'visible', timeout: 15000 })
+
+                // 'attached' (not 'visible'): the box is reliably in the DOM on the results
+                // page but Playwright can flag it not-visible on mobile/SERP layouts; the
+                // ghostClick + fill below make it interactable. Matches SearchOnBing.
+                await searchBox.waitFor({ state: 'attached', timeout: 15000 })
 
                 await this.bot.utils.wait(1000)
                 await this.bot.browser.utils.ghostClick(searchPage, searchBar, { clickCount: 3 })
@@ -558,11 +560,11 @@ export class Search extends TaskBase {
 
                 return counters
             } catch (error) {
-                if (i >= 5) {
+                if (i >= maxAttempts - 1) {
                     this.bot.logger.error(
                         isMobile,
                         'SEARCH-BING',
-                        `Failed after 5 retries | query="${query}" | message=${error instanceof Error ? error.message : String(error)}`
+                        `Failed after ${maxAttempts} retries | query="${query}" | message=${error instanceof Error ? error.message : String(error)}`
                     )
                     break
                 }
