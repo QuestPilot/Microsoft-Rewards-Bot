@@ -4,7 +4,12 @@ const os = require('os')
 const path = require('path')
 const test = require('node:test')
 
-const { analyzeSavedPage, analyzeRewardsPage, collectScriptsForPage } = require('../scripts/rewards-page-analyzer')
+const {
+    analyzeSavedPage,
+    analyzeRewardsPage,
+    collectScriptsForPage,
+    normalizeModelType
+} = require('../scripts/rewards-page-analyzer')
 
 // Skip unless the actual earn-page fixture file is present. A bare (possibly
 // empty) Page/ directory must not turn this optional fixture test into a failure.
@@ -68,4 +73,36 @@ test('rewards page analyzer keeps daily set offer hashes paired with their item'
 
     assert.equal(child2.hash, 'e33cf04d34e275d4b878e60be5bd0f91d2dd24681e71d30351208250d975005c')
     assert.equal(child2.title, 'Russell’s summer bliss')
+})
+
+test('static Rewards routes do not require activity models or a reportActivity action id', () => {
+    const html = '<script>self.__next_f.push([1,"\\"c\\":[\\"\\",\\"about\\"]"])</script>'
+    const analysis = analyzeSavedPage(html)
+
+    assert.equal(analysis.kind, 'rewards-next')
+    assert.equal(analysis.route, 'about')
+    assert.deepEqual(analysis.problems, [])
+    assert.deepEqual(analysis.diagnostics, [])
+})
+
+test('missing lazy reportActivity chunk is diagnostic rather than a capture failure', () => {
+    const html = '<script>self.__next_f.push([1,"\\"c\\":[\\"\\",\\"earn\\"],\\"type\\":\\"dailyset\\",\\"model\\":{\\"offerId\\":\\"offer-1\\",\\"hash\\":\\"hash-1\\"}"])</script>'
+    const analysis = analyzeSavedPage(html)
+
+    assert.deepEqual(analysis.problems, [])
+    assert.ok(analysis.diagnostics.some(message => message.includes('may load only during an activity')))
+})
+
+test('RSC model types are normalized across embedded whitespace', () => {
+    assert.equal(normalizeModelType('streakbo\nnus'), 'streakbonus')
+    assert.equal(normalizeModelType('  DailySet  '), 'dailyset')
+})
+
+test('TypeScript and CLI analyzers retain the same route-aware rules', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src', 'automation', 'RewardsPageAnalyzer.ts'), 'utf8')
+
+    assert.match(source, /ACTIVITY_ROUTES = new Set\(\['dashboard', 'earn'\]\)/)
+    assert.match(source, /ACTIVITY_ROUTES\.has\(analysis\.route\)/)
+    assert.match(source, /normalizeModelType\(match\[1\]\)/)
+    assert.doesNotMatch(source, /problems\.push\('reportActivity server action id not found/)
 })

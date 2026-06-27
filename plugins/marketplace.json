@@ -1,0 +1,23 @@
+{
+  "format": "msrb-marketplace",
+  "version": 1,
+  "sequence": 2,
+  "issuedAt": "2026-06-27T18:29:34.630Z",
+  "ttlSeconds": 604800,
+  "killSwitch": false,
+  "plugins": [
+    {
+      "name": "test-plugin",
+      "version": "1.0.0",
+      "description": "test",
+      "license": "MIT",
+      "author": "discord:683712256243925066",
+      "apiVersion": "1.0.0",
+      "botVersionRange": ">=4.0.0",
+      "sha256": "185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969",
+      "installUrl": "https://cdn.jsdelivr.net/gh/QuestPilot/marketplace-plugins@5f8634a4f46bfee398ad99edcd4e7fba07da3864/test-plugin/1.0.0/index.js",
+      "publishedBotVersion": "4.5.15"
+    }
+  ],
+  "revoked": []
+}

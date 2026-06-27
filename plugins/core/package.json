@@ -13,14 +13,6 @@
                  "officialPlugin":  "core",
                  "releaseShape":  "single-entry-bytecode",
                  "targets":  {
-                                 "win32-x64-node-24.15.0":  {
-                                                                "indexSha256":  "78f097c3d4319f0f4966754db1bf5f6deb3cf83f8830dc2136517704b069aea1",
-                                                                "bytecodeTarget":  {
-                                                                                       "node":  "24.15.0",
-                                                                                       "platform":  "win32",
-                                                                                       "arch":  "x64"
-                                                                                   }
-                                                            },
                                  "linux-x64-node-24.15.0":  {
                                                                 "indexSha256":  "acf1702e0d6e20cc6a60ef5422849b7329e7cea4efc455f09403fa3e080128fa",
                                                                 "bytecodeTarget":  {
@@ -45,7 +37,15 @@
                                                                                         "arch":  "x64"
                                                                                     },
                                                                  "compatibleArtifactSource":  "linux-x64-node-24.15.0"
-                                                             }
+                                                             },
+                                 "win32-x64-node-24.15.0":  {
+                                                                "indexSha256":  "39e09d641cfce8d6a94cca1147241e0f5442379075d139a67814cb610f70f52f",
+                                                                "bytecodeTarget":  {
+                                                                                       "node":  "24.15.0",
+                                                                                       "platform":  "win32",
+                                                                                       "arch":  "x64"
+                                                                                   }
+                                                            }
                              }
              },
     "dependencies":  {

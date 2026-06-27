@@ -62,6 +62,12 @@ test('harvester result exposes detailed route, selector and failure diagnostics'
     assert.match(api, /failures\?: DashboardHarvesterFailure\[\]/)
     assert.match(api, /selectorChecks: DashboardHarvesterSelectorCheck\[\]/)
     assert.match(api, /required: boolean/)
+    assert.match(api, /matchesInitial\?: number/)
+    assert.match(api, /matchesExpanded\?: number/)
+    assert.match(api, /inventoryFile\?: string/)
+    assert.match(api, /domFingerprint\?: string/)
+    assert.match(api, /finalUrl\?: string/)
+    assert.match(api, /httpStatus\?: number/)
 })
 
 test('Main() runs the harvester only when the opt-in core flag is set', () => {

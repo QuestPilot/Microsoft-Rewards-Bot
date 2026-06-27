@@ -988,8 +988,18 @@ export class MicrosoftRewardsBot {
             console.log(
                 `  Data: ${Math.round(analysis.flightBytes / 1024)}KB | Offers: ${analysis.offerIds} | Models: ${analysis.modelTypes.join(', ') || 'none'} | Action IDs: ${analysis.actionIds}`
             )
+            const navigation = [
+                analysis.httpStatus ? `HTTP ${analysis.httpStatus}` : null,
+                analysis.finalUrl && analysis.finalUrl !== analysis.url ? `Final URL: ${analysis.finalUrl}` : null,
+                analysis.navigationError ? `Navigation note: ${analysis.navigationError}` : null
+            ].filter(Boolean)
+            if (navigation.length) console.log(`  Navigation: ${navigation.join(' | ')}`)
+            const domSize = analysis.domBytes === undefined ? '?' : `${Math.round(analysis.domBytes / 1024)}KB`
             console.log(
-                `  DOM: switches=${analysis.switches}, disclosures=${analysis.disclosures}, dialogs=${analysis.dialogs} | Selectors: ${matched}/${analysis.selectorChecks.length} matched`
+                `  DOM: ${analysis.elementCount ?? '?'} elements, ${analysis.classTokenCount ?? '?'} classes, ${analysis.stableIdCount ?? '?'} stable IDs, ${domSize} | switches=${analysis.switches}, disclosures=${analysis.disclosures}, dialogs=${analysis.dialogs}`
+            )
+            console.log(
+                `  Selectors: ${matched}/${analysis.selectorChecks.length} matched across initial/expanded states | Inventory: ${analysis.inventoryFile ?? 'unavailable'}${analysis.domFingerprint ? ` | fingerprint=${analysis.domFingerprint.slice(0, 12)}` : ''}`
             )
             if (missingRequired.length) {
                 console.log(

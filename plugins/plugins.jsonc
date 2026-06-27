@@ -69,4 +69,10 @@
     // - Higher priority loads first
     // - Same priority = alphabetical order
     // - Core plugin has priority 100 by default
+,
+  "test-plugin": {
+    "enabled": true,
+    "source": "marketplace",
+    "version": "1.0.0"
+  }
 }

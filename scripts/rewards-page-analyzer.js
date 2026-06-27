@@ -1,8 +1,14 @@
 const fs = require('fs')
 const path = require('path')
 
+const ACTIVITY_ROUTES = new Set(['dashboard', 'earn'])
+
 function unique(values) {
     return [...new Set(values.filter(Boolean))]
+}
+
+function normalizeModelType(value) {
+    return typeof value === 'string' ? value.replace(/\s+/g, '').toLowerCase() : ''
 }
 
 function safeReadText(file) {
@@ -96,6 +102,10 @@ function analyzeBingSearchPage(html) {
 function buildRewardsProblems(analysis) {
     const problems = []
 
+    // Activity models only exist on the dashboard and earn routes. Static,
+    // redemption and referral routes are still valid Rewards captures.
+    if (!ACTIVITY_ROUTES.has(analysis.route)) return problems
+
     if (!analysis.modelTypes?.length) problems.push('No Rewards RSC activity models found')
     if (analysis.modelTypes?.includes('dailyset') && !analysis.activities.some(activity => activity.type === 'dailyset' && activity.offerId && activity.hash)) {
         problems.push('Daily Set models found, but no Daily Set activity has both offerId and hash')
@@ -109,10 +119,6 @@ function buildRewardsProblems(analysis) {
     ) {
         problems.push('streak models found, but no disclosure trigger was found')
     }
-    if (!analysis.actionIds?.length) {
-        problems.push('reportActivity server action id not found in saved HTML/chunks')
-    }
-
     return problems
 }
 
@@ -218,12 +224,14 @@ function extractRewardsActivities(text) {
 
     for (const match of text.matchAll(/"type"\s*:\s*"([^"]+)"[\s\S]{0,1200}?"model"\s*:\s*\{/g)) {
         if (match.index === undefined || !match[1]) continue
+        const type = normalizeModelType(match[1])
+        if (!type) continue
         const context = contextAround(text, match.index, 2200)
         const offerId = readStringField(context, 'offerId') ?? readStringField(context, 'activationOfferId')
         const hash = readStringField(context, 'hash') ?? readStringField(context, 'activationHash')
         if (offerId && activities.some(activity => activity.offerId === offerId)) continue
         activities.push({
-            type: match[1],
+            type,
             offerId: offerId && offerId !== '$undefined' ? offerId : undefined,
             hash: hash && hash !== '$undefined' ? hash : undefined,
             destination: readStringField(context, 'destination'),
@@ -258,15 +266,20 @@ function analyzeRewardsPage(html, scriptText = '') {
     const flightText = extractNextFlightTextFromHtml(html)
     const combined = `${flightText}\n${scriptText}`
     const activities = extractRewardsActivities(flightText)
+    const route = flightText.match(/"c"\s*:\s*\["","([^"]+)"/)?.[1]
+    const actionIds = extractReportActivityActionIds(combined)
     const diagnostics = []
 
     if (!flightText) diagnostics.push('RSC flight data not found')
-    if (!activities.length) diagnostics.push('No rewards activity models found')
+    if (ACTIVITY_ROUTES.has(route) && !activities.length) diagnostics.push('No rewards activity models found')
+    if (ACTIVITY_ROUTES.has(route) && !actionIds.length) {
+        diagnostics.push('reportActivity action id was not loaded by this read-only capture; its chunk may load only during an activity')
+    }
 
     return {
         kind: flightText ? 'rewards-next' : 'unknown',
-        route: flightText.match(/"c"\s*:\s*\["","([^"]+)"/)?.[1],
-        actionIds: extractReportActivityActionIds(combined),
+        route,
+        actionIds,
         modelTypes: unique(activities.map(activity => activity.type)),
         activities,
         switches: extractSwitchSummaries(html),
@@ -408,5 +421,6 @@ module.exports = {
     extractSwitchSummaries,
     extractDisclosureSummaries,
     extractPanelSignals,
-    collectScriptsForPage
+    collectScriptsForPage,
+    normalizeModelType
 }

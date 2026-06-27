@@ -82,7 +82,12 @@ export interface DashboardHarvesterSelectorCheck {
     group: string
     key: string
     selector: string
+    /** Maximum match count observed across the initial and expanded DOM states. */
     matches: number
+    /** Match count before the harvester opens disclosures and side panels. */
+    matchesInitial?: number
+    /** Match count after the harvester opens disclosures and side panels. */
+    matchesExpanded?: number
     valid: boolean
     required: boolean
     error?: string
@@ -90,8 +95,23 @@ export interface DashboardHarvesterSelectorCheck {
 
 export interface DashboardHarvesterPageAnalysis {
     name: string
+    /** Requested route URL. */
     url: string
+    /** Final URL after redirects. */
+    finalUrl?: string
+    /** Main-document HTTP status when Patchright exposed a response. */
+    httpStatus?: number
+    /** Non-fatal navigation error when a timed-out page still produced usable DOM/RSC data. */
+    navigationError?: string
     title: string
+    domBytes?: number
+    elementCount?: number
+    classTokenCount?: number
+    stableIdCount?: number
+    /** Per-route structured DOM inventory written next to the HTML/RSC artifacts. */
+    inventoryFile?: string
+    /** Deterministic SHA-256 of stable DOM signals for drift comparisons. */
+    domFingerprint?: string
     flightBytes: number
     offerIds: number
     actionIds: number
