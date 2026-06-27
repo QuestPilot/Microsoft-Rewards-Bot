@@ -2650,9 +2650,9 @@ function html() {
     });
     document.addEventListener('dragstart', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
-      var blocked = e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) ||
-        (e.ctrlKey && e.key.toUpperCase() === 'U');
-      if (blocked) { e.preventDefault(); e.stopPropagation(); }
+      // F12 stays blocked (too easy to hit by accident). Ctrl+Shift+I / J / C are
+      // left to Chromium so DevTools remain reachable for debugging the Desk.
+      if (e.key === 'F12') { e.preventDefault(); e.stopPropagation(); }
     }, true);
 
     function showToast(message, isError) {
@@ -5071,12 +5071,9 @@ const server = http.createServer((req, res) => {
             res.end(JSON.stringify({ catalog, source: 'disk' }))
             return
         }
-        const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL
-        if (!catalogUrl) {
-            res.writeHead(200, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({ catalog: null, source: 'none' }))
-            return
-        }
+        // Default to the production catalog endpoint so the marketplace works out of the
+        // box; override with MSRB_MARKETPLACE_CATALOG_URL for local/staging testing.
+        const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL || 'https://bot.lgtw.tf/api/marketplace/catalog'
         const { fetchSignedCatalog } = require('./marketplace-fetch')
         fetchSignedCatalog(catalogUrl).then(function(result) {
             let parsed = null
