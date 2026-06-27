@@ -3,7 +3,7 @@
     "version":  "2.0.1.9",
     "targets":  {
                     "win32-x64-node-24.15.0":  {
-                                                   "indexSha256":  "9a9c6e9dd60e80e99ddc8caaab58e85801ea560e33e286b00b96f45b972ab3d0",
+                                                   "indexSha256":  "78f097c3d4319f0f4966754db1bf5f6deb3cf83f8830dc2136517704b069aea1",
                                                    "bytecodeTarget":  {
                                                                           "node":  "24.15.0",
                                                                           "platform":  "win32",
@@ -11,7 +11,7 @@
                                                                       }
                                                },
                     "linux-x64-node-24.15.0":  {
-                                                   "indexSha256":  "5d4c082398cee952823da078f4957cfa241b6d9f98c02a3a796959ab546e6032",
+                                                   "indexSha256":  "acf1702e0d6e20cc6a60ef5422849b7329e7cea4efc455f09403fa3e080128fa",
                                                    "bytecodeTarget":  {
                                                                           "node":  "24.15.0",
                                                                           "platform":  "linux",
@@ -19,7 +19,7 @@
                                                                       }
                                                },
                     "linux-arm64-node-24.15.0":  {
-                                                     "indexSha256":  "9f74ec1323b48a16a027e70eccf30bf11f20d6adecc44322bde8df2f50ed7aa6",
+                                                     "indexSha256":  "95fae6f0a48a108314aa76cff47af417d97ff5bb9b63d733e138973e52f13511",
                                                      "bytecodeTarget":  {
                                                                             "node":  "24.15.0",
                                                                             "platform":  "linux",
@@ -27,7 +27,7 @@
                                                                         }
                                                  },
                     "darwin-x64-node-24.15.0":  {
-                                                    "indexSha256":  "5d4c082398cee952823da078f4957cfa241b6d9f98c02a3a796959ab546e6032",
+                                                    "indexSha256":  "acf1702e0d6e20cc6a60ef5422849b7329e7cea4efc455f09403fa3e080128fa",
                                                     "bytecodeTarget":  {
                                                                            "node":  "24.15.0",
                                                                            "platform":  "darwin",

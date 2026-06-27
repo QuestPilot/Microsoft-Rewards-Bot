@@ -27,7 +27,41 @@ test('ActivityRunner ships a clean no-op capture stub without Core', () => {
     // Delegates to the plugin implementation when installed…
     assert.match(runner, /if \(this\.premiumTasks\.doCaptureDashboardPages\)/)
     // …otherwise returns an empty result (nothing captured, no points, no throw).
-    assert.match(runner, /return \{ captured: 0, routes: \[\], outputDir: 'Page', problems: \[\] \}/)
+    assert.match(
+        runner,
+        /return \{ captured: 0, routes: \[\], outputDir: null, problems: \[\], analyses: \[\], failures: \[\] \}/
+    )
+})
+
+test('harvester CLI is an isolated terminal-only execution path', () => {
+    const start = read('scripts/start.js')
+    const index = read('src/index.ts')
+    const configLoader = read('src/helpers/ConfigLoader.ts')
+    const logger = read('src/notifications/LogService.ts')
+    const analytics = read('src/notifications/AnalyticsService.ts')
+    const pluginManager = read('src/core/PluginManager.ts')
+
+    assert.match(start, /argv\[2\] === 'harvester'/)
+    assert.match(start, /MSRB_EPHEMERAL_RUN = '1'/)
+    assert.match(start, /MSRB_DISABLE_PLUGINS = '1'/)
+    assert.match(index, /await rewardsBot\.runHarvester\(\)/)
+    assert.match(
+        index,
+        /Artifacts: \$\{result\.outputDir \?\? 'none'\} \| Analytics: disabled \| Webhooks: disabled \| Dashboard sync: disabled/
+    )
+    assert.match(configLoader, /if \(isEphemeralRun\(\)\) return/)
+    assert.match(logger, /!this\.bot\.isHarvesterMode/)
+    assert.match(analytics, /enabled \? this\.loadOrCreateInstanceId\(\) : randomUUID\(\)/)
+    assert.match(pluginManager, /forceCoreForHarvester/)
+    assert.match(pluginManager, /hasConfigFile && !forceCoreForHarvester/)
+})
+
+test('harvester result exposes detailed route, selector and failure diagnostics', () => {
+    const api = read('src/core/InternalPluginAPI.ts')
+    assert.match(api, /analyses\?: DashboardHarvesterPageAnalysis\[\]/)
+    assert.match(api, /failures\?: DashboardHarvesterFailure\[\]/)
+    assert.match(api, /selectorChecks: DashboardHarvesterSelectorCheck\[\]/)
+    assert.match(api, /required: boolean/)
 })
 
 test('Main() runs the harvester only when the opt-in core flag is set', () => {

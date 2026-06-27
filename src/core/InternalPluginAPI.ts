@@ -10,15 +10,14 @@ import type { MicrosoftRewardsBot } from '../index'
 import type { StreakProtectionSyncResult } from './tasks/browser/StreakProtectionGate'
 import type { Promotion } from '../types/AppDashboardData'
 import type { PurplePromotionalItem } from '../types/DashboardData'
-import type {
-    IPlugin,
-    PluginLifecycleContext,
-    PublicPluginContext
-} from '../plugin-api'
+import type { IPlugin, PluginLifecycleContext, PublicPluginContext } from '../plugin-api'
 
 export type { AccountResult, IPlugin, PluginConfigEntry, PluginLogger } from '../plugin-api'
 
-export interface OfficialCorePlugin extends Omit<IPlugin, 'register' | 'onBotInitialized' | 'onAccountStart' | 'onAccountEnd'> {
+export interface OfficialCorePlugin extends Omit<
+    IPlugin,
+    'register' | 'onBotInitialized' | 'onAccountStart' | 'onAccountEnd'
+> {
     register(context: OfficialCoreContext): void | Promise<void>
     onBotInitialized?(context: OfficialCoreLifecycleContext): void | Promise<void>
     onAccountStart?(context: OfficialCoreAccountLifecycleContext): void | Promise<void>
@@ -68,9 +67,48 @@ export interface DashboardCaptureResult {
     /** Route names that were captured (e.g. "dashboard", "earn"). */
     routes: string[]
     /** Output directory the snapshots were written to, relative to the run cwd. */
-    outputDir: string
+    outputDir: string | null
     /** Aggregated analyzer problems across every captured route (selector drift hints). */
     problems: string[]
+    /** Detailed in-memory analysis used by the terminal-only harvester report. */
+    analyses?: DashboardHarvesterPageAnalysis[]
+    /** Routes that could not be analyzed at all. */
+    failures?: DashboardHarvesterFailure[]
+    /** End-to-end analysis duration. */
+    durationMs?: number
+}
+
+export interface DashboardHarvesterSelectorCheck {
+    group: string
+    key: string
+    selector: string
+    matches: number
+    valid: boolean
+    required: boolean
+    error?: string
+}
+
+export interface DashboardHarvesterPageAnalysis {
+    name: string
+    url: string
+    title: string
+    flightBytes: number
+    offerIds: number
+    actionIds: number
+    modelTypes: string[]
+    hasPointClaim: boolean
+    hasDailySet: boolean
+    switches: number
+    disclosures: number
+    dialogs: number
+    selectorChecks: DashboardHarvesterSelectorCheck[]
+    problems: string[]
+}
+
+export interface DashboardHarvesterFailure {
+    name: string
+    url: string
+    error: string
 }
 
 export interface ClaimEntry {

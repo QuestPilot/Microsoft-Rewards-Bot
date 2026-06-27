@@ -90,10 +90,16 @@ test('background launch skips updater unless explicitly enabled', () => {
         startScript.shouldRunUpdater(['node', 'scripts/start.js', '--background'], { MSRB_BACKGROUND_UPDATE: '1' }),
         true
     )
-    assert.equal(
-        startScript.shouldRunUpdater(['node', 'scripts/start.js'], { MSRB_POST_UPDATE_RESTART: '1' }),
-        false
-    )
+    assert.equal(startScript.shouldRunUpdater(['node', 'scripts/start.js'], { MSRB_POST_UPDATE_RESTART: '1' }), false)
+    assert.equal(startScript.shouldRunUpdater(['node', 'scripts/start.js', 'harvester'], {}), false)
+})
+
+test('harvester is a direct terminal-only launch mode', () => {
+    const argv = ['node', 'scripts/start.js', 'harvester']
+    assert.equal(startScript.isHarvesterLaunch(argv), true)
+    assert.equal(startScript.isHarvesterLaunch(['node', 'scripts/start.js']), false)
+    assert.equal(startScript.isTerminalForced(argv, {}), true)
+    assert.equal(startScript.shouldLaunchInterface(argv, { MSRB_FORCE_APP_WINDOW: '1' }), false)
 })
 
 test('background launch reuses dist when available and builds only when missing', () => {
@@ -110,11 +116,9 @@ test('background launch reuses dist when available and builds only when missing'
         assert.equal(startScript.shouldBuildRuntime(['node', 'scripts/start.js', '--background'], root), false)
         assert.equal(startScript.shouldBuildRuntime(['node', 'scripts/start.js'], root), true)
         assert.equal(
-            startScript.shouldBuildRuntime(
-                ['node', 'scripts/start.js', '--background'],
-                root,
-                { MSRB_POST_UPDATE_RESTART: '1' }
-            ),
+            startScript.shouldBuildRuntime(['node', 'scripts/start.js', '--background'], root, {
+                MSRB_POST_UPDATE_RESTART: '1'
+            }),
             true
         )
     } finally {
@@ -175,14 +179,23 @@ test('terminal mode config controls the app window launcher', () => {
         fs.writeFileSync(path.join(root, 'src', 'config.json'), JSON.stringify({ terminal: { enabled: false } }))
 
         assert.equal(startScript.terminalModeEnabled(startScript.readConfig(root)), false)
-        assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { MSRB_FORCE_APP_WINDOW: '1' }, root), true)
+        assert.equal(
+            startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { MSRB_FORCE_APP_WINDOW: '1' }, root),
+            true
+        )
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--terminal'], {}, root), false)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--background'], {}, root), false)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--attach'], {}, root), false)
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js', '--ui-child'], {}, root), false)
-        assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { MSRB_TERMINAL_MODE: '1' }, root), false)
+        assert.equal(
+            startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { MSRB_TERMINAL_MODE: '1' }, root),
+            false
+        )
         assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { CI: 'true' }, root), false)
-        assert.equal(startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { FORCE_HEADLESS: '1' }, root), false)
+        assert.equal(
+            startScript.shouldLaunchInterface(['node', 'scripts/start.js'], { FORCE_HEADLESS: '1' }, root),
+            false
+        )
     } finally {
         fs.rmSync(root, { recursive: true, force: true })
     }

@@ -15,6 +15,10 @@ const { createAccountStorage } = require('../../scripts/account-storage') as {
 
 let configCache: Config
 
+function isEphemeralRun(): boolean {
+    return process.env.MSRB_EPHEMERAL_RUN === '1'
+}
+
 function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error)
 }
@@ -23,7 +27,9 @@ function readJsonFile<T>(filePath: string, label: string): T {
     try {
         return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T
     } catch (error) {
-        throw new Error(`[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`)
+        throw new Error(
+            `[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`
+        )
     }
 }
 
@@ -31,7 +37,9 @@ async function readJsonFileAsync<T>(filePath: string, label: string): Promise<T>
     try {
         return JSON.parse(await fs.promises.readFile(filePath, 'utf-8')) as T
     } catch (error) {
-        throw new Error(`[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`)
+        throw new Error(
+            `[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`
+        )
     }
 }
 
@@ -167,6 +175,7 @@ export async function saveSessionData(
     email: string,
     isMobile: boolean
 ): Promise<string> {
+    if (isEphemeralRun()) return getSessionDir(sessionPath, email)
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const cookiesFileName = isMobile ? 'session_mobile.json' : 'session_desktop.json'
@@ -189,6 +198,7 @@ export async function saveFingerprintData(
     isMobile: boolean,
     fingerpint: BrowserFingerprintWithHeaders
 ): Promise<string> {
+    if (isEphemeralRun()) return getSessionDir(sessionPath, email)
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const fingerprintFileName = isMobile ? 'session_fingerprint_mobile.json' : 'session_fingerprint_desktop.json'
@@ -211,6 +221,7 @@ export async function saveStorageState(
     email: string,
     isMobile: boolean
 ): Promise<void> {
+    if (isEphemeralRun()) return
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const storageFileName = isMobile ? 'session_storage_mobile.json' : 'session_storage_desktop.json'
@@ -240,6 +251,7 @@ export async function saveDashboardVariant(
     isMobile: boolean,
     variant: DashboardVariant
 ): Promise<void> {
+    if (isEphemeralRun()) return
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const file = path.join(sessionDir, 'dashboard-variant.json')

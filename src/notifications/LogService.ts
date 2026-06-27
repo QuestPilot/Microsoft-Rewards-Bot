@@ -141,7 +141,7 @@ export class LogService {
         // Format console output beautifully
         const timeStr = chalk.gray(`[${now}]`)
         const userStr = `${chalk.gray('[')}${chalk.cyan(userName)}${chalk.gray(']')}`
-        
+
         let levelStr = ''
         switch (level) {
             case 'info':
@@ -161,20 +161,21 @@ export class LogService {
 
         const titleStr = `${chalk.gray('[')}${chalk.bold.white(title)}${chalk.gray(']')}`
         const platformStr = badge
-        
+
         const colorFn = getColorFn(logColor)
         const msgStr = colorFn ? colorFn(formatted) : formatted
 
         const consoleStr = `${timeStr} ${userStr} ${levelStr} ${platformStr} ${titleStr} ${msgStr}`
 
-        if (level === 'error' && config.errorDiagnostics) {
+        if (level === 'error' && config.errorDiagnostics && !this.bot.isHarvesterMode) {
             const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
             const error = message instanceof Error ? message : new Error(String(message))
-            errorDiagnostic(page, error, (msg) => this.warn(isMobile, 'DIAGNOSTIC', msg))
+            errorDiagnostic(page, error, msg => this.warn(isMobile, 'DIAGNOSTIC', msg))
         }
 
         const consoleAllowed = this.shouldPassFilter(config.consoleLogFilter, level, cleanMsg)
-        const webhookAllowed = this.shouldPassFilter(config.webhook.webhookLogFilter, level, cleanMsg)
+        const webhookAllowed =
+            !this.bot.isHarvesterMode && this.shouldPassFilter(config.webhook.webhookLogFilter, level, cleanMsg)
 
         if (consoleAllowed) {
             consoleOut(level, consoleStr, null)

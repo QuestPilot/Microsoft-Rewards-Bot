@@ -57,8 +57,12 @@ function isAttachLaunch(argv = process.argv) {
     return argv.includes('--attach')
 }
 
+function isHarvesterLaunch(argv = process.argv) {
+    return argv[2] === 'harvester'
+}
+
 function isTerminalForced(argv = process.argv, env = process.env) {
-    return argv.includes('--terminal') || env.MSRB_TERMINAL_MODE === '1'
+    return isHarvesterLaunch(argv) || argv.includes('--terminal') || env.MSRB_TERMINAL_MODE === '1'
 }
 
 function isUiChild(argv = process.argv, env = process.env) {
@@ -89,7 +93,8 @@ function terminalModeEnabled(config = readConfig()) {
 
 function hasGuiEnvironment(env = process.env) {
     if (env.MSRB_FORCE_APP_WINDOW === '1') return true
-    if (env.MSRB_NO_APP_WINDOW === '1' || env.CI === 'true' || env.CI === '1' || env.FORCE_HEADLESS === '1') return false
+    if (env.MSRB_NO_APP_WINDOW === '1' || env.CI === 'true' || env.CI === '1' || env.FORCE_HEADLESS === '1')
+        return false
     if (isDockerRuntime()) return false
     if (process.platform === 'linux') return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY)
     return true
@@ -103,6 +108,7 @@ function shouldLaunchInterface(argv = process.argv, env = process.env, root = RO
 }
 
 function shouldRunUpdater(argv = process.argv, env = process.env) {
+    if (isHarvesterLaunch(argv)) return false
     if (env.MSRB_POST_UPDATE_RESTART === '1') return false
     if (!isBackgroundLaunch(argv)) return true
     return env.MSRB_BACKGROUND_UPDATE === '1'
@@ -178,7 +184,9 @@ async function deskCommand(action) {
         try {
             const result = manager.status()
             console.log('[DESK] Shortcut status:')
-            Object.entries(result).forEach(([k, v]) => console.log(`  ${v ? '✓' : '✗'} ${k}: ${v ? 'installed' : 'not installed'}`))
+            Object.entries(result).forEach(([k, v]) =>
+                console.log(`  ${v ? '✓' : '✗'} ${k}: ${v ? 'installed' : 'not installed'}`)
+            )
         } catch (err) {
             console.error(`[DESK] Status check failed: ${err.message}`)
             process.exit(1)
@@ -196,6 +204,15 @@ async function main() {
         return
     }
 
+    const harvesterLaunch = isHarvesterLaunch()
+    if (harvesterLaunch) {
+        // Isolate the command from persistent/background integrations. The Core
+        // harvester remains allowed to rebuild its explicit Page/ artifact folder.
+        process.env.MSRB_EPHEMERAL_RUN = '1'
+        process.env.MSRB_DISABLE_PLUGINS = '1'
+        process.env.MSRB_TERMINAL_MODE = '1'
+    }
+
     if (shouldRunUpdater()) {
         const updater = new UpdateManager()
         const updateResult = await updater.run()
@@ -204,6 +221,8 @@ async function main() {
             launchPostUpdateRestart()
             return
         }
+    } else if (harvesterLaunch) {
+        console.log('[HARVESTER] Update check disabled for this isolated maintenance run.')
     } else {
         console.log(
             process.env.MSRB_POST_UPDATE_RESTART === '1'
@@ -212,17 +231,19 @@ async function main() {
         )
     }
 
-    bootstrapUserFiles(ROOT)
+    if (!harvesterLaunch) {
+        bootstrapUserFiles(ROOT)
 
-    // Keep src/config.json and the accounts file in sync with the current
-    // example templates on every start (idempotent: only writes when a new key
-    // is added or a deprecated one is removed). This guarantees new features
-    // reach existing users even when the latest code arrived without going
-    // through the updater (manual copy, restore, etc.). Never block startup.
-    try {
-        migrateUserFiles(ROOT)
-    } catch (error) {
-        console.warn(`[START] Config migration skipped: ${error instanceof Error ? error.message : String(error)}`)
+        // Keep src/config.json and the accounts file in sync with the current
+        // example templates on every start (idempotent: only writes when a new key
+        // is added or a deprecated one is removed). This guarantees new features
+        // reach existing users even when the latest code arrived without going
+        // through the updater (manual copy, restore, etc.). Never block startup.
+        try {
+            migrateUserFiles(ROOT)
+        } catch (error) {
+            console.warn(`[START] Config migration skipped: ${error instanceof Error ? error.message : String(error)}`)
+        }
     }
 
     if (shouldBuildRuntime(process.argv, ROOT, process.env)) {
@@ -252,6 +273,7 @@ module.exports = {
     bootstrapUserFiles,
     hasBuiltRuntime,
     hasGuiEnvironment,
+    isHarvesterLaunch,
     isBackgroundLaunch,
     isAttachLaunch,
     isDockerRuntime,

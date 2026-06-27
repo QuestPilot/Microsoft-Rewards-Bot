@@ -177,12 +177,13 @@ export class PluginManager {
         for (const entry of entries) {
             const entryName = this.getPluginEntryName(entry)
             const entryConfig = pluginConfig[entryName]
+            const forceCoreForHarvester = this.bot.isHarvesterMode && entryName === 'core'
 
             if (thirdPartyDisabled && entryName !== 'core') {
                 continue
             }
 
-            if (hasConfigFile) {
+            if (hasConfigFile && !forceCoreForHarvester) {
                 if (!entryConfig) {
                     this.bot.logger.debug(
                         'main',
