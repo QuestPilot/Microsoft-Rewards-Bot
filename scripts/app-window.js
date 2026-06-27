@@ -101,6 +101,23 @@ function cachedAccountPointsMap() {
     return _accPtsCache
 }
 
+// Maps masked email → SHA-256 hash of real email (first 16 chars) so the
+// Home page can request avatars without knowing the real email address.
+function buildAvatarMap() {
+    const out = {}
+    if (!Array.isArray(accountCache)) return out
+    const crypto = require('crypto')
+    for (const a of accountCache) {
+        if (!a || !a.email) continue
+        const e = String(a.email)
+        const at = e.indexOf('@')
+        if (at < 0) continue
+        const masked = e.slice(0, 2) + '***' + e.slice(at)
+        out[masked] = crypto.createHash('sha256').update(e.toLowerCase().trim()).digest('hex').slice(0, 16)
+    }
+    return out
+}
+
 // ─── Desk UI State (replaces multiple .desk-*.json files) ──────────────
 const DATA_STORE = path.join(ROOT, 'data', 'desk-state.json')
 const STAR_GITHUB = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot'
@@ -956,17 +973,15 @@ function html() {
     .star-banner-btn { flex-shrink:0; padding: 8px clamp(12px,1.2vw,20px); border-radius: 100px; background: rgba(247,200,92,0.15); color: var(--gold); font-size: clamp(11.5px,.88vw,13.5px); font-weight: 600; border: 1px solid rgba(247,200,92,0.3); transition: background 0.2s; pointer-events: none; }
     .star-banner:hover .star-banner-btn { background: rgba(247,200,92,0.25); }
     .info-banner{
-      display:flex;align-items:center;gap:10px;padding:clamp(6px,.75vh,9px) clamp(12px,1.3vw,16px);
-      border-radius:11px;border:1px solid rgba(46,232,255,.15);
-      background:rgba(10,30,50,.5);backdrop-filter:blur(18px);
+      display:flex;align-items:center;gap:10px;padding:clamp(8px,1vh,11px) clamp(14px,1.5vw,18px);
+      border-radius:12px;border:1px solid rgba(46,232,255,.16);
+      background:rgba(10,30,50,.52);backdrop-filter:blur(18px);
       cursor:pointer;transition:border-color .2s,background .2s;
     }
-    .info-banner:hover{background:rgba(14,38,62,.6);border-color:rgba(46,232,255,.28)}
-    .info-banner-icon{width:26px;height:26px;border-radius:7px;background:rgba(46,232,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .info-banner-icon svg{width:13px;height:13px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-    .info-banner-text{flex:1;min-width:0}
-    .info-banner-title{font-size:clamp(11px,.88vw,12.5px);font-weight:700;color:var(--text)}
-    .info-banner-sub{font-size:clamp(10px,.78vw,11.5px);color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .info-banner:hover{background:rgba(14,38,62,.62);border-color:rgba(46,232,255,.3)}
+    .info-banner-icon{width:28px;height:28px;border-radius:8px;background:rgba(46,232,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .info-banner-icon svg{width:14px;height:14px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .info-banner-text{flex:1;min-width:0;font-size:clamp(11px,.88vw,12.5px);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .info-banner-arrow{color:var(--muted);font-size:13px;flex-shrink:0}
     .ctx-menu{
       position:fixed;z-index:9000;min-width:190px;padding:5px;
@@ -1007,17 +1022,17 @@ function html() {
 
     /* Points card */
     .pts-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3px}
-    .pts-val{font-size:36px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px}
+    .pts-val{font-size:34px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px}
     .pts-label{font-size:11px;color:var(--muted);margin-top:3px}
-    .mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
     .mini{
-      background:rgba(255,255,255,.035);border:1px solid var(--border);
-      border-radius:9px;padding:8px 7px;text-align:center;
+      background:rgba(255,255,255,.03);border:1px solid var(--border);
+      border-radius:8px;padding:5px 6px;text-align:center;
     }
-    .mini-val{font-size:12px;font-weight:800;transition:color .3s}
-    .mini-lbl{font-size:10px;color:var(--muted);margin-top:3px}
-    .mini-sm .mini-val{font-size:11px;font-weight:700;color:var(--muted)}
-    .mini-sm .mini-lbl{font-size:9.5px}
+    .mini-val{font-size:11px;font-weight:800;transition:color .3s}
+    .mini-lbl{font-size:9px;color:var(--muted);margin-top:2px}
+    .mini-sm .mini-val{font-size:10px;font-weight:700;color:var(--muted)}
+    .mini-sm .mini-lbl{font-size:8.5px}
 
     /* Accounts card */
     .acc-list{display:flex;flex-direction:column;gap:7px;overflow-y:auto;flex:1}
@@ -1102,30 +1117,51 @@ function html() {
     .acc-actions-cell{display:flex;gap:6px;flex-shrink:0}
 
     /* Console view */
-    .console-wrap{display:none;flex-direction:column;gap:12px;min-height:0;overflow:hidden}
+    .console-wrap{display:none;flex-direction:column;gap:10px;min-height:0;overflow:hidden}
     .console-wrap.vis{display:flex}
-    .console-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
-    .console-head-actions{display:flex;align-items:center;gap:8px}
+    .console-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .console-head-left{display:flex;align-items:center;gap:10px}
+    .console-head-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .console-line-count{font-size:10.5px;color:var(--muted);font-weight:600;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.05)}
+    .console-filters{display:flex;align-items:center;gap:4px}
+    .console-filter{background:none;border:1px solid rgba(255,255,255,.1);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:10.5px;font-weight:600;cursor:pointer;transition:all .15s}
+    .console-filter:hover{border-color:var(--cyan);color:var(--cyan)}
+    .console-filter.active{border-color:var(--cyan);color:var(--cyan);background:rgba(46,232,255,.08)}
+    .console-filter.active[data-level="error"]{border-color:#ff8098;color:#ff8098;background:rgba(255,128,152,.08)}
+    .console-filter.active[data-level="warn"]{border-color:var(--gold);color:var(--gold);background:rgba(247,200,92,.08)}
+    .console-search{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text);border-radius:7px;padding:3px 9px;font-size:11.5px;width:110px;outline:none;transition:all .15s;font-family:inherit}
+    .console-search:focus{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.04);width:150px}
+    .console-search::placeholder{color:var(--muted)}
     .console-box{
       flex:1;background:#020610;border:1px solid var(--border);
-      border-radius:var(--r);padding:18px 20px;overflow-y:auto;overflow-anchor:none;
-      font-family:"Cascadia Code",Consolas,"Courier New",monospace;font-size:13px;
-      line-height:1.75;color:#cfe3f2;white-space:pre-wrap;word-break:break-word;
-      scroll-behavior:smooth;
-      cursor:text;
+      border-radius:var(--r);padding:14px 16px;overflow-y:auto;overflow-anchor:none;
+      font-family:"Cascadia Code",Consolas,"Courier New",monospace;font-size:12px;
+      line-height:1.7;color:#cfe3f2;word-break:break-word;
+      scroll-behavior:smooth;cursor:text;
     }
-    .console-box::-webkit-scrollbar{width:11px}
-    .console-box::-webkit-scrollbar-thumb{background:rgba(110,146,184,.32);border-radius:8px;border:2px solid #020610}
-    .console-box::-webkit-scrollbar-thumb:hover{background:rgba(110,146,184,.5)}
+    .console-box::-webkit-scrollbar{width:9px}
+    .console-box::-webkit-scrollbar-thumb{background:rgba(110,146,184,.28);border-radius:6px;border:2px solid #020610}
+    .console-box::-webkit-scrollbar-thumb:hover{background:rgba(110,146,184,.48)}
+    /* Individual log line */
+    .clog{display:flex;gap:10px;padding:1px 0;line-height:1.65;border-radius:3px}
+    .clog:hover{background:rgba(255,255,255,.025)}
+    .clog-ts{color:rgba(110,146,184,.4);font-size:10.5px;flex-shrink:0;padding-top:2px;font-variant-numeric:tabular-nums;min-width:54px}
+    .clog-msg{flex:1;min-width:0;word-break:break-word;white-space:pre-wrap}
+    .clog-error .clog-msg{color:#ff8098}
+    .clog-warn .clog-msg{color:var(--gold)}
+    .clog-success .clog-msg{color:var(--green)}
+    .clog-info .clog-msg{color:#cfe3f2}
+    @keyframes clogIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .clog-new{animation:clogIn .16s ease-out both}
     .console-jump{
-      position:absolute;right:24px;bottom:22px;display:none;align-items:center;gap:6px;
-      padding:7px 13px;border-radius:100px;border:1px solid rgba(46,232,255,.35);
-      background:rgba(7,18,34,.95);color:var(--cyan);font-size:12px;font-weight:600;
+      position:absolute;right:20px;bottom:18px;display:none;align-items:center;gap:6px;
+      padding:6px 12px;border-radius:100px;border:1px solid rgba(46,232,255,.32);
+      background:rgba(7,18,34,.96);color:var(--cyan);font-size:11.5px;font-weight:600;
       cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4);transition:all .15s;z-index:5;
     }
-    .console-jump:hover{background:rgba(46,232,255,.16)}
+    .console-jump:hover{background:rgba(46,232,255,.14)}
     .console-jump.show{display:inline-flex}
-    .console-jump svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .console-jump svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 
     /* Footer */
     .footer{
@@ -2031,10 +2067,7 @@ function html() {
         <div class="info-banner-icon">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         </div>
-        <div class="info-banner-text">
-          <div class="info-banner-title">Announcements &amp; Updates</div>
-          <div class="info-banner-sub">Stay informed — news, tips and important information from the team</div>
-        </div>
+        <span class="info-banner-text">Stay informed — news, tips and important information from the team</span>
         <span class="info-banner-arrow">›</span>
       </div>
       <div class="cards">
@@ -2130,8 +2163,19 @@ function html() {
     <!-- Console view -->
     <div class="console-wrap" id="view-console" style="position:relative">
       <div class="console-head">
-        <span class="card-label">Console output</span>
+        <div class="console-head-left">
+          <span class="card-label">Console</span>
+          <span class="console-line-count" id="console-line-count">0 lines</span>
+          <div class="console-filters">
+            <button class="console-filter active" data-level="all">All</button>
+            <button class="console-filter" data-level="error">Error</button>
+            <button class="console-filter" data-level="warn">Warn</button>
+            <button class="console-filter" data-level="success">OK</button>
+          </div>
+        </div>
         <div class="console-head-actions">
+          <input class="console-search" id="console-search" type="search" placeholder="Filter…" autocomplete="off">
+          <button class="btn btn-secondary btn-sm" id="console-clear">Clear</button>
           <button class="btn btn-secondary btn-sm" id="console-copy">Copy</button>
         </div>
       </div>
@@ -3135,8 +3179,76 @@ function html() {
       });
     }
 
+    // ── Console ───────────────────────────────
+    var _consoleLogs = [];
+    var _consoleFilter = 'all';
+    var _consoleSearch = '';
+    var _consoleClearedAt = 0;
+
+    function getConsoleLvl(l) {
+      var m = String(l.message || '').toLowerCase();
+      var lv = String(l.level || '').toLowerCase();
+      if (lv === 'error' || /\berror\b|fail(ed)?|exception|crash/.test(m)) return 'error';
+      if (lv === 'warn'  || /warn(ing)?|\battention\b/.test(m))             return 'warn';
+      if (/\bsuccess\b|complete|done|collected|\bok\b|✓/.test(m))           return 'success';
+      return 'info';
+    }
+
+    function makeLogEl(l, animate) {
+      var div = document.createElement('div');
+      div.className = 'clog clog-' + getConsoleLvl(l) + (animate ? ' clog-new' : '');
+      var ts = new Date(l.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      div.innerHTML = '<span class="clog-ts">' + ts + '</span><span class="clog-msg">' + esc(l.message) + '</span>';
+      return div;
+    }
+
+    function matchesConsoleFilter(l) {
+      if (_consoleFilter !== 'all' && getConsoleLvl(l) !== _consoleFilter) return false;
+      if (_consoleSearch && String(l.message || '').toLowerCase().indexOf(_consoleSearch) === -1) return false;
+      return true;
+    }
+
+    function updateConsoleBox(incremental) {
+      var b = G('console-box');
+      if (!b) return;
+      var stick = (b.scrollHeight - b.scrollTop - b.clientHeight) < 60;
+      var prevTop = b.scrollTop;
+
+      var filtered = _consoleLogs.filter(matchesConsoleFilter);
+
+      if (incremental && _consoleFilter === 'all' && !_consoleSearch) {
+        // Fast path: only append the lines that aren't in the DOM yet
+        var existingCount = b.querySelectorAll('.clog').length;
+        var toAdd = _consoleLogs.slice(existingCount);
+        if (toAdd.length) {
+          var frag = document.createDocumentFragment();
+          for (var i = 0; i < toAdd.length; i++) {
+            frag.appendChild(makeLogEl(toAdd[i], i >= toAdd.length - 5));
+          }
+          b.appendChild(frag);
+        }
+      } else {
+        b.innerHTML = filtered.map(function(l) {
+          return makeLogEl(l, false).outerHTML;
+        }).join('');
+      }
+
+      var cnt = G('console-line-count');
+      if (cnt) {
+        var shown = _consoleFilter !== 'all' || _consoleSearch ? filtered.length + '/' + _consoleLogs.length : _consoleLogs.length;
+        cnt.textContent = shown + ' lines';
+      }
+
+      if (stick) b.scrollTop = b.scrollHeight;
+      else if (!incremental) b.scrollTop = prevTop;
+
+      var farUp = (b.scrollHeight - b.scrollTop - b.clientHeight) > 80;
+      var jump = G('console-jump');
+      if (jump) jump.classList.toggle('show', view === 'console' && farUp);
+    }
+
     // ── Dashboard accounts (masked list) ──────
-    function renderAccounts(accounts, active, loading, ptsMap) {
+    function renderAccounts(accounts, active, loading, ptsMap, avatarMap) {
       if (loading) {
         return '<div class="loading-block"><span class="inline-spinner"></span><span>Loading protected accounts…</span></div>';
       }
@@ -3148,8 +3260,10 @@ function html() {
         var disabled = !a.enabled;
         var pts = ptsMap && a.email ? ptsMap[a.email] : 0;
         var badge = pts > 0 ? '<span class="acc-pts-badge"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>+' + pts.toLocaleString() + '</span>' : '';
+        // Use pre-computed hash from avatarMap so masked email resolves to the right avatar file
+        var avatarKey = (avatarMap && a.email && avatarMap[a.email]) ? avatarMap[a.email] : encodeURIComponent(a.email||'');
         return '<div class="acc-row' + (isActive?' is-active':'') + (disabled?' is-disabled':'') + '">' +
-          '<div class="acc-avatar"><img src="/avatars/' + encodeURIComponent(a.email||'') + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block"></div>' +
+          '<div class="acc-avatar"><img src="/avatars/' + avatarKey + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block"></div>' +
           '<div class="acc-info"><div class="acc-email">' + esc(a.email||'') + '</div>' +
           '<div class="acc-st">' + (disabled?'Disabled':isActive?'Running...':'Ready') + '</div></div>' +
           badge +
@@ -3228,26 +3342,15 @@ function html() {
       if (sbBtn) sbBtn.style.display = headlessRun ? '' : 'none';
       G('btn-stop').disabled = !running;
       if (data.accountPointsMap) _accPtsMap = data.accountPointsMap;
-      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady, data.accountPointsMap);
+      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady, data.accountPointsMap, data.avatarMap);
 
-      if (data.consoleLogs && data.consoleLogs.length) {
-        var lines = data.consoleLogs.map(function(l) {
-          return '[' + new Date(l.at).toLocaleTimeString() + '] ' + l.message;
-        }).join('\\n');
-        var b = G('console-box');
-        if (b._lastText !== lines) {
-          // Preserve the user's scroll position: only auto-stick to the bottom
-          // when they were already near it. Otherwise leave the view where it is.
-          var stick = (b.scrollHeight - b.scrollTop - b.clientHeight) < 60;
-          var prevTop = b.scrollTop;
-          b.textContent = lines;
-          b._lastText = lines;
-          if (stick) { b.scrollTop = b.scrollHeight; }
-          else { b.scrollTop = prevTop; }
-        }
-        var farUp = (b.scrollHeight - b.scrollTop - b.clientHeight) > 80;
-        var jump = G('console-jump');
-        if (jump) jump.classList.toggle('show', view === 'console' && farUp);
+      if (data.consoleLogs) {
+        var newLogs = _consoleClearedAt
+          ? data.consoleLogs.filter(function(l) { return new Date(l.at).getTime() > _consoleClearedAt; })
+          : data.consoleLogs;
+        var grew = newLogs.length > _consoleLogs.length;
+        _consoleLogs = newLogs;
+        if (grew) updateConsoleBox(true);
       }
 
       var fdot = G('fdot');
@@ -4031,10 +4134,42 @@ function html() {
         alert('Could not start terminal mode: ' + e);
       }
     });
-    // Console copy & jump
+    // Console — filters, search, clear, copy, jump
+    document.querySelectorAll('.console-filter').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _consoleFilter = btn.getAttribute('data-level');
+        document.querySelectorAll('.console-filter').forEach(function(b) {
+          b.classList.toggle('active', b === btn);
+        });
+        updateConsoleBox(false);
+      });
+    });
+    G('console-search').addEventListener('input', function() {
+      _consoleSearch = this.value.toLowerCase().trim();
+      updateConsoleBox(false);
+    });
+    G('console-clear').addEventListener('click', function() {
+      _consoleClearedAt = Date.now();
+      _consoleLogs = [];
+      var b = G('console-box');
+      if (b) b.innerHTML = '';
+      var cnt = G('console-line-count');
+      if (cnt) cnt.textContent = '0 lines';
+      _consoleFilter = 'all';
+      _consoleSearch = '';
+      document.querySelectorAll('.console-filter').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-level') === 'all');
+      });
+      var s = G('console-search');
+      if (s) s.value = '';
+      fetch('/api/clear-logs', {method:'POST'}).catch(function(){});
+    });
     G('console-copy').addEventListener('click', function() {
-      var t = G('console-box').textContent || '';
-      navigator.clipboard.writeText(t).then(function(){
+      var txt = _consoleLogs.map(function(l) {
+        var ts = new Date(l.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        return '[' + ts + '] ' + l.message;
+      }).join('\n');
+      navigator.clipboard.writeText(txt).then(function(){
         var b = G('console-copy'); var o = b.textContent; b.textContent = 'Copied ✓';
         setTimeout(function(){ b.textContent = o; }, 1400);
       }).catch(function(){});
@@ -5172,8 +5307,15 @@ const server = http.createServer((req, res) => {
             ...state,
             corePluginEnabled: isPluginEnabled('core'),
             claimedPoints: gs.claimedPoints,
-            accountPointsMap: cachedAccountPointsMap()
+            accountPointsMap: cachedAccountPointsMap(),
+            avatarMap: buildAvatarMap()
         }))
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/clear-logs') {
+        state.consoleLogs = []
+        state.logs = []
+        res.writeHead(204); res.end()
         return
     }
     if (req.method === 'GET' && req.url === '/api/license') {
@@ -5329,8 +5471,12 @@ const server = http.createServer((req, res) => {
         return
     }
     if (req.method === 'GET' && req.url.startsWith('/avatars/')) {
-        const email = decodeURIComponent(req.url.split('/avatars/')[1] || '')
-        const hash = require('crypto').createHash('sha256').update(email.toLowerCase()).digest('hex').substring(0, 16)
+        const input = decodeURIComponent(req.url.split('/avatars/')[1] || '')
+        // Accept a pre-computed 16-char hex hash directly (from avatarMap) so the
+        // Home page can load avatars using masked emails without reversing them.
+        const hash = /^[0-9a-f]{16}$/.test(input)
+            ? input
+            : require('crypto').createHash('sha256').update(input.toLowerCase().trim()).digest('hex').substring(0, 16)
         const avatarPath = path.join(ROOT, 'data', 'avatars', `${hash}.jpg`)
         if (fs.existsSync(avatarPath)) {
             res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=86400' })
