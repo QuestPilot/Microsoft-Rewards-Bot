@@ -13,8 +13,8 @@ const PORT = Number.parseInt(process.env.MSRB_APP_PORT || '0', 10)
 const APP_TITLE = 'Rewards Desk'
 const APP_ICON_PATH = path.join(ROOT, 'assets', 'logo.ico')
 const APP_BANNER_PATH = path.join(ROOT, 'assets', 'banner-core.png')
-const APP_WINDOW_WIDTH = 1600
-const APP_WINDOW_HEIGHT = 950
+const APP_WINDOW_WIDTH = 1650
+const APP_WINDOW_HEIGHT = 980
 const API_TOKEN = crypto.randomBytes(32).toString('base64url')
 const MAX_API_BODY_BYTES = 64 * 1024
 const accountStorage = createAccountStorage({ root: ROOT })
@@ -74,6 +74,32 @@ function readBotStats() {
     return out
 }
 
+
+// Returns a map of maskedEmail → totalPointsCollected for the Home account list badges.
+function readAllAccountStats() {
+    const dir = path.join(ROOT, 'data', 'stats', 'accounts')
+    const out = {}
+    try {
+        for (const f of fs.readdirSync(dir)) {
+            if (!f.endsWith('.json')) continue
+            try {
+                const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))
+                if (d.maskedEmail) out[d.maskedEmail] = d.totalPointsCollected || 0
+            } catch {}
+        }
+    } catch {}
+    return out
+}
+let _accPtsCache = null
+let _accPtsCacheAt = 0
+function cachedAccountPointsMap() {
+    const now = Date.now()
+    if (!_accPtsCache || now - _accPtsCacheAt > 30000) {
+        _accPtsCache = readAllAccountStats()
+        _accPtsCacheAt = now
+    }
+    return _accPtsCache
+}
 
 // ─── Desk UI State (replaces multiple .desk-*.json files) ──────────────
 const DATA_STORE = path.join(ROOT, 'data', 'desk-state.json')
@@ -763,10 +789,12 @@ function html() {
     .startup-card.is-busy{opacity:.72;pointer-events:none}
     .toast{
       position:fixed;right:22px;bottom:22px;z-index:450;max-width:360px;
-      padding:11px 14px;border-radius:11px;border:1px solid rgba(47,210,125,.26);
-      background:rgba(7,20,28,.96);color:#caffdf;font-size:12.5px;
-      box-shadow:0 18px 50px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);
-      pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+      padding:12px 16px;border-radius:14px;border:1px solid rgba(47,210,125,.28);
+      background:rgba(8,22,38,.82);backdrop-filter:blur(22px);color:#caffdf;font-size:13px;
+      box-shadow:0 20px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);
+      opacity:0;transform:translateY(12px);pointer-events:none;
+      transition:opacity .22s ease,transform .22s ease;
+      display:flex;align-items:center;gap:10px;
     }
     .toast.show{opacity:1;transform:none}
     .toast.error{border-color:rgba(255,107,138,.35);color:#ffd2dc}
@@ -927,6 +955,33 @@ function html() {
     .star-banner-sub { font-size: clamp(11.5px,.88vw,13.5px); color: rgba(255,255,255,0.6); white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
     .star-banner-btn { flex-shrink:0; padding: 8px clamp(12px,1.2vw,20px); border-radius: 100px; background: rgba(247,200,92,0.15); color: var(--gold); font-size: clamp(11.5px,.88vw,13.5px); font-weight: 600; border: 1px solid rgba(247,200,92,0.3); transition: background 0.2s; pointer-events: none; }
     .star-banner:hover .star-banner-btn { background: rgba(247,200,92,0.25); }
+    .info-banner{
+      display:flex;align-items:center;gap:13px;padding:clamp(10px,1.2vh,16px) clamp(14px,1.6vw,22px);
+      border-radius:14px;border:1px solid rgba(46,232,255,.18);
+      background:rgba(10,30,50,.55);backdrop-filter:blur(18px);
+      cursor:pointer;transition:border-color .2s,background .2s;
+    }
+    .info-banner:hover{background:rgba(14,38,62,.65);border-color:rgba(46,232,255,.32)}
+    .info-banner-icon{width:36px;height:36px;border-radius:10px;background:rgba(46,232,255,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .info-banner-icon svg{width:18px;height:18px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .info-banner-text{flex:1;min-width:0}
+    .info-banner-title{font-size:clamp(12px,.95vw,13.5px);font-weight:700;color:var(--text)}
+    .info-banner-sub{font-size:clamp(11px,.85vw,12.5px);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .info-banner-arrow{color:var(--muted);font-size:14px;flex-shrink:0}
+    .ctx-menu{
+      position:fixed;z-index:9000;min-width:190px;padding:5px;
+      background:rgba(10,20,36,.92);backdrop-filter:blur(22px);
+      border:1px solid rgba(255,255,255,.1);border-radius:12px;
+      box-shadow:0 16px 48px rgba(0,0,0,.55);display:none;
+    }
+    .ctx-menu.open{display:block}
+    .ctx-item{
+      display:flex;align-items:center;gap:10px;padding:8px 12px;
+      border-radius:8px;cursor:pointer;color:var(--text);font-size:13px;
+      transition:background .14s;
+    }
+    .ctx-item:hover{background:rgba(30,155,255,.15)}
+    .ctx-item svg{width:15px;height:15px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:clamp(8px,1.2vh,14px)}
     .card-label{font-size:clamp(10px,.85vw,11.5px);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
 
@@ -980,6 +1035,7 @@ function html() {
     .acc-info{flex:1;min-width:0}
     .acc-email{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .acc-st{font-size:11px;color:var(--muted);margin-top:1px}
+    .acc-pts-badge{font-size:11px;font-weight:700;color:var(--gold);background:rgba(247,200,92,.1);border:1px solid rgba(247,200,92,.2);border-radius:6px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
     .acc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
     .dot-ready{background:var(--muted)}
     .dot-run{background:var(--blue);animation:pulse 1.3s infinite}
@@ -1967,6 +2023,16 @@ function html() {
           <button class="star-banner-btn">Star Project</button>
         </div>
       </div>
+      <div class="info-banner" onclick="window.open('https://bot.lgtw.tf/announcement')">
+        <div class="info-banner-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="info-banner-text">
+          <div class="info-banner-title">Announcements &amp; Updates</div>
+          <div class="info-banner-sub">Stay informed — news, tips and important information from the team</div>
+        </div>
+        <span class="info-banner-arrow">›</span>
+      </div>
       <div class="cards">
       <!-- Status -->
       <div class="card">
@@ -2003,7 +2069,7 @@ function html() {
         <div class="mini-grid">
           <div class="mini">
             <div class="mini-val" id="mini-core" style="color:var(--muted)">—</div>
-            <div class="mini-lbl">Core plugin</div>
+            <div class="mini-lbl">Points Claimed</div>
           </div>
           <div class="mini">
             <div class="mini-val" id="mini-coupons">—</div>
@@ -2017,7 +2083,6 @@ function html() {
       <div class="card" style="flex:1; min-height:0; display:flex; flex-direction:column">
         <div class="card-head">
           <span class="card-label">Accounts</span>
-          <button class="btn btn-secondary btn-sm" id="btn-open-acc">Manage →</button>
         </div>
         <div class="acc-list" id="acc-list"></div>
       </div>
@@ -2458,17 +2523,23 @@ function html() {
       <div class="plugins-catalog" id="plugins-catalog"></div>
     </div>
 
-  <!-- Premium Account Edit Modal -->
-  <div class="modal-bg" id="acc-modal" style="backdrop-filter:blur(8px);background:rgba(0,0,0,0.4)">
-    <div class="acc-modal" style="width:min(440px,94vw);background:#060d18;border:1px solid rgba(255,255,255,0.08);border-radius:24px;box-shadow:0 30px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;max-height:92vh;overflow:hidden">
-      <!-- Header -->
-      <div style="padding:32px 32px 24px;border-bottom:1px solid rgba(255,255,255,0.04);position:relative">
-        <div style="position:absolute;top:-40px;left:0;right:0;height:120px;background:var(--blue);opacity:0.1;filter:blur(60px);pointer-events:none"></div>
-        <h2 id="acc-modal-title" style="margin:0;font-size:22px;font-weight:700;color:#fff;position:relative">Add account</h2>
-        <p style="margin:6px 0 0;color:rgba(255,255,255,0.5);font-size:13.5px;position:relative">Microsoft account credentials &mdash; stored locally only.</p>
+  <!-- Dedicated Account Edit Page -->
+  <div class="view-full" id="view-accedit" style="display:flex;flex-direction:column;overflow:hidden">
+    <!-- Page header -->
+    <div style="display:flex;align-items:center;gap:14px;padding:clamp(12px,1.5vw,20px) clamp(16px,2vw,28px);border-bottom:1px solid rgba(255,255,255,0.05);flex-shrink:0">
+      <button id="acc-modal-cancel" class="btn-icon" title="Back to Accounts" style="width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(255,255,255,0.08);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div id="acc-modal-avatar" class="acc-modal-avatar" style="flex-shrink:0">+</div>
+      <div style="flex:1;min-width:0">
+        <h2 id="acc-modal-title" style="margin:0;font-size:clamp(16px,1.4vw,20px);font-weight:700;color:var(--text)">Add account</h2>
+        <p style="margin:2px 0 0;color:var(--muted);font-size:clamp(11px,0.85vw,13px)">Microsoft account credentials &mdash; stored locally only.</p>
       </div>
-      <!-- Body -->
-      <div style="padding:28px 32px;overflow-y:auto;display:flex;flex-direction:column;gap:18px">
+      <button class="btn btn-primary" id="acc-modal-save" style="border-radius:12px;flex-shrink:0">Save account</button>
+    </div>
+    <!-- Form body -->
+    <div style="flex:1;overflow-y:auto;padding:clamp(16px,2vw,28px) clamp(16px,2.5vw,32px)">
+      <div style="max-width:520px;display:flex;flex-direction:column;gap:18px">
         <div class="modal-field">
           <label>Email</label>
           <input class="modal-input" id="acc-email" type="email" autocomplete="off" placeholder="account@outlook.com">
@@ -2540,7 +2611,7 @@ function html() {
                 <input class="modal-input" id="acc-proxy-pass" type="password" autocomplete="new-password" placeholder="pass">
               </div>
             </div>
-            
+
             <div class="acc-sub-head">Save fingerprint</div>
             <div class="acc-grid-2">
               <label class="cfg-check"><span>Desktop</span>
@@ -2552,15 +2623,7 @@ function html() {
             </div>
           </div>
         </details>
-      </div>
-
-      <!-- Footer Actions -->
-      <div style="padding:20px 32px 32px;display:flex;flex-direction:column;gap:12px;background:rgba(255,255,255,0.01);border-top:1px solid rgba(255,255,255,0.04)">
-        <div style="display:flex;gap:12px">
-          <button class="btn" id="acc-modal-cancel" style="flex:1;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.08);border-radius:12px">Cancel</button>
-          <button class="btn btn-primary" id="acc-modal-save" style="flex:1;border-radius:12px">Save account</button>
-        </div>
-        <div class="modal-msg" id="acc-modal-msg" style="text-align:center;color:#ff5e5e;font-size:13px;height:18px"></div>
+        <div class="modal-msg" id="acc-modal-msg" style="color:#ff5e5e;font-size:13px;min-height:18px"></div>
       </div>
     </div>
   </div>
@@ -2808,9 +2871,18 @@ function html() {
     var PLUGIN_DOC_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/blob/main/docs/create-plugin.md';
     var DOCS_GITHUB_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/main/docs';
 
+    var _ctxMenu = G('ctx-menu');
     document.addEventListener('contextmenu', function(e) {
       if (e.target && e.target.closest && e.target.closest('#console-box')) return;
       e.preventDefault();
+      _ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 210) + 'px';
+      _ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 60) + 'px';
+      _ctxMenu.classList.add('open');
+    });
+    document.addEventListener('click', function() { _ctxMenu.classList.remove('open'); });
+    G('ctx-open-folder').addEventListener('click', function() {
+      _ctxMenu.classList.remove('open');
+      fetch('/api/open-folder', {method:'POST'}).catch(function(){});
     });
     document.addEventListener('dragstart', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
@@ -3016,6 +3088,7 @@ function html() {
       G('view-core').className = v === 'core' ? 'core-view vis' : 'core-view';
       G('view-plugins').className = v === 'plugins' ? 'plugins-wrap vis' : 'plugins-wrap';
       G('view-docs').className = v === 'docs' ? 'docs-wrap vis' : 'docs-wrap';
+      G('view-accedit').className = v === 'accedit' ? 'view-full vis' : 'view-full';
       G('footer-bar').style.display = (v === 'dash' || v === 'accounts') ? '' : 'none';
       ['dash','accounts','console','settings','core','plugins','docs'].forEach(function(n) {
         var el = G('nav-' + n); if (el) el.classList.toggle('active', n === v);
@@ -3045,21 +3118,23 @@ function html() {
     }
 
     // ── Dashboard accounts (masked list) ──────
-    function renderAccounts(accounts, active, loading) {
+    function renderAccounts(accounts, active, loading, ptsMap) {
       if (loading) {
         return '<div class="loading-block"><span class="inline-spinner"></span><span>Loading protected accounts…</span></div>';
       }
       if (!accounts || !accounts.length) {
-        return '<div class="acc-empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg><p>No accounts yet</p><button class="btn btn-secondary btn-sm" onclick="setView(&apos;accounts&apos;)">Add accounts</button></div>';
+        return '<div class="acc-empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg><p>No accounts yet</p></div>';
       }
       return accounts.map(function(a) {
-        var ini = String(a.email || 'A?').split('@')[0].slice(0,2).toUpperCase();
         var isActive = active && a.email && a.email.indexOf(active.slice(0,5)) === 0;
         var disabled = !a.enabled;
+        var pts = ptsMap && a.email ? ptsMap[a.email] : 0;
+        var badge = pts > 0 ? '<span class="acc-pts-badge">+' + pts.toLocaleString() + '</span>' : '';
         return '<div class="acc-row' + (isActive?' is-active':'') + (disabled?' is-disabled':'') + '">' +
           '<div class="acc-avatar"><img src="/avatars/' + encodeURIComponent(a.email||'') + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block"></div>' +
           '<div class="acc-info"><div class="acc-email">' + esc(a.email||'') + '</div>' +
           '<div class="acc-st">' + (disabled?'Disabled':isActive?'Running...':'Ready') + '</div></div>' +
+          badge +
           '<span class="acc-dot ' + (disabled?'dot-off':isActive?'dot-run':'dot-ready') + '"></span></div>';
       }).join('');
     }
@@ -3110,8 +3185,9 @@ function html() {
       G('pts-label').textContent = hasData ? 'collected this run' : 'start a run to see stats';
 
       var mc = G('mini-core');
-      mc.textContent = coreOk ? 'Active' : (m.core === 'Inactive' ? 'Inactive' : running ? '...' : '—');
-      mc.style.color = coreOk ? 'var(--green)' : 'var(--muted)';
+      var cp = data.claimedPoints;
+      mc.textContent = cp > 0 ? '+' + cp.toLocaleString() : (running ? '...' : '—');
+      mc.style.color = cp > 0 ? 'var(--cyan)' : 'var(--muted)';
       G('mini-coupons').textContent = m.coupons || (running ? '...' : '—');
 
       // When the bot is running in headless (hidden-window) mode, the browser is
@@ -3133,7 +3209,7 @@ function html() {
       G('btn-run').disabled = running || allDisabled;
       if (sbBtn) sbBtn.style.display = headlessRun ? '' : 'none';
       G('btn-stop').disabled = !running;
-      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady);
+      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady, data.accountPointsMap);
 
       if (data.consoleLogs && data.consoleLogs.length) {
         var lines = data.consoleLogs.map(function(l) {
@@ -3570,7 +3646,7 @@ function html() {
       var av = G('acc-modal-avatar');
       var ini = String(a.email || '').split('@')[0].slice(0,2).toUpperCase();
       if (av) av.textContent = ini || '+';
-      var adv = document.querySelector('#acc-modal .acc-adv');
+      var adv = document.querySelector('.acc-adv');
       if (adv) adv.open = false;
       G('acc-modal-msg').textContent = '';
     }
@@ -3578,13 +3654,13 @@ function html() {
       accEditIdx = -1;
       G('acc-modal-title').textContent = 'Add account';
       _accFill({});
-      G('acc-modal').classList.add('open'); G('acc-email').focus();
+      setView('accedit'); G('acc-email').focus();
     }
     function openAccEdit(i) {
       accEditIdx = i;
       G('acc-modal-title').textContent = 'Edit account';
       _accFill(_raw[i]);
-      G('acc-modal').classList.add('open'); G('acc-email').focus();
+      setView('accedit'); G('acc-email').focus();
     }
     async function saveAccModal() {
       var email = G('acc-email').value.trim();
@@ -3638,7 +3714,7 @@ function html() {
         return;
       }
 
-      G('acc-modal').classList.remove('open'); renderAccEditor();
+      setView('accounts');
     }
 
     // ── Settings ──────────────────────────────
@@ -3752,11 +3828,17 @@ function html() {
       var sb = G('btn-show-browser');
       if (sb) sb.addEventListener('click', function() { fetch('/api/show-browser', { method: 'POST' }); });
     })();
-    if (G('btn-open-acc')) G('btn-open-acc').addEventListener('click', function() { setView('accounts'); });
     G('btn-add-acc').addEventListener('click', openAccAdd);
+    G('acc-editor-list').addEventListener('dblclick', function(e) {
+      var row = e.target.closest('[data-email]');
+      if (!row) return;
+      var email = row.getAttribute('data-email');
+      var idx = _raw.findIndex(function(a) { return (a.email || '') === email; });
+      if (idx !== -1) toggleAcc(idx);
+    });
     G('btn-test-proxies').addEventListener('click', function() { runProxyTest(); });
     G('acc-modal-save').addEventListener('click', saveAccModal);
-    G('acc-modal-cancel').addEventListener('click', function() { G('acc-modal').classList.remove('open'); });
+    G('acc-modal-cancel').addEventListener('click', function() { setView('accounts'); });
     G('acc-email').addEventListener('keydown', function(e) { if (e.key==='Enter') G('acc-password').focus(); });
     G('acc-password').addEventListener('keydown', function(e) { if (e.key==='Enter') saveAccModal(); });
     G('acc-pw-toggle').addEventListener('click', function() {
@@ -4976,6 +5058,12 @@ function html() {
       clearTimeout(_fbToastTimer);
       _fbToastTimer = setTimeout(function() { toast.classList.remove('show'); }, 4000);
     }
+  <div class="ctx-menu" id="ctx-menu">
+    <div class="ctx-item" id="ctx-open-folder">
+      <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Open bot folder
+    </div>
+  </div>
   </script>
 </body>
 </html>`
@@ -5046,7 +5134,13 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/state') {
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ ...state, corePluginEnabled: isPluginEnabled('core') }))
+        const gs = readBotStats()
+        res.end(JSON.stringify({
+            ...state,
+            corePluginEnabled: isPluginEnabled('core'),
+            claimedPoints: gs.claimedPoints,
+            accountPointsMap: cachedAccountPointsMap()
+        }))
         return
     }
     if (req.method === 'GET' && req.url === '/api/license') {
@@ -5478,6 +5572,15 @@ const server = http.createServer((req, res) => {
                 res.writeHead(400); res.end(String(e.message))
             }
         })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/open-folder') {
+        try {
+            childProcess.spawn('explorer', [ROOT], { detached: true, stdio: 'ignore' }).unref()
+            res.writeHead(204); res.end()
+        } catch(e) {
+            res.writeHead(500); res.end(String(e.message))
+        }
         return
     }
     if (req.method === 'POST' && req.url === '/api/open-portal') {
