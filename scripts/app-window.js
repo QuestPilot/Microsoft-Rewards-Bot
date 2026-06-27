@@ -1014,8 +1014,10 @@ function html() {
       background:rgba(255,255,255,.035);border:1px solid var(--border);
       border-radius:10px;padding:11px 9px;text-align:center;
     }
-    .mini-val{font-size:14px;font-weight:800;transition:color .3s}
-    .mini-lbl{font-size:11px;color:var(--muted);margin-top:3px}
+    .mini-val{font-size:12px;font-weight:800;transition:color .3s}
+    .mini-lbl{font-size:10px;color:var(--muted);margin-top:3px}
+    .mini-sm .mini-val{font-size:11px;font-weight:700;color:var(--muted)}
+    .mini-sm .mini-lbl{font-size:9.5px}
 
     /* Accounts card */
     .acc-list{display:flex;flex-direction:column;gap:7px;overflow-y:auto;flex:1}
@@ -1234,12 +1236,12 @@ function html() {
     
     .modal-msg{min-height:17px;font-size:12px;color:var(--cyan);margin-top:9px}
     /* Accounts editor */
-    .btn-icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;transition:all .15s;flex-shrink:0}
+    .btn-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;transition:all .15s;flex-shrink:0}
     .btn-icon:hover{color:var(--text);background:rgba(255,255,255,.12);border-color:rgba(30,155,255,.3)}
     .btn-icon.danger:hover{color:var(--rose);border-color:rgba(255,107,138,.3);background:rgba(255,107,138,.07)}
     .btn-icon.btn-icon-on{color:var(--green);border-color:rgba(47,210,125,.3);background:rgba(47,210,125,.08)}
     .btn-icon.btn-icon-on:hover{color:var(--green);border-color:rgba(47,210,125,.5);background:rgba(47,210,125,.14)}
-    .btn-icon svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .btn-icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .acc-editor-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid transparent;transition:all .15s;margin-bottom:7px}
     .acc-editor-row:hover{border-color:var(--border);background:rgba(255,255,255,.045)}
     .acc-actions-cell{display:flex;gap:6px;flex-shrink:0}
@@ -1462,6 +1464,8 @@ function html() {
     .lbl-opt{opacity:.55;font-weight:400;text-transform:none;letter-spacing:0}
     .acc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .acc-sub-head{font-size:10.5px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 8px}
+    .acc-form-section-head{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.08em;padding-bottom:10px;border-bottom:1px solid rgba(46,232,255,.12);margin-bottom:2px}
+    .acc-form-section-head svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
     .acc-adv{margin-top:4px}
     .acc-adv .cfg-check{height:42px}
     /* Sidebar action buttons */
@@ -2071,7 +2075,7 @@ function html() {
             <div class="mini-val" id="mini-core" style="color:var(--muted)">—</div>
             <div class="mini-lbl">Points Claimed</div>
           </div>
-          <div class="mini">
+          <div class="mini mini-sm">
             <div class="mini-val" id="mini-coupons">—</div>
             <div class="mini-lbl">Coupons</div>
           </div>
@@ -2526,20 +2530,25 @@ function html() {
   <!-- Dedicated Account Edit Page -->
   <div class="view-full" id="view-accedit" style="display:flex;flex-direction:column;overflow:hidden">
     <!-- Page header -->
-    <div style="display:flex;align-items:center;gap:14px;padding:clamp(12px,1.5vw,20px) clamp(16px,2vw,28px);border-bottom:1px solid rgba(255,255,255,0.05);flex-shrink:0">
-      <button id="acc-modal-cancel" class="btn-icon" title="Back to Accounts" style="width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(255,255,255,0.08);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
-        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    <div style="display:flex;align-items:center;gap:14px;padding:clamp(12px,1.5vh,18px) clamp(18px,2vw,30px);border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;background:rgba(4,10,20,.5)">
+      <button id="acc-modal-cancel" class="btn-icon" title="Back to Accounts">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <div id="acc-modal-avatar" class="acc-modal-avatar" style="flex-shrink:0">+</div>
       <div style="flex:1;min-width:0">
-        <h2 id="acc-modal-title" style="margin:0;font-size:clamp(16px,1.4vw,20px);font-weight:700;color:var(--text)">Add account</h2>
-        <p style="margin:2px 0 0;color:var(--muted);font-size:clamp(11px,0.85vw,13px)">Microsoft account credentials &mdash; stored locally only.</p>
+        <h2 id="acc-modal-title" style="margin:0;font-size:clamp(15px,1.3vw,19px);font-weight:700">Add account</h2>
+        <p style="margin:2px 0 0;color:var(--muted);font-size:clamp(11px,0.85vw,12.5px)">Stored locally &mdash; encrypted on disk.</p>
       </div>
-      <button class="btn btn-primary" id="acc-modal-save" style="border-radius:12px;flex-shrink:0">Save account</button>
+      <button class="btn btn-primary" id="acc-modal-save" style="flex-shrink:0;border-radius:12px">Save account</button>
     </div>
-    <!-- Form body -->
-    <div style="flex:1;overflow-y:auto;padding:clamp(16px,2vw,28px) clamp(16px,2.5vw,32px)">
-      <div style="max-width:520px;display:flex;flex-direction:column;gap:18px">
+    <!-- Two-column form body -->
+    <div style="flex:1;overflow-y:auto;padding:clamp(14px,2vh,24px) clamp(18px,2.2vw,32px);display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,2vw,28px);align-content:start">
+      <!-- LEFT: Credentials -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="acc-form-section-head">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.8-4 13.2-4 15 0"/></svg>
+          Credentials
+        </div>
         <div class="modal-field">
           <label>Email</label>
           <input class="modal-input" id="acc-email" type="email" autocomplete="off" placeholder="account@outlook.com">
@@ -2554,76 +2563,82 @@ function html() {
           </div>
         </div>
         <div class="modal-field">
-          <label>TOTP secret <span class="lbl-opt">(optional &mdash; only if 2FA is enabled)</span></label>
-          <input class="modal-input" id="acc-totp" autocomplete="off" placeholder="Base32 TOTP secret">
+          <label>TOTP secret <span class="lbl-opt">(optional)</span></label>
+          <input class="modal-input" id="acc-totp" autocomplete="off" placeholder="Base32 secret — only if 2FA enabled">
         </div>
-
-        <details class="cfg-adv acc-adv">
-          <summary>Advanced &mdash; recovery, proxy &amp; locale</summary>
-          <div style="display:flex;flex-direction:column;gap:18px;margin-top:16px">
-            <div class="modal-field">
-              <label>Recovery email <span class="lbl-opt">(optional)</span></label>
-              <input class="modal-input" id="acc-recovery" type="email" autocomplete="off" placeholder="recovery@outlook.com">
-            </div>
-            <div class="acc-grid-2">
-              <div class="modal-field">
-                <label>Geo locale</label>
-                <input class="modal-input" id="acc-geo" autocomplete="off" placeholder="auto">
-              </div>
-              <div class="modal-field">
-                <label>Language</label>
-                <input class="modal-input" id="acc-lang" autocomplete="off" placeholder="en">
-              </div>
-            </div>
-            <div class="modal-field">
-              <label>Dashboard <span class="lbl-opt">(auto-detected)</span></label>
-              <select class="modal-input" id="acc-dashboard-mode">
-                <option value="auto">Auto-detect (recommended)</option>
-                <option value="next">Force new dashboard</option>
-                <option value="legacy">Force classic (ASP)</option>
-              </select>
-            </div>
-            <div class="acc-sub-head">Proxy <span class="lbl-opt">(optional)</span></div>
-            <div class="modal-field">
-              <label>Host / URL</label>
-              <input class="modal-input" id="acc-proxy-url" autocomplete="off" placeholder="http://host or ip">
-            </div>
-            <div class="acc-grid-2">
-              <div class="modal-field">
-                <label>Port</label>
-                <input class="modal-input" id="acc-proxy-port" type="number" autocomplete="off" placeholder="8080">
-              </div>
-              <div class="modal-field" style="display:flex;align-items:flex-end">
-                <label class="toggle" style="margin-bottom:8px">
-                  <input type="checkbox" id="acc-proxy-axios">
-                  <span class="toggle-slider"></span>
-                  Use Axios
-                </label>
-              </div>
-            </div>
-            <div class="acc-grid-2">
-              <div class="modal-field">
-                <label>Username</label>
-                <input class="modal-input" id="acc-proxy-user" autocomplete="off" placeholder="user">
-              </div>
-              <div class="modal-field">
-                <label>Password</label>
-                <input class="modal-input" id="acc-proxy-pass" type="password" autocomplete="new-password" placeholder="pass">
-              </div>
-            </div>
-
-            <div class="acc-sub-head">Save fingerprint</div>
-            <div class="acc-grid-2">
-              <label class="cfg-check"><span>Desktop</span>
-                <label class="toggle"><input type="checkbox" id="acc-fp-desktop"><span class="toggle-slider"></span></label>
-              </label>
-              <label class="cfg-check"><span>Mobile</span>
-                <label class="toggle"><input type="checkbox" id="acc-fp-mobile"><span class="toggle-slider"></span></label>
-              </label>
-            </div>
+        <div class="modal-field">
+          <label>Recovery email <span class="lbl-opt">(optional)</span></label>
+          <input class="modal-input" id="acc-recovery" type="email" autocomplete="off" placeholder="recovery@outlook.com">
+        </div>
+      </div>
+      <!-- RIGHT: Region, Proxy, Fingerprint -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="acc-form-section-head">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Region &amp; Dashboard
+        </div>
+        <div class="acc-grid-2">
+          <div class="modal-field">
+            <label>Geo locale</label>
+            <input class="modal-input" id="acc-geo" autocomplete="off" placeholder="auto">
           </div>
-        </details>
-        <div class="modal-msg" id="acc-modal-msg" style="color:#ff5e5e;font-size:13px;min-height:18px"></div>
+          <div class="modal-field">
+            <label>Language</label>
+            <input class="modal-input" id="acc-lang" autocomplete="off" placeholder="en">
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>Dashboard variant <span class="lbl-opt">(auto-detected)</span></label>
+          <select class="modal-input" id="acc-dashboard-mode">
+            <option value="auto">Auto-detect (recommended)</option>
+            <option value="next">Force new dashboard</option>
+            <option value="legacy">Force classic (ASP)</option>
+          </select>
+        </div>
+        <div class="acc-form-section-head" style="margin-top:6px">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          Proxy <span class="lbl-opt" style="font-weight:400;font-size:10px;margin-left:4px">(optional)</span>
+        </div>
+        <div class="modal-field">
+          <label>Host / URL</label>
+          <input class="modal-input" id="acc-proxy-url" autocomplete="off" placeholder="http://host or ip">
+        </div>
+        <div class="acc-grid-2">
+          <div class="modal-field">
+            <label>Port</label>
+            <input class="modal-input" id="acc-proxy-port" type="number" autocomplete="off" placeholder="8080">
+          </div>
+          <div class="modal-field" style="display:flex;align-items:flex-end;padding-bottom:4px">
+            <label class="toggle" style="margin-bottom:4px">
+              <input type="checkbox" id="acc-proxy-axios">
+              <span class="toggle-slider"></span>
+              Use Axios
+            </label>
+          </div>
+        </div>
+        <div class="acc-grid-2">
+          <div class="modal-field">
+            <label>Username</label>
+            <input class="modal-input" id="acc-proxy-user" autocomplete="off" placeholder="user">
+          </div>
+          <div class="modal-field">
+            <label>Password</label>
+            <input class="modal-input" id="acc-proxy-pass" type="password" autocomplete="new-password" placeholder="pass">
+          </div>
+        </div>
+        <div class="acc-form-section-head" style="margin-top:6px">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          Fingerprint
+        </div>
+        <div class="acc-grid-2">
+          <label class="cfg-check"><span>Desktop</span>
+            <label class="toggle"><input type="checkbox" id="acc-fp-desktop"><span class="toggle-slider"></span></label>
+          </label>
+          <label class="cfg-check"><span>Mobile</span>
+            <label class="toggle"><input type="checkbox" id="acc-fp-mobile"><span class="toggle-slider"></span></label>
+          </label>
+        </div>
+        <div class="modal-msg" id="acc-modal-msg" style="color:var(--rose);font-size:12px;min-height:16px;margin-top:4px"></div>
       </div>
     </div>
   </div>
@@ -3209,6 +3224,7 @@ function html() {
       G('btn-run').disabled = running || allDisabled;
       if (sbBtn) sbBtn.style.display = headlessRun ? '' : 'none';
       G('btn-stop').disabled = !running;
+      if (data.accountPointsMap) _accPtsMap = data.accountPointsMap;
       G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady, data.accountPointsMap);
 
       if (data.consoleLogs && data.consoleLogs.length) {
@@ -3266,6 +3282,12 @@ function html() {
     var _raw = [];
     var _accountsLoading = false;
     var _accountsLoaded = false;
+    var _accPtsMap = {};
+    function maskEmailClient(email) {
+      var parts = String(email || '').split('@');
+      if (parts.length !== 2 || !parts[0] || !parts[1]) return email;
+      return parts[0].slice(0,2) + '***@' + parts[1];
+    }
     var _accGroupsCollapsed = JSON.parse(localStorage.getItem('acc_groups_collapsed') || '{"proxy":false,"direct":false}');
     var _proxyTestResults = {};
     var _testingProxies = false;
@@ -3457,6 +3479,8 @@ function html() {
           if (a.geoLocale && String(a.geoLocale).toLowerCase() !== 'auto') {
             metaInfo += '<span title="Geo locale" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.07);color:#9aa3b2">' + esc(String(a.geoLocale).toUpperCase()) + '</span>';
           }
+          var accPts = _accPtsMap[maskEmailClient(a.email || '')] || 0;
+          var ptsBadge = accPts > 0 ? '<span class="acc-pts-badge">+' + accPts.toLocaleString() + '</span>' : '';
 
           return '<div class="' + rowClass + '" data-email="' + esc(a.email||'') + '">' +
             '<div class="acc-avatar' + (isRunning ? ' running' : '') + '"><img src="/avatars/' + encodeURIComponent(a.email||'') + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block"></div>' +
@@ -3466,6 +3490,7 @@ function html() {
                 '<div class="' + statusClass + '">' + esc(statusText) + '</div>' +
                 proxyInfo +
                 metaInfo +
+                ptsBadge +
               '</div>' +
             '</div>' +
             '<div class="acc-actions-cell">' +
@@ -5058,13 +5083,13 @@ function html() {
       clearTimeout(_fbToastTimer);
       _fbToastTimer = setTimeout(function() { toast.classList.remove('show'); }, 4000);
     }
+  </script>
   <div class="ctx-menu" id="ctx-menu">
     <div class="ctx-item" id="ctx-open-folder">
       <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       Open bot folder
     </div>
   </div>
-  </script>
 </body>
 </html>`
 }
