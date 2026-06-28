@@ -30,6 +30,7 @@ New here? Run `npm start`, let **Rewards Desk** open, and read the two pages bel
 - [Docker](./docker.md)
 - [Node.js version](./node-version.md)
 - [Built-in scheduler](./scheduler.md)
+- [Account safety](./account-safety.md) — safe-by-default behavior and how to reduce ban risk
 - [Privacy & telemetry](./privacy.md) — exactly what is (and isn't) collected, and how to turn it off
 - [Security policy](../SECURITY.md) — how your credentials are protected and how to report issues
 - [Licensing and allowed use](./licensing.md)

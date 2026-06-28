@@ -139,6 +139,7 @@ See [Docker deployment](docs/docker.md) for the full Compose example and Core co
 | Enable, disable, or inspect plugins | [Plugin System](docs/plugins.md) |
 | Build your own plugin | [Create a Plugin](docs/create-plugin.md) · [Plugin API](docs/plugin-api.md) |
 | Fix launch, install, or update issues | [Troubleshooting](docs/troubleshooting.md) |
+| Run safely & reduce ban risk | [Account Safety](docs/account-safety.md) |
 | Understand privacy, telemetry, and security | [Privacy & Telemetry](docs/privacy.md) · [Security Policy](SECURITY.md) |
 | Licensing and allowed use | [License](LICENSE) · [Commercial Use](COMMERCIAL.md) · [Trademark](TRADEMARK.md) |
 
