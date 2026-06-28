@@ -9,7 +9,20 @@ const { createDesktopInstallManager } = require('../launchers/desktop-install-ma
 const { createStartupManager } = require('../launchers/startup-manager')
 
 const ROOT = path.resolve(__dirname, '..', '..')
-const PORT = Number.parseInt(process.env.MSRB_APP_PORT || '0', 10)
+// Stable default port so the LAN URL is bookmarkable on a phone; falls back to a
+// small deterministic range, then an OS-assigned port, under contention.
+const DEFAULT_DESK_PORT = 7700
+// Desk server coordinates, finalized at listen() time (see startDeskServer below).
+let deskBoundPort = null
+let deskLanEnabled = false
+let deskLanIp = null
+let deskLanUrl = null
+// Origins allowed to embed/probe this local Desk from an HTTPS page (the remote
+// Nexus dashboard). Browsers gate public→loopback/LAN requests behind CORS +
+// Private Network Access; we opt in for the pinned Nexus origin only.
+const DESK_EMBED_ORIGINS = new Set(
+    ['https://bot.lgtw.tf'].concat(process.env.MSRB_DESK_EMBED_ORIGIN ? [process.env.MSRB_DESK_EMBED_ORIGIN] : [])
+)
 const APP_TITLE = 'Rewards Desk'
 const APP_ICON_PATH = path.join(ROOT, 'assets', 'logo.ico')
 const APP_BANNER_PATH = path.join(ROOT, 'assets', 'banner-core.png')
@@ -27,6 +40,33 @@ try {
 
 function readVersion() {
     try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version } catch { return '4.0.x' }
+}
+
+// The address other devices on the home network use to reach the Desk when LAN
+// access is on. Naively taking the first non-internal IPv4 is wrong: it can land on
+// an APIPA link-local (169.254.x.x — not routable) or a virtual adapter (VMware/WSL/
+// Hyper-V). Prefer a real RFC1918 private LAN address and de-prioritise virtual NICs.
+function getLanIPv4() {
+    try {
+        const ifaces = os.networkInterfaces()
+        const candidates = []
+        for (const name of Object.keys(ifaces)) {
+            for (const ni of ifaces[name] || []) {
+                if (!ni || ni.family !== 'IPv4' || ni.internal || !ni.address) continue
+                if (ni.address.startsWith('169.254.')) continue // APIPA — no DHCP lease, not on the LAN
+                candidates.push({ name, address: ni.address })
+            }
+        }
+        if (!candidates.length) return null
+        const isPrivate = a => a.startsWith('192.168.') || a.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(a)
+        const isVirtual = n => /(vmware|virtualbox|vethernet|hyper-v|wsl|docker|default switch|loopback)/i.test(n)
+        candidates.sort((x, y) => {
+            const score = c => (isPrivate(c.address) ? 2 : 0) - (isVirtual(c.name) ? 1 : 0)
+            return score(y) - score(x)
+        })
+        return candidates[0].address
+    } catch {}
+    return null
 }
 const APP_VERSION = readVersion()
 
@@ -2786,6 +2826,21 @@ function html() {
             </div>
           </div>
           <div class="settings-section">
+            <h3>Network access</h3>
+            <div class="settings-section-note">Open this Desk from other devices on your home network (phone, laptop) and control the bot from there.</div>
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Local network access (LAN)</div><div class="toggle-sub">Reachable from other devices on your Wi-Fi. Anyone on your network who opens the address can control the bot. Changing this needs a Desk restart.</div></div><label class="toggle"><input type="checkbox" id="tog-lanAccess"><span class="toggle-slider"></span></label></div>
+            </div>
+            <div id="lan-url-row" class="advanced-block term-row" style="margin-top:12px; display:none">
+              <div class="toggle-wrap-left">
+                <div class="toggle-label">Open on your phone</div>
+                <div class="toggle-sub">Bookmark this address on a device on the same network:</div>
+                <div id="lan-url-value" style="margin-top:6px; font-family:monospace; color:#3bc9ff; user-select:all; word-break:break-all"></div>
+              </div>
+              <button class="btn btn-secondary" id="btn-copy-lan-url" style="flex-shrink:0">Copy</button>
+            </div>
+          </div>
+          <div class="settings-section">
             <h3>Search tuning</h3>
             <div class="settings-section-note">Fine-tune search behaviour and timing. Delays accept values like <b>3min</b> or <b>8sec</b>.</div>
             <div class="toggle-grid">
@@ -4467,6 +4522,10 @@ function html() {
       var analyticsEnabled = s.analytics != null ? s.analytics.enabled !== false : true;
       var togAn = G('tog-analytics'); if (togAn) togAn.checked = analyticsEnabled;
       var anWarn = G('analytics-warning'); if (anWarn) anWarn.style.display = analyticsEnabled ? 'none' : 'block';
+      // Local network access (LAN) — toggle + bookmarkable address for other devices
+      var lan = G('tog-lanAccess'); if (lan) lan.checked = s.deskLanAccess === true;
+      var lanVal = G('lan-url-value'); if (lanVal) lanVal.textContent = s.deskLanUrl || '';
+      var lanRow = G('lan-url-row'); if (lanRow) lanRow.style.display = (s.deskLanAccess && s.deskLanUrl) ? '' : 'none';
       // Search tuning (advanced)
       var ss = s.searchSettings || {};
       if (G('tog-parallelSearching')) G('tog-parallelSearching').checked = ss.parallelSearching === true;
@@ -4760,6 +4819,22 @@ function html() {
     Object.keys(TOGGLE_MAP).forEach(function(id) {
       var el = G(id); if (!el) return;
       el.addEventListener('change', function() { saveSetting(TOGGLE_MAP[id], el.checked); });
+    });
+    // LAN access — persisted like the others, but the bound socket only changes on
+    // the next launch, so we tell the user to restart for it to take effect.
+    var _lanTog = G('tog-lanAccess');
+    if (_lanTog) _lanTog.addEventListener('change', function() {
+      saveSetting('desk.lanAccess', this.checked);
+      showToast(this.checked
+        ? 'LAN access enabled — restart the Desk to apply.'
+        : 'LAN access disabled — restart the Desk to apply.');
+    });
+    var _lanCopy = G('btn-copy-lan-url');
+    if (_lanCopy) _lanCopy.addEventListener('click', function() {
+      var v = (G('lan-url-value') || {}).textContent || '';
+      if (!v) return;
+      navigator.clipboard.writeText(v).then(function(){ showToast('Address copied to clipboard'); })
+        .catch(function(){ showToast('Could not copy address', true); });
     });
     // Free-text search-tuning fields (debounced save on change; brief saved pulse).
     var TEXT_MAP = {
@@ -5974,11 +6049,35 @@ function html() {
 </html>`
 }
 
+// Hosts the localhost API gate accepts. Loopback always; the machine's LAN
+// address too when LAN access is enabled (so another device in the house can use
+// the Desk). A mismatched host/origin is still rejected — see http.js.
+function deskAllowedHosts() {
+    const address = server.address()
+    if (!address || typeof address !== 'object') return []
+    const port = address.port
+    const hosts = [`127.0.0.1:${port}`, `localhost:${port}`]
+    if (deskLanEnabled && deskLanIp) hosts.push(`${deskLanIp}:${port}`)
+    return hosts
+}
+
+// Opt this local server in to being embedded/probed by the remote Nexus dashboard
+// (an HTTPS page). Without CORS + the Private-Network-Access header, the browser
+// blocks a public site from reaching loopback/LAN.
+function applyDeskEmbedHeaders(req, res) {
+    const origin = req.headers.origin
+    if (origin && DESK_EMBED_ORIGINS.has(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin)
+        res.setHeader('Vary', 'Origin')
+    }
+    res.setHeader('Access-Control-Allow-Private-Network', 'true')
+}
+
 // Localhost HTTP utilities extracted to ./desk/http.js (behavior identical; the
 // security gate + body limit are covered by tests/desk-behavior.test.js).
 const { createHttp } = require('./http')
 const { jsonResponse, safeEqual, authorizeApiRequest, readApiBody, parseJson } = createHttp({
-    getServerAddress: () => server.address(),
+    getAllowedHosts: deskAllowedHosts,
     apiToken: API_TOKEN,
     maxBodyBytes: MAX_API_BODY_BYTES
 })
@@ -5993,8 +6092,33 @@ const SHOW_BROWSER_SIGNAL = path.join(os.tmpdir(), 'msrb-show-browser.signal')
 
 const server = http.createServer((req, res) => {
     const requestPath = new URL(req.url, 'http://127.0.0.1').pathname
+    // CORS + Private-Network-Access preflight for the Nexus embed/probe. Handled
+    // before the /api gate so a cross-origin OPTIONS is never 403'd for lacking a token.
+    if (req.method === 'OPTIONS') {
+        applyDeskEmbedHeaders(req, res)
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'x-msrb-token, content-type')
+        res.setHeader('Access-Control-Max-Age', '600')
+        res.writeHead(204)
+        res.end()
+        return
+    }
+    // Ungated reachability probe: lets the remote dashboard detect a local Desk on
+    // this machine and learn the LAN URL. Returns only public, non-sensitive coords.
+    if (req.method === 'GET' && requestPath === '/__desk_ping') {
+        applyDeskEmbedHeaders(req, res)
+        jsonResponse(res, 200, {
+            desk: true,
+            version: readVersion(),
+            port: deskBoundPort,
+            lanUrl: deskLanUrl,
+            lanEnabled: deskLanEnabled
+        })
+        return
+    }
     if (requestPath.startsWith('/api/') && !authorizeApiRequest(req, res)) return
     if (req.method === 'GET' && req.url === '/') {
+        applyDeskEmbedHeaders(req, res)
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
         res.end(html())
         return
@@ -6259,7 +6383,13 @@ const server = http.createServer((req, res) => {
             core: cfg.core || {},
             backgroundAgent: cfg.backgroundAgent || {},
             webhook: cfg.webhook || {},
-            hasCoreLicense: state.deskLicense.tier === 'premium'
+            hasCoreLicense: state.deskLicense.tier === 'premium',
+            // Live Desk network coordinates (source of truth = what's actually bound,
+            // not just the stored config). The toggle writes desk.lanAccess; the bound
+            // value only changes after a restart.
+            deskLanAccess: deskLanEnabled,
+            deskLanUrl,
+            deskPort: deskBoundPort
         }))
         return
     }
@@ -6638,14 +6768,61 @@ const server = http.createServer((req, res) => {
     res.end('Not found')
 })
 
-server.listen(PORT, '127.0.0.1', () => {
+startDeskServer()
+
+function startDeskServer() {
+    const deskCfg = (readConfigRaw() || {}).desk || {}
+    // LAN access: env override (tests force loopback with MSRB_DESK_LAN=0) wins,
+    // otherwise config desk.lanAccess (default ON). When ON we bind 0.0.0.0 so the
+    // Desk is reachable from other devices on the home network; 0.0.0.0 still covers
+    // loopback, so the local app window keeps using 127.0.0.1.
+    const lanEnv = process.env.MSRB_DESK_LAN
+    deskLanEnabled = lanEnv === '1' ? true : lanEnv === '0' ? false : deskCfg.lanAccess !== false
+    deskLanIp = deskLanEnabled ? getLanIPv4() : null
+    const host = deskLanEnabled ? '0.0.0.0' : '127.0.0.1'
+
+    // An explicit MSRB_APP_PORT wins (tests pin a free port; 0 = OS-assigned). Otherwise
+    // a stable default (config desk.port or 7700) so the LAN URL is bookmarkable; under
+    // contention we walk a small deterministic range the remote dashboard can also probe.
+    const explicit = process.env.MSRB_APP_PORT
+    const hasExplicit = explicit != null && explicit !== ''
+    const desired = hasExplicit
+        ? Number.parseInt(explicit, 10) || 0
+        : Number.parseInt(deskCfg.port || DEFAULT_DESK_PORT, 10) || DEFAULT_DESK_PORT
+    listenWithFallback(host, desired, hasExplicit ? 0 : 9)
+}
+
+function listenWithFallback(host, port, attemptsLeft) {
+    const onError = err => {
+        server.removeListener('listening', onListening)
+        if (err && err.code === 'EADDRINUSE' && attemptsLeft > 0) {
+            listenWithFallback(host, port + 1, attemptsLeft - 1)
+        } else if (err && err.code === 'EADDRINUSE' && port !== 0) {
+            listenWithFallback(host, 0, 0) // give up on the fixed range — let the OS choose
+        } else {
+            pushLog('error', `Desk server failed to listen: ${err && err.message ? err.message : err}`)
+        }
+    }
+    const onListening = () => {
+        server.removeListener('error', onError)
+        finalizeDeskServer()
+    }
+    server.once('error', onError)
+    server.once('listening', onListening)
+    server.listen(port, host)
+}
+
+function finalizeDeskServer() {
     const address = server.address()
-    const url = `http://127.0.0.1:${address.port}`
+    deskBoundPort = address && typeof address === 'object' ? address.port : null
+    deskLanUrl = deskLanEnabled && deskLanIp && deskBoundPort ? `http://${deskLanIp}:${deskBoundPort}` : null
+    const url = `http://127.0.0.1:${deskBoundPort}`
+    if (deskLanUrl) pushLog('info', `Desk reachable on your network at ${deskLanUrl}`)
     if (process.env.MSRB_APP_NO_OPEN !== '1') openAppWindow(url)
     initializeDeskInBackground()
     void refreshAgentState()
     setInterval(() => void refreshAgentState(), 900)
-})
+}
 
 // Browser launcher extracted to ./desk/browser-launcher.js (behavior identical).
 const { createBrowserLauncher } = require('./browser-launcher')

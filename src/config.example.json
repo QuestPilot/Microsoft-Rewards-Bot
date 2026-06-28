@@ -105,5 +105,8 @@
     },
     "terminal": {
         "enabled": false
+    },
+    "desk": {
+        "lanAccess": true
     }
 }

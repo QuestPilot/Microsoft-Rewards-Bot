@@ -93,7 +93,9 @@ function killTree(proc) {
 before(async () => {
     port = await freePort()
     child = spawn(process.execPath, [APP], {
-        env: { ...process.env, MSRB_APP_NO_OPEN: '1', MSRB_APP_PORT: String(port) },
+        // MSRB_DESK_LAN=0 keeps the test server bound to loopback only (no 0.0.0.0 bind
+        // → no Windows Firewall prompt in CI; the host/origin gate assertions stay exact).
+        env: { ...process.env, MSRB_APP_NO_OPEN: '1', MSRB_APP_PORT: String(port), MSRB_DESK_LAN: '0' },
         stdio: ['ignore', 'pipe', 'pipe'],
         // group-lead on POSIX so killTree can take down the spawned account worker too
         detached: process.platform !== 'win32'
@@ -130,6 +132,24 @@ test('/api/* with a mismatched Host header is rejected (403)', async () => {
 test('/api/* with a mismatched Origin header is rejected (403)', async () => {
     const res = await request('/api/plugins', { token, origin: 'http://evil.example' })
     assert.equal(res.status, 403)
+})
+
+test('GET /__desk_ping is ungated and advertises the Desk for remote embedding', async () => {
+    const res = await request('/__desk_ping', { token: null })
+    assert.equal(res.status, 200)
+    const data = JSON.parse(res.body)
+    assert.equal(data.desk, true)
+    assert.equal(typeof data.port, 'number')
+    assert.ok('lanUrl' in data && 'lanEnabled' in data, 'ping reports LAN coordinates')
+    // Reached by an HTTPS page (the remote dashboard) → must opt in to Private Network Access.
+    assert.equal(res.headers['access-control-allow-private-network'], 'true')
+})
+
+test('OPTIONS preflight from the pinned Nexus origin is allowed', async () => {
+    const res = await request('/__desk_ping', { method: 'OPTIONS', token: null, origin: 'https://bot.lgtw.tf' })
+    assert.equal(res.status, 204)
+    assert.equal(res.headers['access-control-allow-origin'], 'https://bot.lgtw.tf')
+    assert.equal(res.headers['access-control-allow-private-network'], 'true')
 })
 
 test('GET /api/plugins returns the plugin listing shape', async () => {

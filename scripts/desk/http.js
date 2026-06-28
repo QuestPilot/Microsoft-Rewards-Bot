@@ -5,14 +5,15 @@
 // limit; behaviorally covered by tests/desk-behavior.test.js (401/403/contracts).
 //
 // Dependencies are injected so this stays decoupled from app-window's module state:
-//   getServerAddress() — returns the live server.address() (the `server` const is
-//                        defined later in app-window.js, so a thunk avoids the TDZ);
-//   apiToken           — the per-process API token;
-//   maxBodyBytes       — the request body cap.
+//   getAllowedHosts() — returns the live list of accepted "host:port" strings
+//                       (loopback always; the LAN address too when LAN access is on).
+//                       A thunk avoids the TDZ on app-window's `server` const;
+//   apiToken          — the per-process API token;
+//   maxBodyBytes      — the request body cap.
 
 const crypto = require('crypto')
 
-function createHttp({ getServerAddress, apiToken, maxBodyBytes }) {
+function createHttp({ getAllowedHosts, apiToken, maxBodyBytes }) {
     function jsonResponse(res, statusCode, payload) {
         res.writeHead(statusCode, {
             'content-type': 'application/json; charset=utf-8',
@@ -29,14 +30,13 @@ function createHttp({ getServerAddress, apiToken, maxBodyBytes }) {
     }
 
     function authorizeApiRequest(req, res) {
-        const address = getServerAddress()
-        const expectedHost = address && typeof address === 'object' ? `127.0.0.1:${address.port}` : null
-        if (!expectedHost || req.headers.host !== expectedHost) {
+        const allowedHosts = getAllowedHosts()
+        if (!allowedHosts.length || !allowedHosts.includes(req.headers.host)) {
             jsonResponse(res, 403, { error: 'Invalid host' })
             return false
         }
         const origin = req.headers.origin
-        if (origin && origin !== `http://${expectedHost}`) {
+        if (origin && !allowedHosts.some(host => origin === `http://${host}`)) {
             jsonResponse(res, 403, { error: 'Invalid origin' })
             return false
         }

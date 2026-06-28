@@ -131,6 +131,12 @@ export const ConfigSchema = z.object({
     }).default({ enabled: true }),
     backgroundAgent: BackgroundAgentSchema.optional(),
     terminal: TerminalSchema.optional(),
+    /** Rewards Desk (local control UI) settings. `lanAccess` lets other devices on
+     *  the home network reach the Desk at http://<this-pc-ip>:<port>; default on. */
+    desk: z.object({
+        lanAccess: z.boolean().default(true),
+        port: NumberOrString.optional()
+    }).optional(),
     scheduler: SchedulerSchema.optional(),
     core: z.object({
         doubleSearchPoints: z.boolean().optional(),
