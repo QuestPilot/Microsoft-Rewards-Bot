@@ -10,9 +10,9 @@
 
 const fs = require('fs')
 const path = require('path')
-const { signBytes } = require('./security/SignedManifest')
+const { signBytes } = require('../security/SignedManifest')
 
-const root = path.resolve(__dirname, '..')
+const root = path.resolve(__dirname, '..', '..')
 const catalogPath = path.resolve(process.argv[2] || path.join(root, 'plugins', 'marketplace.json'))
 const outputPath = path.resolve(process.argv[3] || path.join(root, 'plugins', 'marketplace.sig'))
 const privateKeyPath = process.env.MSRB_MARKETPLACE_PRIVATE_KEY_PATH

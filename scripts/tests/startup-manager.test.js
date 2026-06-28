@@ -4,7 +4,7 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { createStartupManager } = require('../startup-manager')
+const { createStartupManager } = require('../launchers/startup-manager')
 
 function fixture(platform) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-startup-'))

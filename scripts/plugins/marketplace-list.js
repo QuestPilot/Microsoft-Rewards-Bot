@@ -6,7 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const ROOT = path.resolve(__dirname, '..')
+const ROOT = path.resolve(__dirname, '..', '..')
 const CATALOG_PATH = path.join(ROOT, 'plugins', 'marketplace.json')
 
 function col(s, w) {
@@ -47,7 +47,7 @@ async function main() {
 
     let installed = {}
     try {
-        const { createPluginsConfig } = require('./desk/plugins-config')
+        const { createPluginsConfig } = require('../desk/plugins-config')
         const cfg = createPluginsConfig({ root: ROOT, atomicWriteText: () => {} })
         installed = cfg.readPluginsConfig()
     } catch {}

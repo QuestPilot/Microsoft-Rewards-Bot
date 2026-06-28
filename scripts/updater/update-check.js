@@ -1,4 +1,4 @@
-const { UpdateManager } = require('./updater/UpdateManager')
+const { UpdateManager } = require('./UpdateManager')
 
 const dryRun = process.argv.includes('--dry-run')
 const force = process.argv.includes('--force') || process.argv.includes('--repair')

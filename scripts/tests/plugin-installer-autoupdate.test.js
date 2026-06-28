@@ -11,7 +11,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-const { ensureMarketplacePlugin } = require('../plugin-installer')
+const { ensureMarketplacePlugin } = require('../plugins/plugin-installer')
 const { findLatestEntry, cmpVersion } = require('../security/marketplace-catalog')
 
 const NOW = '2026-06-25T00:00:00Z'

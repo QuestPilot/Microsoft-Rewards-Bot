@@ -4,7 +4,7 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { createDesktopInstallManager } = require('../desktop-install-manager')
+const { createDesktopInstallManager } = require('../launchers/desktop-install-manager')
 
 function fixture(platform) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'msrb-install-'))

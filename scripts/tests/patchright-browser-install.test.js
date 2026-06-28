@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { ensurePatchrightChromium } = require('../ensure-patchright-browser')
+const { ensurePatchrightChromium } = require('../build/ensure-patchright-browser')
 
 test('Patchright Chromium installation is skipped when the executable exists', () => {
     let spawnCalls = 0

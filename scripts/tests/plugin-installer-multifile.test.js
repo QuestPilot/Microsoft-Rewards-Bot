@@ -11,7 +11,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-const { ensureMarketplacePlugin } = require('../plugin-installer')
+const { ensureMarketplacePlugin } = require('../plugins/plugin-installer')
 
 const NOW = '2026-06-25T00:00:00Z'
 const sha256 = (s) => crypto.createHash('sha256').update(Buffer.from(s)).digest('hex')

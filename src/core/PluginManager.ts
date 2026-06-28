@@ -58,7 +58,7 @@ interface PluginPackageManifest {
     }
 }
 
-/** Handle returned by the out-of-process plugin sandbox (scripts/plugin-sandbox.js). */
+/** Handle returned by the out-of-process plugin sandbox (scripts/plugins/plugin-sandbox.js). */
 interface SandboxedPluginHandle {
     name: string | null
     version: string | null
@@ -289,7 +289,7 @@ export class PluginManager {
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             mp = require('../../scripts/security/marketplace-catalog')
             // eslint-disable-next-line @typescript-eslint/no-require-imports
-            installer = require('../../scripts/plugin-installer')
+            installer = require('../../scripts/plugins/plugin-installer')
         } catch (error) {
             this.bot.logger.warn(
                 'main',
@@ -365,11 +365,11 @@ export class PluginManager {
         }
     }
 
-    /** Real runtime fetcher: a hardened HTTPS GET (scripts/marketplace-fetch.js). */
+    /** Real runtime fetcher: a hardened HTTPS GET (scripts/plugins/marketplace-fetch.js). */
     private defaultMarketplaceFetcher(): MarketplaceFetcher | undefined {
         try {
             // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const { fetchMarketplaceAsset } = require('../../scripts/marketplace-fetch') as {
+            const { fetchMarketplaceAsset } = require('../../scripts/plugins/marketplace-fetch') as {
                 fetchMarketplaceAsset: (url: string) => Promise<Buffer>
             }
             return (url: string) => fetchMarketplaceAsset(url)
@@ -395,7 +395,7 @@ export class PluginManager {
     private defaultCatalogFetcher(): CatalogFetcher | undefined {
         try {
             // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const { fetchSignedCatalog } = require('../../scripts/marketplace-fetch') as {
+            const { fetchSignedCatalog } = require('../../scripts/plugins/marketplace-fetch') as {
                 fetchSignedCatalog: (url: string) => Promise<{ catalog: string; signature: string }>
             }
             return (url: string) => fetchSignedCatalog(url)
@@ -723,7 +723,7 @@ export class PluginManager {
 
     /**
      * Load an untrusted plugin inside a V8 isolate (no Node APIs, no secrets). The
-     * plugin's source is read and handed to scripts/plugin-sandbox.js; the returned
+     * plugin's source is read and handed to scripts/plugins/plugin-sandbox.js; the returned
      * handle is adapted to the IPlugin interface so the rest of the manager is
      * agnostic to how the plugin runs. If isolation is unavailable on this platform
      * we FAIL CLOSED (never run untrusted code in-process).
@@ -746,7 +746,7 @@ export class PluginManager {
             // Lazy-require: isolated-vm is a native module. If it can't load here,
             // refuse the plugin rather than run untrusted code unsandboxed.
             // eslint-disable-next-line @typescript-eslint/no-require-imports
-            ;({ createPluginSandbox } = require('../../scripts/plugin-sandbox') as { createPluginSandbox: CreatePluginSandbox })
+            ;({ createPluginSandbox } = require('../../scripts/plugins/plugin-sandbox') as { createPluginSandbox: CreatePluginSandbox })
         } catch (error) {
             this.bot.logger.warn(
                 'main',

@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const { UpdateManager } = require('./updater/UpdateManager')
 const { bootstrapUserFiles, migrateUserFiles } = require('./updater/ConfigMigrator')
-const { ensurePatchrightChromium } = require('./ensure-patchright-browser')
+const { ensurePatchrightChromium } = require('./build/ensure-patchright-browser')
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -264,7 +264,7 @@ function launchPostUpdateRestart(argv = process.argv, env = process.env, spawn =
 }
 
 async function deskCommand(action) {
-    const { createDesktopInstallManager } = require('./desktop-install-manager')
+    const { createDesktopInstallManager } = require('./launchers/desktop-install-manager')
     const manager = createDesktopInstallManager({ root: ROOT })
 
     if (action === 'install') {
@@ -310,7 +310,7 @@ async function deskCommand(action) {
 // never allowed to block startup.
 function migrateLaunchers(root = ROOT, env = process.env) {
     try {
-        const { createRuntimeLaunchers } = require('./runtime-launchers')
+        const { createRuntimeLaunchers } = require('./launchers/runtime-launchers')
         const currentDir = createRuntimeLaunchers({ root }).runtimeDir
         const markerPath = path.join(root, 'data', '.launcher-state.json')
         let marker = {}
@@ -322,7 +322,7 @@ function migrateLaunchers(root = ROOT, env = process.env) {
         if (!marker.launcherDir || path.resolve(marker.launcherDir) !== path.resolve(currentDir)) {
             // Re-point installed desktop/start-menu shortcuts (only if the user has them).
             try {
-                const { createDesktopInstallManager } = require('./desktop-install-manager')
+                const { createDesktopInstallManager } = require('./launchers/desktop-install-manager')
                 const mgr = createDesktopInstallManager({ root })
                 const st = mgr.status()
                 if (st && (st.desktop || st.menu)) mgr.install()
@@ -331,7 +331,7 @@ function migrateLaunchers(root = ROOT, env = process.env) {
             }
             // Re-point enabled OS auto-start entries (desk and/or background agent).
             try {
-                const { createStartupManager } = require('./startup-manager')
+                const { createStartupManager } = require('./launchers/startup-manager')
                 const sm = createStartupManager({ root })
                 const sst = sm.status()
                 if (sst && sst.desk && sst.desk.installed) sm.setDeskEnabled(true)

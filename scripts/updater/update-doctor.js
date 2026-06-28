@@ -2,11 +2,11 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 
-const { UpdateManager } = require('./updater/UpdateManager')
-const { compareReleaseVersions } = require('./updater/ReleaseVersion')
-const { readPublicKey, verifySignedBytes } = require('./security/SignedManifest')
+const { UpdateManager } = require('./UpdateManager')
+const { compareReleaseVersions } = require('./ReleaseVersion')
+const { readPublicKey, verifySignedBytes } = require('../security/SignedManifest')
 
-const ROOT = path.resolve(__dirname, '..')
+const ROOT = path.resolve(__dirname, '..', '..')
 
 function readJson(relativePath) {
     return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), 'utf8'))

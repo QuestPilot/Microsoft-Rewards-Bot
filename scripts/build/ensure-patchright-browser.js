@@ -10,7 +10,7 @@ function resolvePatchrightCli(root) {
 }
 
 function ensurePatchrightChromium(options = {}) {
-    const root = path.resolve(options.root || path.join(__dirname, '..'))
+    const root = path.resolve(options.root || path.join(__dirname, '..', '..'))
     const fsApi = options.fsApi || fs
     const spawnSync = options.spawnSync || childProcess.spawnSync
     const nodePath = options.nodePath || process.execPath

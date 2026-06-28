@@ -11,7 +11,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-const { ensureMarketplacePlugin } = require('../plugin-installer')
+const { ensureMarketplacePlugin } = require('../plugins/plugin-installer')
 
 const SOURCE = `module.exports = { name: 'mkt', version: '1.0.0', register(){} }`
 const SHA = crypto.createHash('sha256').update(Buffer.from(SOURCE)).digest('hex')

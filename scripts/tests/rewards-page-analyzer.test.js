@@ -9,7 +9,7 @@ const {
     analyzeRewardsPage,
     collectScriptsForPage,
     normalizeModelType
-} = require('../rewards-page-analyzer')
+} = require('../diagnostics/rewards-page-analyzer')
 
 // Skip unless the actual earn-page fixture file is present. A bare (possibly
 // empty) Page/ directory must not turn this optional fixture test into a failure.

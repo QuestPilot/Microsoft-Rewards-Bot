@@ -2,7 +2,7 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 
-const ROOT = path.resolve(__dirname, '..')
+const ROOT = path.resolve(__dirname, '..', '..')
 const CORE_DIR = path.join(ROOT, 'plugins', 'core')
 const OFFICIAL_CORE_PATH = path.join(ROOT, 'plugins', 'official-core.json')
 const OFFICIAL_CORE_SIGNATURE_PATH = path.join(ROOT, 'plugins', 'official-core.sig')

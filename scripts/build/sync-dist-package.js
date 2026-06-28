@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const root = path.resolve(__dirname, '..')
+const root = path.resolve(__dirname, '..', '..')
 const dist = path.join(root, 'dist')
 const packageTarget = path.join(root, 'node_modules', 'microsoft-rewards-bot')
 

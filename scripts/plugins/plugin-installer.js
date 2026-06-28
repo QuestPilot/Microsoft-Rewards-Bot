@@ -15,7 +15,7 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const semver = require('semver')
-const { findEntry, findLatestEntry, cmpVersion, isRevoked } = require('./security/marketplace-catalog')
+const { findEntry, findLatestEntry, cmpVersion, isRevoked } = require('../security/marketplace-catalog')
 
 function sha256(buffer) {
     return crypto.createHash('sha256').update(buffer).digest('hex')

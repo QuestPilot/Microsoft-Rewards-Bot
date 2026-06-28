@@ -5,8 +5,8 @@ const http = require('http')
 const os = require('os')
 const path = require('path')
 const { createAccountStorage } = require('../account-storage')
-const { createDesktopInstallManager } = require('../desktop-install-manager')
-const { createStartupManager } = require('../startup-manager')
+const { createDesktopInstallManager } = require('../launchers/desktop-install-manager')
+const { createStartupManager } = require('../launchers/startup-manager')
 
 const ROOT = path.resolve(__dirname, '..', '..')
 const PORT = Number.parseInt(process.env.MSRB_APP_PORT || '0', 10)
@@ -6401,7 +6401,7 @@ const server = http.createServer((req, res) => {
         // Default to the production catalog endpoint so the marketplace works out of the
         // box; override with MSRB_MARKETPLACE_CATALOG_URL for local/staging testing.
         const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL || 'https://bot.lgtw.tf/api/marketplace/catalog'
-        const { fetchSignedCatalog } = require('../marketplace-fetch')
+        const { fetchSignedCatalog } = require('../plugins/marketplace-fetch')
         fetchSignedCatalog(catalogUrl).then(function(result) {
             let parsed = null
             try { parsed = JSON.parse(result.catalog) } catch {}

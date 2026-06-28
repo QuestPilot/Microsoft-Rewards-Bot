@@ -12,7 +12,7 @@ const os = require('node:os')
 const path = require('node:path')
 
 const { isPluginStale } = require('../security/marketplace-catalog')
-const { ensureMarketplacePlugin } = require('../plugin-installer')
+const { ensureMarketplacePlugin } = require('../plugins/plugin-installer')
 
 test('isPluginStale flags only when the bot is well ahead of the publish stamp', () => {
     assert.equal(isPluginStale('4.5.15', '4.5.15'), false, 'same version')

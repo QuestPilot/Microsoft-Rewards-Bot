@@ -11,7 +11,7 @@ const assert = require('node:assert/strict')
 
 let createPluginSandbox
 try {
-    ;({ createPluginSandbox } = require('../plugin-sandbox'))
+    ;({ createPluginSandbox } = require('../plugins/plugin-sandbox'))
 } catch (err) {
     // isolated-vm is a native module; if it cannot load on this platform the
     // sandbox is unavailable and the bot falls back (warn/popup, headless

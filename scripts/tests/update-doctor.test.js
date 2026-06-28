@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const test = require('node:test')
 
-const doctor = require('../update-doctor')
+const doctor = require('../updater/update-doctor')
 
 test('update doctor parses plugins.jsonc-style comments without losing URLs', () => {
     const parsed = JSON.parse(doctor.stripJsonComments(`{
@@ -27,7 +27,7 @@ test('update doctor gives Docker-specific update action', () => {
 })
 
 test('Core release check enforces exact version policy and required targets', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'scripts/check-core-release-artifact.js'), 'utf8')
+    const source = fs.readFileSync(path.join(process.cwd(), 'scripts/signing/check-core-release-artifact.js'), 'utf8')
 
     assert.match(source, /required_core_version/)
     assert.match(source, /minimum_core_version/)

@@ -2,9 +2,9 @@
 
 const fs = require('fs')
 const path = require('path')
-const { signBytes } = require('./security/SignedManifest')
+const { signBytes } = require('../security/SignedManifest')
 
-const root = path.resolve(__dirname, '..')
+const root = path.resolve(__dirname, '..', '..')
 const manifestPath = path.resolve(process.argv[2] || path.join(root, 'plugins', 'official-core.json'))
 const outputPath = path.resolve(process.argv[3] || path.join(root, 'plugins', 'official-core.sig'))
 const privateKeyPath = process.env.MSRB_CORE_PRIVATE_KEY_PATH
