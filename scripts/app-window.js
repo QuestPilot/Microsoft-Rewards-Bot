@@ -1855,94 +1855,92 @@ function html() {
     /* ── Plugins page ────────────────────────────────────────────── */
     .plugins-wrap{display:none;flex-direction:column;min-height:0;flex:1;overflow:hidden}
     .plugins-wrap.vis{display:flex}
-    .plugins-hero{padding:18px 24px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
-    .plugins-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
-    .plugins-hero h2{font-size:20px;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:10px}
-    .plugins-hero p{font-size:12.5px;color:var(--muted);margin:0;max-width:520px;line-height:1.55}
-    .plugins-hero-actions{display:flex;gap:7px;align-items:center;flex-shrink:0;flex-wrap:wrap}
-    .plugins-stats{display:flex;gap:20px}
-    .plugins-stat{display:flex;flex-direction:column}
-    .plugins-stat-num{font-size:20px;font-weight:800;line-height:1;color:var(--text)}
-    .plugins-stat-lbl{font-size:10.5px;color:var(--muted);margin-top:2px}
-    .plugins-toolbar{padding:11px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
-    .plugins-search{flex:1;min-width:140px;padding:8px 13px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
-    .plugins-search:focus{border-color:rgba(46,232,255,.32)}
+    .plugins-topbar{display:flex;align-items:center;gap:8px;padding:11px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .plugins-topbar-title{font-size:14px;font-weight:800;flex:1;display:flex;align-items:center;gap:7px}
+    .plugins-topbar-title svg{opacity:.7;flex-shrink:0}
+    .ptopbar-sep{width:1px;height:15px;background:var(--border);margin:0 2px;flex-shrink:0}
+    .pbtn-icon{width:27px;height:27px;border-radius:7px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+    .pbtn-icon:hover{color:var(--text);border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.05)}
+    .pbtn-icon svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .ptxt-btn{font-size:12px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;transition:color .15s;white-space:nowrap}
+    .ptxt-btn:hover{color:var(--text)}
+    .plugins-toolbar{padding:9px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .plugins-search{flex:1;min-width:100px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:12.5px;outline:none;transition:border-color .15s}
+    .plugins-search:focus{border-color:rgba(46,232,255,.3)}
     .plugins-search::placeholder{color:var(--muted)}
-    .plugins-tabs{display:flex;gap:2px;background:rgba(255,255,255,.04);border-radius:10px;padding:3px;flex-shrink:0}
-    .plugins-tab{padding:5px 12px;border-radius:7px;border:none;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
-    .plugins-tab.active{background:rgba(46,232,255,.12);color:var(--cyan);box-shadow:inset 0 0 0 1px rgba(46,232,255,.18)}
-    .plugins-body{flex:1;overflow-y:auto;padding:18px 24px 28px;display:flex;flex-direction:column;gap:22px;min-height:0}
-    /* Core featured card */
-    .pcore-card{border-radius:15px;border:1px solid rgba(247,200,92,.32);background:linear-gradient(135deg,rgba(28,22,6,.98),rgba(10,7,1,.97));padding:18px 20px;display:flex;align-items:flex-start;gap:16px;position:relative;overflow:hidden;flex-shrink:0}
-    .pcore-card::before{content:'';position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:radial-gradient(circle,rgba(247,200,92,.07),transparent 70%);pointer-events:none}
-    .pcore-ico{width:50px;height:50px;border-radius:13px;background:rgba(247,200,92,.1);border:1px solid rgba(247,200,92,.28);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
-    .pcore-ico svg{width:22px;height:22px;fill:currentColor}
-    .pcore-body{flex:1;min-width:0}
-    .pcore-name{font-size:16px;font-weight:800;color:#fde68a;display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
-    .pcore-desc{font-size:12px;color:rgba(255,215,100,.65);line-height:1.55;margin-bottom:10px;max-width:500px}
-    .pcore-feats{display:flex;flex-wrap:wrap;gap:5px}
-    .pcore-feat{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(247,200,92,.09);color:rgba(253,225,120,.75);border:1px solid rgba(247,200,92,.18)}
-    .pcore-side{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex-shrink:0}
-    .pcore-locked{font-size:11px;color:var(--gold);display:flex;align-items:center;gap:5px;opacity:.8;margin-top:2px;white-space:nowrap}
-    .pcore-locked svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
-    /* Section header */
-    .psect{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-    .psect-title{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
-    .psect-count{font-size:11px;font-weight:700;color:var(--cyan);background:rgba(46,232,255,.1);padding:1px 7px;border-radius:20px;border:1px solid rgba(46,232,255,.15)}
-    /* Installed plugin rows */
-    .plist{display:flex;flex-direction:column;gap:8px}
-    .pcard{background:rgba(6,14,28,.75);border:1px solid var(--border);border-radius:13px;padding:13px 15px;display:flex;align-items:flex-start;gap:12px;transition:border-color .18s}
-    .pcard:hover{border-color:rgba(46,232,255,.2)}
-    .pcard-ico{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.07);border:1px solid rgba(46,232,255,.14);color:var(--cyan);margin-top:1px}
-    .pcard-ico svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .plugins-tabs{display:flex;gap:2px;flex-shrink:0}
+    .plugins-tab{padding:5px 9px;border-radius:7px;border:1px solid transparent;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .plugins-tab:hover{color:var(--text);background:rgba(255,255,255,.04)}
+    .plugins-tab.active{background:rgba(46,232,255,.09);color:var(--cyan);border-color:rgba(46,232,255,.18)}
+    .plugins-body{flex:1;overflow-y:auto;padding:14px 20px 28px;display:flex;flex-direction:column;gap:14px;min-height:0}
+    /* Core card — compact horizontal */
+    .pcore-card{border-radius:12px;border:1px solid rgba(247,200,92,.22);background:linear-gradient(130deg,rgba(20,15,3,.97),rgba(7,5,0,.97));padding:13px 15px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;flex-shrink:0}
+    .pcore-card::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(247,200,92,.04),transparent 60%);pointer-events:none}
+    .pcore-ico{width:38px;height:38px;border-radius:9px;background:rgba(247,200,92,.09);border:1px solid rgba(247,200,92,.2);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
+    .pcore-ico svg{width:17px;height:17px;fill:currentColor}
+    .pcore-body{flex:1;min-width:0;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+    .pcore-name{font-size:13px;font-weight:800;color:rgba(253,230,138,.9);display:flex;align-items:center;gap:6px;flex-shrink:0}
+    .pcore-feats{display:flex;flex-wrap:wrap;gap:3px;flex:1}
+    .pcore-feat{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:20px;background:rgba(247,200,92,.06);color:rgba(247,200,92,.6);border:1px solid rgba(247,200,92,.12)}
+    .pcore-side{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .pcore-locked{font-size:10.5px;color:rgba(247,200,92,.6);display:flex;align-items:center;gap:4px;white-space:nowrap}
+    .pcore-locked svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2}
+    /* Section label */
+    .psect{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .psect-title{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:rgba(110,146,184,.45);white-space:nowrap}
+    .psect-line{flex:1;height:1px;background:rgba(255,255,255,.06)}
+    /* Installed rows */
+    .plist{display:flex;flex-direction:column;gap:5px}
+    .pcard{background:rgba(5,12,25,.6);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;transition:border-color .18s}
+    .pcard:hover{border-color:rgba(46,232,255,.15)}
+    .pcard-ico{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.05);border:1px solid rgba(46,232,255,.1);color:rgba(46,232,255,.6);margin-top:1px}
+    .pcard-ico svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
     .pcard-body{flex:1;min-width:0}
-    .pcard-row1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px}
-    .pcard-name{font-size:13.5px;font-weight:700}
-    .pcard-meta{font-size:11px;color:var(--muted);margin-bottom:3px}
-    .pcard-desc{font-size:11.5px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-    .pcard-manage{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)}
-    .pcard-side{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0}
-    .pmanage-trust{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#ffae7a;cursor:pointer}
-    .pmanage-trust input{accent-color:#ff8c5a}
-    .pmanage-au{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer}
-    .pmanage-au input{accent-color:var(--cyan)}
-    .plink{font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px;transition:color .15s}
+    .pcard-row1{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+    .pcard-name{font-size:13px;font-weight:700}
+    .pcard-meta{font-size:10.5px;color:var(--muted);margin-top:2px;margin-bottom:2px;opacity:.65}
+    .pcard-desc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.7}
+    .pcard-manage{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)}
+    .pcard-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+    .pmanage-trust{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:rgba(210,145,74,.85);cursor:pointer}
+    .pmanage-trust input{accent-color:#d4914a;width:12px;height:12px}
+    .pmanage-au{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted);cursor:pointer}
+    .pmanage-au input{accent-color:var(--cyan);width:12px;height:12px}
+    .plink{font-size:10.5px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:3px;transition:color .15s}
     .plink:hover{color:var(--text)}
     .plink.danger:hover{color:var(--rose)}
-    .plink svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2}
+    .plink svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2}
     /* Marketplace grid */
-    .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:11px}
-    .pgcard{background:rgba(6,14,28,.75);border:1px solid var(--border);border-radius:14px;padding:15px;display:flex;flex-direction:column;gap:0;transition:border-color .18s,transform .14s;cursor:default}
-    .pgcard:hover{border-color:rgba(56,224,200,.25);transform:translateY(-1px)}
-    .pgcard-head{display:flex;align-items:flex-start;gap:11px;margin-bottom:9px}
-    .pgcard-ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(56,224,200,.08);border:1px solid rgba(56,224,200,.18);color:#38e0c8;flex-shrink:0}
-    .pgcard-ico svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-    .pgcard-info{flex:1;min-width:0;padding-top:1px}
-    .pgcard-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pgcard-author{font-size:10.5px;color:var(--muted);margin-top:2px}
-    .pgcard-desc{font-size:11.5px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:11px;flex:1}
-    .pgcard-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}
-    .pgcard-chips{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+    .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px}
+    .pgcard{background:rgba(5,12,25,.6);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 12px 10px;display:flex;flex-direction:column;transition:border-color .18s,transform .13s}
+    .pgcard:hover{border-color:rgba(56,224,200,.18);transform:translateY(-1px)}
+    .pgcard-head{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+    .pgcard-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(56,224,200,.05);border:1px solid rgba(56,224,200,.12);color:rgba(56,224,200,.7);flex-shrink:0}
+    .pgcard-ico svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .pgcard-info{flex:1;min-width:0}
+    .pgcard-name{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pgcard-author{font-size:10px;color:var(--muted);margin-top:1px;opacity:.65}
+    .pgcard-desc{font-size:10.5px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;opacity:.7;margin-bottom:8px;flex:1}
+    .pgcard-foot{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-top:auto}
+    .pgcard-chips{display:flex;gap:3px;flex-wrap:wrap;flex:1}
     /* Chips */
-    .pchip{font-size:9px;font-weight:800;letter-spacing:.04em;padding:2px 6px;border-radius:5px;text-transform:uppercase;white-space:nowrap;border:1px solid}
-    .pchip-official{background:rgba(247,200,92,.14);color:var(--gold);border-color:rgba(247,200,92,.28)}
-    .pchip-mkt{background:rgba(56,224,200,.1);color:#38e0c8;border-color:rgba(56,224,200,.25)}
-    .pchip-ver{background:rgba(255,255,255,.05);color:var(--muted);border-color:var(--border);text-transform:none;letter-spacing:0;font-size:10px}
-    .pchip-installed{background:rgba(47,210,125,.1);color:var(--green);border-color:rgba(47,210,125,.25)}
-    .pchip-trusted{background:rgba(255,140,90,.1);color:#ffae7a;border-color:rgba(255,140,90,.25)}
-    .pchip-update{background:rgba(46,232,255,.1);color:var(--cyan);border-color:rgba(46,232,255,.25);text-transform:none;letter-spacing:0}
-    .pchip-stale{background:rgba(247,200,92,.1);color:var(--gold);border-color:rgba(247,200,92,.25);text-transform:none;letter-spacing:0}
-    .pchip-off{background:rgba(255,255,255,.04);color:var(--muted);border-color:var(--border)}
-    /* Buttons */
-    .pbtn{padding:6px 14px;font-size:12px;font-weight:700;border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,opacity .15s;border:1px solid transparent;flex-shrink:0}
-    .pbtn:disabled{opacity:.5;cursor:not-allowed}
-    .pbtn-install{border-color:rgba(56,224,200,.38);background:rgba(56,224,200,.1);color:#38e0c8}
-    .pbtn-install:hover:not(:disabled){background:rgba(56,224,200,.2);border-color:rgba(56,224,200,.55)}
-    .pbtn-update{border-color:rgba(46,232,255,.38);background:rgba(46,232,255,.1);color:var(--cyan)}
-    .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.2)}
+    .pchip{font-size:9px;font-weight:800;letter-spacing:.03em;padding:1px 5px;border-radius:4px;text-transform:uppercase;white-space:nowrap;border:1px solid}
+    .pchip-official{background:rgba(247,200,92,.09);color:rgba(247,200,92,.85);border-color:rgba(247,200,92,.2)}
+    .pchip-ver{background:transparent;color:rgba(110,146,184,.6);border-color:rgba(255,255,255,.08);text-transform:none;letter-spacing:0;font-size:9.5px}
+    .pchip-installed{background:rgba(47,210,125,.07);color:rgba(47,210,125,.85);border-color:rgba(47,210,125,.18)}
+    .pchip-trusted{background:rgba(210,145,74,.08);color:rgba(210,145,74,.85);border-color:rgba(210,145,74,.2)}
+    .pchip-update{background:rgba(46,232,255,.07);color:var(--cyan);border-color:rgba(46,232,255,.18);text-transform:none;letter-spacing:0}
+    .pchip-stale{background:rgba(247,200,92,.07);color:rgba(247,200,92,.75);border-color:rgba(247,200,92,.18);text-transform:none;letter-spacing:0}
+    .pchip-off{background:transparent;color:rgba(110,146,184,.45);border-color:rgba(255,255,255,.07)}
+    /* Action buttons */
+    .pbtn{padding:5px 11px;font-size:11.5px;font-weight:700;border-radius:7px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,opacity .15s;border:1px solid transparent;flex-shrink:0}
+    .pbtn:disabled{opacity:.4;cursor:not-allowed}
+    .pbtn-install{border-color:rgba(56,224,200,.28);background:rgba(56,224,200,.07);color:rgba(56,224,200,.9)}
+    .pbtn-install:hover:not(:disabled){background:rgba(56,224,200,.14);border-color:rgba(56,224,200,.45)}
+    .pbtn-update{border-color:rgba(46,232,255,.28);background:rgba(46,232,255,.07);color:var(--cyan)}
+    .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.14)}
     /* Empty state */
-    .pempty{padding:36px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;border:1px dashed rgba(255,255,255,.09);border-radius:14px}
-    .pempty code{font-size:11px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px}
+    .pempty{padding:30px 20px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.6;border:1px dashed rgba(255,255,255,.07);border-radius:10px;opacity:.7}
 
     /* ── Docs page ──────────────────────────────────────────────── */
     .docs-wrap{display:none;flex-direction:column;min-height:0;flex:1;gap:12px;overflow:hidden}
@@ -2915,40 +2913,24 @@ function html() {
 
     <!-- Plugins view -->
     <div class="plugins-wrap" id="view-plugins">
-      <div class="plugins-hero">
-        <div class="plugins-hero-top">
-          <div>
-            <h2>
-              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--cyan);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
-              Plugins
-            </h2>
-            <p>Browse and install community plugins. Core and all installed plugins are managed here — sandboxed by default.</p>
-          </div>
-          <div class="plugins-hero-actions">
-            <button class="btn btn-secondary btn-sm" id="plugins-refresh-btn">
-              <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;margin-right:5px;vertical-align:middle"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>Refresh
-            </button>
-            <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Dev guide ↗</button>
-            <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish / Manage ›</button>
-          </div>
+      <div class="plugins-topbar">
+        <div class="plugins-topbar-title">
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--cyan);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
+          Plugins
         </div>
-        <div class="plugins-stats">
-          <div class="plugins-stat">
-            <span class="plugins-stat-num" id="pstat-installed">—</span>
-            <span class="plugins-stat-lbl">Installed</span>
-          </div>
-          <div class="plugins-stat">
-            <span class="plugins-stat-num" id="pstat-available">—</span>
-            <span class="plugins-stat-lbl">In marketplace</span>
-          </div>
-        </div>
+        <button class="pbtn-icon" id="plugins-refresh-btn" title="Refresh catalog">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+        </button>
+        <div class="ptopbar-sep"></div>
+        <button class="ptxt-btn" id="plugins-doc-btn">Dev guide ↗</button>
+        <button class="btn btn-primary btn-sm" id="plugins-publish-btn" style="font-size:12px;padding:5px 11px;border-radius:8px">Publish ›</button>
       </div>
       <div class="plugins-toolbar">
         <input class="plugins-search" id="plugins-search" type="text" placeholder="Search plugins…" autocomplete="off" spellcheck="false">
         <div class="plugins-tabs" id="plugins-tabs">
           <button class="plugins-tab active" data-pfilter="all">All</button>
-          <button class="plugins-tab" data-pfilter="installed">Installed</button>
-          <button class="plugins-tab" data-pfilter="marketplace">Marketplace</button>
+          <button class="plugins-tab" data-pfilter="installed" id="ptab-installed">Installed</button>
+          <button class="plugins-tab" data-pfilter="marketplace" id="ptab-marketplace">Marketplace</button>
         </div>
       </div>
       <div class="plugins-body" id="plugins-catalog"></div>
@@ -5161,18 +5143,18 @@ function html() {
       if (p.installed && p.trust === 'full') chips += '<span class="pchip pchip-trusted">Trusted</span>';
       if (p.installed && !p.enabled) chips += '<span class="pchip pchip-off">Off</span>';
       if (p.installed && p.stale) chips += '<span class="pchip pchip-stale">Outdated</span>';
-      if (updatable) chips += '<span class="pchip pchip-update">v' + esc(p.latest) + ' available</span>';
+      if (updatable) chips += '<span class="pchip pchip-update">v' + esc(p.latest) + ' ready</span>';
       var meta = [];
       if (p.author) meta.push('by ' + esc(p.author));
       if (p.license) meta.push(esc(p.license));
       if (p.installed && !p.inCatalog) meta.push('local');
       var side = '<label class="toggle"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>';
-      if (held && updatable) side += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
+      if (held && updatable) side += '<button class="pbtn pbtn-update" style="margin-top:4px" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
       var manage = '';
       if (p.installed) {
         var mrow = '';
         if (p.source === 'marketplace') {
-          mrow += '<label class="pmanage-trust"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted Mode</label>';
+          mrow += '<label class="pmanage-trust" title="Lets this plugin access more bot APIs — does not grant OS or admin permissions"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted mode</label>';
           if (!p.pinned) mrow += '<label class="pmanage-au"><input type="checkbox" data-autoupdate="' + escAttr(p.name) + '"' + (p.autoUpdate !== false ? ' checked' : '') + '> Auto-update</label>';
           mrow += '<button class="plink" data-report="' + escAttr(p.name) + '" data-rv="' + escAttr(p.installedVersion || p.version) + '"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Report</button>';
         }
@@ -5183,7 +5165,7 @@ function html() {
         '<div class="pcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
         '<div class="pcard-body">' +
           '<div class="pcard-row1"><span class="pcard-name">' + esc(p.name) + '</span>' + chips + '</div>' +
-          (meta.length ? '<div class="pcard-meta">' + meta.join(' &middot; ') + '</div>' : '') +
+          (meta.length ? '<div class="pcard-meta">' + meta.join(' · ') + '</div>' : '') +
           (p.description ? '<div class="pcard-desc">' + esc(p.description) + '</div>' : '') +
           manage +
         '</div>' +
@@ -5193,9 +5175,8 @@ function html() {
 
     function pluginGridCardHtml(p) {
       var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/>';
-      var chips = '';
-      if (p.version) chips += '<span class="pchip pchip-ver">v' + esc(p.version) + '</span>';
-      if (p.license) chips += '<span class="pchip" style="background:rgba(255,255,255,.04);color:var(--muted);border-color:var(--border);font-size:9px;text-transform:none">' + esc(p.license) + '</span>';
+      var chips = p.version ? '<span class="pchip pchip-ver">v' + esc(p.version) + '</span>' : '';
+      if (p.license) chips += ' <span class="pchip pchip-ver">' + esc(p.license) + '</span>';
       return '<div class="pgcard">' +
         '<div class="pgcard-head">' +
           '<div class="pgcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
@@ -5204,7 +5185,7 @@ function html() {
             (p.author ? '<div class="pgcard-author">by ' + esc(p.author) + '</div>' : '') +
           '</div>' +
         '</div>' +
-        (p.description ? '<div class="pgcard-desc">' + esc(p.description) + '</div>' : '<div class="pgcard-desc" style="opacity:.4">No description provided.</div>') +
+        (p.description ? '<div class="pgcard-desc">' + esc(p.description) + '</div>' : '<div class="pgcard-desc" style="opacity:.3;font-style:italic">No description.</div>') +
         '<div class="pgcard-foot">' +
           '<div class="pgcard-chips">' + chips + '</div>' +
           '<button class="pbtn pbtn-install" data-install="' + escAttr(p.name) + '" data-ver="' + escAttr(p.version) + '">Install</button>' +
@@ -5213,44 +5194,42 @@ function html() {
     }
 
     function marketplaceEmptyHtml() {
-      if (_catalogMeta.error) return '<div class="pempty">Could not reach the marketplace.<br><span style="font-size:11px;opacity:.6">' + esc(_catalogMeta.error) + '</span></div>';
-      return '<div class="pempty">No community plugins yet.<br><span style="font-size:11px;opacity:.6">When the catalog is published, plugins appear here. Made one? Hit <b>Publish / Manage</b>.</span></div>';
+      if (_catalogMeta.error) return '<div class="pempty">Could not reach the marketplace.<br><small>' + esc(_catalogMeta.error) + '</small></div>';
+      return '<div class="pempty">No community plugins in the catalog yet — check back soon.</div>';
     }
 
     function renderCatalog(filterQ) {
       var wrap = G('plugins-catalog');
       if (!wrap) return;
       var q = (filterQ || '').trim().toLowerCase();
-      var showInstalled = _catalogFilter !== 'marketplace';
-      var showMarket = _catalogFilter !== 'installed';
+      var showInst = _catalogFilter !== 'marketplace';
+      var showMkt = _catalogFilter !== 'installed';
       var html = '';
-      // Core card — always shown unless filter is strictly marketplace
-      if (_catalogCore && showInstalled) {
-        var matchCore = !q || ('core official premium ' + (_catalogCore.description || '')).toLowerCase().indexOf(q) >= 0;
+      if (_catalogCore && showInst) {
+        var matchCore = !q || 'core official premium'.indexOf(q) >= 0;
         if (matchCore) html += coreCardHtml(_catalogCore);
       }
       var items = _catalog.filter(function(p){
         if (!q) return true;
         return (p.name + ' ' + (p.author || '') + ' ' + (p.description || '')).toLowerCase().indexOf(q) >= 0;
       });
-      var inst = showInstalled ? items.filter(function(p){ return p.installed; }) : [];
-      var avail = showMarket ? items.filter(function(p){ return !p.installed; }) : [];
+      var inst = showInst ? items.filter(function(p){ return p.installed; }) : [];
+      var avail = showMkt ? items.filter(function(p){ return !p.installed; }) : [];
       if (inst.length) {
-        html += '<div><div class="psect"><span class="psect-title">Installed</span><span class="psect-count">' + inst.length + '</span></div>';
+        html += '<div><div class="psect"><span class="psect-title">Installed</span><span class="psect-line"></span></div>';
         html += '<div class="plist">' + inst.map(pluginCardHtml).join('') + '</div></div>';
       }
-      if (showMarket) {
-        html += '<div><div class="psect"><span class="psect-title">Marketplace</span>' + (avail.length ? '<span class="psect-count">' + avail.length + '</span>' : '') + '</div>';
+      if (showMkt) {
+        html += '<div><div class="psect"><span class="psect-title">Marketplace</span><span class="psect-line"></span></div>';
         html += avail.length ? '<div class="pgrid">' + avail.map(pluginGridCardHtml).join('') + '</div>' : marketplaceEmptyHtml();
         html += '</div>';
       }
       if (!html) html = '<div class="pempty">No plugins match your search.</div>';
       wrap.innerHTML = html;
-      // Update stats
       var totalInst = _catalog.filter(function(p){ return p.installed; }).length + (_catalogCore ? 1 : 0);
       var totalAvail = _catalog.filter(function(p){ return !p.installed; }).length;
-      var si = G('pstat-installed'); if (si) si.textContent = totalInst;
-      var sa = G('pstat-available'); if (sa) sa.textContent = totalAvail;
+      var ti = G('ptab-installed'); if (ti) ti.textContent = totalInst ? 'Installed (' + totalInst + ')' : 'Installed';
+      var tm = G('ptab-marketplace'); if (tm) tm.textContent = totalAvail ? 'Marketplace (' + totalAvail + ')' : 'Marketplace';
       bindCatalogEvents();
     }
 
@@ -5270,7 +5249,7 @@ function html() {
         inp.addEventListener('change', function() {
           var name = inp.getAttribute('data-trust');
           if (inp.checked) {
-            if (!window.confirm('⚠ Trusted Mode gives "' + name + '" FULL access to your computer (files, network, etc.) — it will NO LONGER be sandboxed. Only do this for a plugin you fully trust. Continue?')) { inp.checked = false; return; }
+            if (!window.confirm('Trusted Mode lets "' + name + '" access more of the bot\'s internal APIs. It still runs inside the bot process — no OS, admin or filesystem access is granted. Enable only if you trust this plugin\'s author. Continue?')) { inp.checked = false; return; }
           }
           fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, trust: inp.checked ? 'full' : 'sandbox'})}).catch(function(){});
         });
