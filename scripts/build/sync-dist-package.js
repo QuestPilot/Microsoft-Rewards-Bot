@@ -5,6 +5,16 @@ const root = path.resolve(__dirname, '..', '..')
 const dist = path.join(root, 'dist')
 const packageTarget = path.join(root, 'node_modules', 'microsoft-rewards-bot')
 
+// dist/ is the published release artifact, so it must carry its own package.json.
+// It is also the sentinel hasBuiltRuntime() checks to confirm a build completed,
+// which lets the smart-build safely skip rebuilding when nothing changed.
+try {
+    fs.mkdirSync(dist, { recursive: true })
+    fs.copyFileSync(path.join(root, 'package.json'), path.join(dist, 'package.json'))
+} catch (err) {
+    console.warn(`[sync-dist-package] Could not write dist/package.json: ${err.message}`)
+}
+
 // Refresh the self-package so `import 'microsoft-rewards-bot'` resolves to the
 // freshly built dist/. The committed/published release artifact is dist/ itself —
 // this node_modules copy is only a runtime convenience. On Windows a running bot

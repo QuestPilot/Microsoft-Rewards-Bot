@@ -126,6 +126,12 @@ function hasBuiltRuntime(root = ROOT) {
 // is not. An update (post-update restart) and a missing dist always force it.
 const BUILD_MARKER_REL = path.join('data', '.build-state.json')
 
+// User data under src/ that the bot/desk rewrite at runtime (re-encrypted accounts,
+// config edits). These must NOT feed the build fingerprint, or it would change on
+// every run and defeat the smart-build skip. The desk syncs config.json into dist
+// itself, and accounts are read from src/ — so excluding them is safe.
+const RUNTIME_DATA_FILES = new Set(['config.json', 'accounts.json', 'accounts.enc.json'])
+
 function computeSourceFingerprint(root = ROOT) {
     const crypto = require('crypto')
     const inputs = []
@@ -140,6 +146,7 @@ function computeSourceFingerprint(root = ROOT) {
             const full = path.join(dir, entry.name)
             if (entry.isDirectory()) walk(full)
             else if (entry.isFile()) {
+                if (RUNTIME_DATA_FILES.has(entry.name) || entry.name.endsWith('.bak')) continue
                 try {
                     const st = fs.statSync(full)
                     inputs.push(`${full}:${st.size}:${Math.round(st.mtimeMs)}`)
