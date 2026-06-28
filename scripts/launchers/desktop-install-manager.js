@@ -38,7 +38,11 @@ function createDesktopInstallManager(options = {}) {
         return { desktop, startMenu }
     }
 
-    function createWindowsShortcut(shortcutPath, launcherPath) {
+    function createWindowsShortcut(shortcutPath, launcherPath, minimized = false) {
+        // WindowStyle 7 = minimized (no activate), 1 = normal. The first launch uses a
+        // normal window so first-time setup is visible in the terminal; later launches
+        // use a minimized window so the Desk's own loading screen is the interface
+        // instead of a black console.
         const script =
             '$ws=New-Object -ComObject WScript.Shell;' +
             '$s=$ws.CreateShortcut($env:MSRB_SHORTCUT_PATH);' +
@@ -47,6 +51,7 @@ function createDesktopInstallManager(options = {}) {
             '$s.WorkingDirectory=$env:MSRB_ROOT;' +
             '$s.IconLocation=($env:MSRB_ICON+",0");' +
             '$s.Description="Microsoft Rewards Bot local control panel";' +
+            '$s.WindowStyle=' + (minimized ? '7' : '1') + ';' +
             '$s.Save()'
         fs.mkdirSync(path.dirname(shortcutPath), { recursive: true })
         run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {
@@ -171,7 +176,20 @@ function createDesktopInstallManager(options = {}) {
         throw new Error('Desktop installation is not supported on this platform')
     }
 
-    return { install, status, uninstall }
+    // Re-create existing Windows shortcuts with a minimized window so later launches
+    // don't flash a black console — the Desk's own loading screen becomes the UI.
+    // No-op on macOS/Linux (their launchers run a real terminal app) and when no
+    // shortcut is installed. Best-effort.
+    function setLauncherMinimized(minimized = true) {
+        if (platform !== 'win32') return status()
+        const paths = windowsPaths()
+        const launcherPath = launchers.ensureDeskLauncher()
+        if (fs.existsSync(paths.desktop)) createWindowsShortcut(paths.desktop, launcherPath, minimized)
+        if (fs.existsSync(paths.startMenu)) createWindowsShortcut(paths.startMenu, launcherPath, minimized)
+        return status()
+    }
+
+    return { install, status, uninstall, setLauncherMinimized }
 }
 
 function shellQuote(value) {

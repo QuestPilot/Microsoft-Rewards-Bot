@@ -225,6 +225,7 @@ function recordDeskLaunch(root = ROOT) {
         const state = readLaunchState(root)
         const nowIso = new Date().toISOString()
         const next = {
+            ...state,
             deskLaunches: (state.deskLaunches || 0) + 1,
             firstLaunchAt: state.firstLaunchAt || nowIso,
             lastLaunchAt: nowIso
@@ -447,8 +448,26 @@ async function main() {
         // panel) — it never auto-runs the bot. The visible prep above (update check
         // + smart build) is the first-launch terminal step; the Desk's own loading
         // screen then takes over. Smart build keeps later launches fast.
-        const firstDesk = isFirstDeskLaunch(ROOT)
+        const before = readLaunchState(ROOT)
+        const firstDesk = (before.deskLaunches || 0) === 0
         recordDeskLaunch(ROOT)
+        // Once (right after the first visible launch), switch the shortcut to a
+        // minimized window so subsequent launches show the Desk's own loading screen
+        // instead of a black console. Gated by a marker flag so it runs a single time.
+        if (!before.launcherMinimized) {
+            try {
+                require('./launchers/desktop-install-manager')
+                    .createDesktopInstallManager({ root: ROOT })
+                    .setLauncherMinimized(true)
+                const st = readLaunchState(ROOT)
+                fs.writeFileSync(
+                    path.join(ROOT, LAUNCH_MARKER_REL),
+                    `${JSON.stringify({ ...st, launcherMinimized: true }, null, 2)}\n`
+                )
+            } catch {
+                /* shortcuts not installed — fine */
+            }
+        }
         console.log(firstDesk ? '[START] Setup complete — opening Rewards Desk.' : '[START] Opening Rewards Desk…')
         launchAppWindow()
         return
