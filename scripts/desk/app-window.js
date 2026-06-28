@@ -2939,12 +2939,6 @@ function html() {
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Search on Bing local queries</div><div class="toggle-sub">Use local search-history suggestions as Bing queries</div></div><label class="toggle"><input type="checkbox" id="tog-searchOnBing"><span class="toggle-slider"></span></label></div>
             </div>
           </div>
-          <div class="settings-section">
-            <h3>Parallelism</h3>
-            <div class="acc-grid-2">
-              <div class="modal-field"><label>Parallel accounts (clusters)</label><input type="number" class="modal-input" id="set-clusters" min="1" max="20" placeholder="1" autocomplete="off"><div class="toggle-sub" style="margin-top:4px">How many accounts run simultaneously. Higher = faster but riskier.</div></div>
-            </div>
-          </div>
         </div>
 
         <!-- Schedule -->
@@ -3066,6 +3060,12 @@ function html() {
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Dashboard data</div><div class="toggle-sub">Rich dashboard snapshots, ready-to-claim &amp; streak info</div></div><label class="toggle"><input type="checkbox" id="tog-core-collectDashboardInfo"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Set Rewards goal<span class="next-badge">Next only</span></div><div class="toggle-sub">Auto-pick an eligible gift card as your Rewards goal</div></div><label class="toggle"><input type="checkbox" id="tog-core-setGoal"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Page Harvester<span class="beta-badge">Diagnostic</span></div><div class="toggle-sub">Snapshots all Rewards pages (HTML + data) into the Page/ folder. Enable once, run the bot — Page/ is rebuilt and the toggle resets. For selector maintenance only, does not earn points.</div></div><label class="toggle"><input type="checkbox" id="tog-core-captureDashboardPages"><span class="toggle-slider"></span></label></div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>Parallelism</h3>
+            <div class="acc-grid-2">
+              <div class="modal-field"><label>Parallel accounts (clusters)</label><input type="number" class="modal-input" id="set-clusters" min="1" max="20" placeholder="1" autocomplete="off"><div class="toggle-sub" style="margin-top:4px">How many accounts run simultaneously. Requires Core. Higher = faster but riskier.</div></div>
             </div>
           </div>
         </div>
@@ -4972,7 +4972,7 @@ function html() {
       var rz = G('tog-runOnZero'); if (rz) rz.checked = s.runOnZeroPoints === true;
       var dl = G('tog-debugLogs'); if (dl) dl.checked = s.debugLogs === true;
       var sb = G('tog-searchOnBing'); if (sb) sb.checked = s.searchOnBingLocalQueries !== false;
-      var cl = G('set-clusters'); if (cl) cl.value = s.clusters != null ? s.clusters : 1;
+      var cl = G('set-clusters'); if (cl) cl.value = s.core && s.core.clusters != null ? s.core.clusters : 1;
       var analyticsEnabled = s.analytics != null ? s.analytics.enabled !== false : true;
       var togAn = G('tog-analytics'); if (togAn) togAn.checked = analyticsEnabled;
       var anWarn = G('analytics-warning'); if (anWarn) anWarn.style.display = analyticsEnabled ? 'none' : 'block';
@@ -5240,7 +5240,7 @@ function html() {
     if (_clEl) _clEl.addEventListener('change', function() {
       var v = Math.min(20, Math.max(1, parseInt(this.value, 10) || 1));
       this.value = v;
-      saveSetting('clusters', v);
+      saveSetting('core.clusters', v);
     });
     // Configure buttons → open the config modal
     document.querySelectorAll('[data-cfg]').forEach(function(btn) {
@@ -6876,7 +6876,6 @@ const server = http.createServer((req, res) => {
             runOnZeroPoints: cfg.runOnZeroPoints,
             debugLogs: cfg.debugLogs,
             searchOnBingLocalQueries: cfg.searchOnBingLocalQueries,
-            clusters: cfg.clusters,
             analytics: cfg.analytics,
             terminal: cfg.terminal || { enabled: false },
             scheduler: cfg.scheduler || {},

@@ -17,12 +17,6 @@ export function todayDateString(): string {
     return new Date().toISOString().slice(0, 10)
 }
 
-/** data/errors/YYYY-MM-DD/error-{timestamp}/ */
-export function errorDir(timestamp: string): string {
-    const date = timestamp.slice(0, 10)
-    return dataPath('errors', date, `error-${timestamp}`)
-}
-
 /** data/run-summary/ */
 export function runSummaryDir(): string {
     return dataPath('run-summary')
@@ -46,35 +40,11 @@ export async function runDataCleanup(log?: (msg: string) => void): Promise<void>
     const info = log ?? (() => undefined)
     const cutoff = Date.now() - MAX_AGE_MS
 
-    await cleanupDateFolders(dataPath('errors'), cutoff, info)
     await cleanupJsonlByDate(dataPath('run-summary', 'accounts.jsonl'), cutoff, info)
     await cleanupJsonlByDate(dataPath('run-summary', 'notifications.jsonl'), cutoff, info)
     await cleanupHealthHistory(dataPath('run-health', 'history.json'), cutoff, info)
     await cleanupDateJsonFiles(dataPath('stats', 'daily'), cutoff, info)
     await cleanupDateJsonFiles(dataPath('stats', 'searches'), cutoff, info)
-}
-
-/** Deletes YYYY-MM-DD subdirectories whose date is older than cutoff. */
-async function cleanupDateFolders(dir: string, cutoff: number, info: (msg: string) => void): Promise<void> {
-    let entries: string[]
-    try {
-        entries = await fs.readdir(dir)
-    } catch {
-        return
-    }
-
-    for (const entry of entries) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(entry)) continue
-        const entryTime = new Date(entry).getTime()
-        if (!Number.isNaN(entryTime) && entryTime < cutoff) {
-            try {
-                await fs.rm(path.join(dir, entry), { recursive: true, force: true })
-                info(`[DATA-CLEANUP] Removed old folder: ${path.join(dir, entry)}`)
-            } catch {
-                // non-critical
-            }
-        }
-    }
 }
 
 /** Filters a JSONL file, keeping only entries newer than cutoff. Reads createdAt or recordedAt field. */

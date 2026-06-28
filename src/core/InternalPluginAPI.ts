@@ -93,6 +93,25 @@ export interface DashboardHarvesterSelectorCheck {
     error?: string
 }
 
+/**
+ * RSC flight-data contract check. The selectorChecks above validate the DOM; these
+ * validate the Next.js `__next_f` flight payload the data parsers depend on (balance,
+ * pointClaim, streakCounter, …) — the exact failure mode of the original Next.js
+ * migration, which DOM checks alone could not catch.
+ */
+export interface DashboardHarvesterFlightCheck {
+    /** Logical key name, e.g. "balance+level" or "streakCounter". */
+    key: string
+    /** Human-readable description of what consumes this key. */
+    label: string
+    /** Source regex (string form) that was tested against the flight payload. */
+    pattern: string
+    /** Whether the pattern matched the captured flight text. */
+    present: boolean
+    /** When true, an absent key is pushed to `problems` (drift); when false it is informational. */
+    required: boolean
+}
+
 export interface DashboardHarvesterPageAnalysis {
     name: string
     /** Requested route URL. */
@@ -122,6 +141,11 @@ export interface DashboardHarvesterPageAnalysis {
     disclosures: number
     dialogs: number
     selectorChecks: DashboardHarvesterSelectorCheck[]
+    /** RSC flight-key contract results (data-layer drift detection). */
+    flightChecks?: DashboardHarvesterFlightCheck[]
+    /** Non-required selectors that matched 0 elements — surfaced (non-blocking) so silent
+     *  selector death (a token rename, a removed card) is visible without crying wolf. */
+    zeroMatchSelectors?: string[]
     problems: string[]
 }
 

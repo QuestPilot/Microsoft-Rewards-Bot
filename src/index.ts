@@ -219,7 +219,7 @@ export class MicrosoftRewardsBot {
         }
         this.config = loadConfig()
         this.analytics = new AnalyticsService(!this.isHarvesterMode && (this.config.analytics?.enabled ?? true))
-        this.activeWorkers = this.config.clusters
+        this.activeWorkers = this.config.core?.clusters ?? 1
         this.exitedWorkers = []
     }
 
@@ -311,7 +311,7 @@ export class MicrosoftRewardsBot {
                 'run_started',
                 this.analytics.withContext({
                     account_count: totalAccounts,
-                    clusters: this.config.clusters,
+                    clusters: this.config.core?.clusters ?? 1,
                     has_core: this.pluginManager.hasOfficialCoreEntitlement(),
                     workers_enabled: Object.entries(this.config.workers)
                         .filter(([, v]) => v === true)
@@ -320,7 +320,7 @@ export class MicrosoftRewardsBot {
             )
         }
 
-        if (this.config.clusters > 1) {
+        if ((this.config.core?.clusters ?? 1) > 1) {
             if (cluster.isPrimary) {
                 this.logRunStart(totalAccounts)
                 return this.runMaster(enabledAccounts, runStartTime)
@@ -348,7 +348,7 @@ export class MicrosoftRewardsBot {
         this.logger.info(
             'main',
             'RUN-START',
-            `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
+            `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.core?.clusters ?? 1}`
         )
     }
 
@@ -441,7 +441,7 @@ export class MicrosoftRewardsBot {
     private runMaster(accounts: Account[], runStartTime: number): Promise<number> {
         void this.logger.info('main', 'CLUSTER-PRIMARY', `Primary process started | PID: ${process.pid}`)
 
-        const rawChunks = this.utils.chunkArray(accounts, this.config.clusters)
+        const rawChunks = this.utils.chunkArray(accounts, this.config.core?.clusters ?? 1)
         const accountChunks = rawChunks.filter(c => c && c.length > 0)
         this.activeWorkers = accountChunks.length
 
@@ -761,7 +761,7 @@ export class MicrosoftRewardsBot {
             }
         }
 
-        if (this.config.clusters <= 1 && !cluster.isWorker) {
+        if ((this.config.core?.clusters ?? 1) <= 1 && !cluster.isWorker) {
             const totalCollectedPoints = accountStats.reduce((sum, s) => sum + s.collectedPoints, 0)
             const totalInitialPoints = accountStats.reduce((sum, s) => sum + s.initialPoints, 0)
             const totalFinalPoints = accountStats.reduce((sum, s) => sum + s.finalPoints, 0)
@@ -856,7 +856,7 @@ export class MicrosoftRewardsBot {
                 device: this.isMobile ? 'mobile' : 'desktop',
                 has_core: hasCore,
                 has_proxy: hasProxy,
-                clusters: this.config.clusters,
+                clusters: this.config.core?.clusters ?? 1,
                 headless: this.config.headless === true,
                 parallel_search: this.config.searchSettings?.parallelSearching === true,
                 geo_locale: account.geoLocale,
@@ -872,7 +872,7 @@ export class MicrosoftRewardsBot {
             void reportError({
                 kind: 'account_banned',
                 email: account.email,
-                error: `Account locked (${error.reason}) after ${durationSeconds}s — prior runs: ${summary?.totalRuns ?? 0}, proxy: ${hasProxy}, clusters: ${this.config.clusters}, parallel: ${this.config.searchSettings?.parallelSearching === true}`,
+                error: `Account locked (${error.reason}) after ${durationSeconds}s — prior runs: ${summary?.totalRuns ?? 0}, proxy: ${hasProxy}, clusters: ${this.config.core?.clusters ?? 1}, parallel: ${this.config.searchSettings?.parallelSearching === true}`,
                 hasCore,
                 durationSeconds
             })

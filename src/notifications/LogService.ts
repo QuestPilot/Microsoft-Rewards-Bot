@@ -1,6 +1,5 @@
 import chalk from 'chalk'
 import cluster from 'cluster'
-import { errorDiagnostic } from '../helpers/ErrorDiagnostic'
 import type { MicrosoftRewardsBot } from '../index'
 import type { LogFilter } from '../types/Config'
 import type { DashboardPlatform } from '../types/Dashboard'
@@ -166,12 +165,6 @@ export class LogService {
         const msgStr = colorFn ? colorFn(formatted) : formatted
 
         const consoleStr = `${timeStr} ${userStr} ${levelStr} ${platformStr} ${titleStr} ${msgStr}`
-
-        if (level === 'error' && config.errorDiagnostics && !this.bot.isHarvesterMode) {
-            const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage
-            const error = message instanceof Error ? message : new Error(String(message))
-            errorDiagnostic(page, error, msg => this.warn(isMobile, 'DIAGNOSTIC', msg))
-        }
 
         const consoleAllowed = this.shouldPassFilter(config.consoleLogFilter, level, cleanMsg)
         const webhookAllowed =

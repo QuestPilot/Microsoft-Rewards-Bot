@@ -91,8 +91,6 @@ export const ConfigSchema = z.object({
     sessionPath: z.string(),
     headless: z.boolean(),
     runOnZeroPoints: z.boolean(),
-    clusters: z.number().int().nonnegative(),
-    errorDiagnostics: z.boolean(),
     workers: z.object({
         doDailySet: z.boolean(),
         doSpecialPromotions: z.boolean(),
@@ -153,6 +151,7 @@ export const ConfigSchema = z.object({
         applyCoupons: z.boolean().optional(),
         temporaryPunchcards: z.boolean().optional(),
         collectDashboardInfo: z.boolean().optional(),
+        clusters: z.number().int().nonnegative().optional(),
         streakProtection: z.boolean().optional(),
         dashboardSync: z.boolean().optional(),
         captureDashboardPages: z.boolean().optional()

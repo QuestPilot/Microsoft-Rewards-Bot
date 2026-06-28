@@ -22,8 +22,8 @@ Microsoft Rewards Bot automates daily sets, searches, and promotions on Microsof
 
 It supports **both** Microsoft Rewards dashboards in a single project — the new Next.js dashboard and the older one — detecting which one each account is served at login and using the right code path automatically, so every account earns regardless of which dashboard Microsoft has rolled out to it.
 
-> [!NOTE]
-> This repository is source-available for personal non-commercial use and official contributions only. Commercial redistribution, public forks, and bypassing the Core plugin boundary are not permitted.
+> [!TIP]
+> **One bot. Both dashboards. Every point.** This isn't just another search script — it's a complete automation platform. It runs on **both** Microsoft Rewards dashboards (the new one *and* the classic one) with per-account auto-detection, ships a built-in control panel that needs no terminal, a sandboxed plugin marketplace, and silent auto-updates. Add the optional **Core** plugin and you unlock full point coverage — claimable cards, dashboard coupons, streak protection, and app rewards — plus a remote web dashboard to run every machine from anywhere. Set it up once and leave nothing on the table.
 
 ---
 

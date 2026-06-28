@@ -26,15 +26,13 @@ test('atomic file helper supports binary diagnostics', async () => {
     assert.deepEqual(fs.readFileSync(filePath), bytes)
 })
 
-test('runtime session and diagnostics writers use atomic file helper', () => {
+test('runtime session writers use atomic file helper', () => {
     const root = path.join(__dirname, '..', '..')
     const configLoader = fs.readFileSync(path.join(root, 'src/helpers/ConfigLoader.ts'), 'utf8')
     const agentRuntime = fs.readFileSync(path.join(root, 'src/core/AgentRuntime.ts'), 'utf8')
-    const diagnostics = fs.readFileSync(path.join(root, 'src/helpers/ErrorDiagnostic.ts'), 'utf8')
 
     assert.match(configLoader, /writeJsonAtomic/)
     assert.match(configLoader, /Could not read \$\{label\}/)
     assert.doesNotMatch(configLoader, /new Error\(error as string\)/)
     assert.match(agentRuntime, /writeJsonAtomic/)
-    assert.match(diagnostics, /writeFileAtomic/)
 })

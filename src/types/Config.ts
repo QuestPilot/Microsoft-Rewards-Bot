@@ -3,8 +3,6 @@ export interface Config {
     sessionPath: string
     headless: boolean
     runOnZeroPoints: boolean
-    clusters: number
-    errorDiagnostics: boolean
     workers: ConfigWorkers
     searchOnBingLocalQueries: boolean
     globalTimeout: number | string
@@ -77,6 +75,8 @@ export interface ConfigCore {
     /** New (Next.js) dashboard only — no-op on classic (ASP) accounts. */
     temporaryPunchcards?: boolean
     collectDashboardInfo?: boolean
+    /** Number of parallel account processes. Higher = faster but riskier. Default: 1. */
+    clusters?: number
     /** Both dashboards: Next via the streak panel, legacy via the Core account API. */
     streakProtection?: boolean
     dashboardSync?: boolean
