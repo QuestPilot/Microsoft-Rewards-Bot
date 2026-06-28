@@ -4,11 +4,11 @@ const fs = require('fs')
 const http = require('http')
 const os = require('os')
 const path = require('path')
-const { createAccountStorage } = require('./account-storage')
-const { createDesktopInstallManager } = require('./desktop-install-manager')
-const { createStartupManager } = require('./startup-manager')
+const { createAccountStorage } = require('../account-storage')
+const { createDesktopInstallManager } = require('../desktop-install-manager')
+const { createStartupManager } = require('../startup-manager')
 
-const ROOT = path.resolve(__dirname, '..')
+const ROOT = path.resolve(__dirname, '..', '..')
 const PORT = Number.parseInt(process.env.MSRB_APP_PORT || '0', 10)
 const APP_TITLE = 'Rewards Desk'
 const APP_ICON_PATH = path.join(ROOT, 'assets', 'logo.ico')
@@ -22,7 +22,7 @@ const desktopInstallManager = createDesktopInstallManager({ root: ROOT })
 const startupManager = createStartupManager({ root: ROOT })
 let agentApi = null
 try {
-    agentApi = require('../dist/core/AgentRuntime')
+    agentApi = require('../../dist/core/AgentRuntime')
 } catch {}
 
 function readVersion() {
@@ -193,7 +193,7 @@ function runCoreLicenseWorker(payload) {
 function startAccountStorageWorker() {
     if (accountWorkerReady) return accountWorkerReady
     accountWorkerReady = new Promise((resolve, reject) => {
-        accountWorker = childProcess.spawn(process.execPath, [path.join(__dirname, 'account-storage-worker.js')], {
+        accountWorker = childProcess.spawn(process.execPath, [path.join(__dirname, '..', 'account-storage-worker.js')], {
             cwd: ROOT,
             env: process.env,
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -273,7 +273,7 @@ async function accountStorageRequest(action, payload = {}) {
 
 function runJsonWorker(scriptName, payload) {
     return new Promise((resolve, reject) => {
-        const worker = childProcess.spawn(process.execPath, [path.join(__dirname, scriptName)], {
+        const worker = childProcess.spawn(process.execPath, [path.join(__dirname, '..', scriptName)], {
             cwd: ROOT,
             env: process.env,
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -575,7 +575,7 @@ function sendInput(value) {
 }
 
 // Config read/patch helpers extracted to ./desk/config.js (behavior identical).
-const { createConfig } = require('./desk/config')
+const { createConfig } = require('./config')
 const { readConfigRaw, writeConfigPatch } = createConfig({ root: ROOT, atomicWriteText })
 
 // ── Auto-detected dashboard variant (cosmetic badge hint) ────────────────────
@@ -608,7 +608,7 @@ function enrichAccountsWithVariant(accounts) {
 
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 // Extracted to ./desk/plugins-config.js (behavior identical).
-const { createPluginsConfig } = require('./desk/plugins-config')
+const { createPluginsConfig } = require('./plugins-config')
 const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion, setPluginAutoUpdate } = createPluginsConfig({ root: ROOT, atomicWriteText })
 
 function atomicWriteText(filePath, content) {
@@ -677,7 +677,7 @@ function launchTerminalMode() {
 
 // ── Docs (docs/*.md) ────────────────────────────────────────────────────────
 // Extracted to ./desk/docs.js — behavior identical; covered by tests/desk-behavior.test.js.
-const { createDocs } = require('./desk/docs')
+const { createDocs } = require('./docs')
 const { listDocs, readDocFile } = createDocs({ root: ROOT, appVersion: APP_VERSION })
 
 async function loadDeskLicenseState() {
@@ -5976,7 +5976,7 @@ function html() {
 
 // Localhost HTTP utilities extracted to ./desk/http.js (behavior identical; the
 // security gate + body limit are covered by tests/desk-behavior.test.js).
-const { createHttp } = require('./desk/http')
+const { createHttp } = require('./http')
 const { jsonResponse, safeEqual, authorizeApiRequest, readApiBody, parseJson } = createHttp({
     getServerAddress: () => server.address(),
     apiToken: API_TOKEN,
@@ -5984,7 +5984,7 @@ const { jsonResponse, safeEqual, authorizeApiRequest, readApiBody, parseJson } =
 })
 
 // Proxy helpers extracted to ./desk/proxy.js (behavior identical).
-const { testProxy } = require('./desk/proxy')
+const { testProxy } = require('./proxy')
 
 // Cross-process control file: the desk touches it to ask the running bot to
 // bring its off-screen ("headless" on desktop) browser window on-screen. The
@@ -6401,7 +6401,7 @@ const server = http.createServer((req, res) => {
         // Default to the production catalog endpoint so the marketplace works out of the
         // box; override with MSRB_MARKETPLACE_CATALOG_URL for local/staging testing.
         const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL || 'https://bot.lgtw.tf/api/marketplace/catalog'
-        const { fetchSignedCatalog } = require('./marketplace-fetch')
+        const { fetchSignedCatalog } = require('../marketplace-fetch')
         fetchSignedCatalog(catalogUrl).then(function(result) {
             let parsed = null
             try { parsed = JSON.parse(result.catalog) } catch {}
@@ -6429,7 +6429,7 @@ const server = http.createServer((req, res) => {
         // accurate "update available", and a "may be outdated" flag when this bot has
         // moved well ahead of the bot version the plugin was published for.
         let mpcat = null
-        try { mpcat = require('./security/marketplace-catalog') } catch {}
+        try { mpcat = require('../security/marketplace-catalog') } catch {}
         const staleWindow = Number(process.env.MSRB_PLUGIN_STALE_WINDOW) || undefined
         for (const p of list) {
             try {
@@ -6648,7 +6648,7 @@ server.listen(PORT, '127.0.0.1', () => {
 })
 
 // Browser launcher extracted to ./desk/browser-launcher.js (behavior identical).
-const { createBrowserLauncher } = require('./desk/browser-launcher')
+const { createBrowserLauncher } = require('./browser-launcher')
 const { openAppWindow } = createBrowserLauncher({ windowWidth: APP_WINDOW_WIDTH, windowHeight: APP_WINDOW_HEIGHT, pushLog })
 
 // parseJson is provided by ./desk/http.js (destructured from createHttp above).

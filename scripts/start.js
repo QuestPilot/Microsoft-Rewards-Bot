@@ -118,10 +118,115 @@ function hasBuiltRuntime(root = ROOT) {
     return fs.existsSync(path.join(root, 'dist', 'index.js')) && fs.existsSync(path.join(root, 'dist', 'package.json'))
 }
 
+// ── Smart build: only rebuild when the local source actually changed ──────────
+// We fingerprint every file under src/ (plus package.json + tsconfig.json) by
+// size + mtime and compare it to the marker written after the last successful
+// build. Any uncertainty (missing/invalid marker, unreadable tree) resolves to
+// "build" on purpose — false positives that rebuild are cheap, a stale runtime
+// is not. An update (post-update restart) and a missing dist always force it.
+const BUILD_MARKER_REL = path.join('data', '.build-state.json')
+
+function computeSourceFingerprint(root = ROOT) {
+    const crypto = require('crypto')
+    const inputs = []
+    const walk = dir => {
+        let entries
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true })
+        } catch {
+            return
+        }
+        for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : 1))) {
+            const full = path.join(dir, entry.name)
+            if (entry.isDirectory()) walk(full)
+            else if (entry.isFile()) {
+                try {
+                    const st = fs.statSync(full)
+                    inputs.push(`${full}:${st.size}:${Math.round(st.mtimeMs)}`)
+                } catch {
+                    /* ignore unreadable file */
+                }
+            }
+        }
+    }
+    walk(path.join(root, 'src'))
+    for (const rel of ['package.json', 'tsconfig.json']) {
+        try {
+            const st = fs.statSync(path.join(root, rel))
+            inputs.push(`${rel}:${st.size}:${Math.round(st.mtimeMs)}`)
+        } catch {
+            /* file may not exist */
+        }
+    }
+    return crypto.createHash('sha1').update(inputs.join('\n')).digest('hex')
+}
+
+function sourceChangedSinceBuild(root = ROOT) {
+    try {
+        const marker = JSON.parse(fs.readFileSync(path.join(root, BUILD_MARKER_REL), 'utf8'))
+        if (!marker || !marker.fingerprint) return true
+        return marker.fingerprint !== computeSourceFingerprint(root)
+    } catch {
+        return true
+    }
+}
+
+function writeBuildMarker(root = ROOT) {
+    try {
+        fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+        fs.writeFileSync(
+            path.join(root, BUILD_MARKER_REL),
+            `${JSON.stringify({ fingerprint: computeSourceFingerprint(root), builtAt: new Date().toISOString() }, null, 2)}\n`
+        )
+    } catch {
+        /* best-effort: a missing marker just means we rebuild next time */
+    }
+}
+
 function shouldBuildRuntime(argv = process.argv, root = ROOT, env = process.env) {
     if (env.MSRB_POST_UPDATE_RESTART === '1') return true
-    if (!isBackgroundLaunch(argv)) return true
-    return !hasBuiltRuntime(root)
+    if (!hasBuiltRuntime(root)) return true
+    if (isBackgroundLaunch(argv)) return false
+    // Foreground (desk / terminal): rebuild only when local source changed.
+    return sourceChangedSinceBuild(root)
+}
+
+// ── First-run experience: terminal first, app window afterwards ───────────────
+// The very first desk launch runs in the terminal so installs/migrations are
+// fully visible and verifiable. From the second launch on we open the polished
+// app window instead. The count lives in data/ (where the desk records state).
+const LAUNCH_MARKER_REL = path.join('data', '.launch-state.json')
+
+function readLaunchState(root = ROOT) {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(path.join(root, LAUNCH_MARKER_REL), 'utf8'))
+        return parsed && typeof parsed === 'object' ? parsed : { deskLaunches: 1 }
+    } catch (error) {
+        // Missing marker → genuine first launch. Unreadable/corrupt → assume not
+        // first, so a bad file never traps the user in the terminal forever.
+        if (error && error.code === 'ENOENT') return { deskLaunches: 0 }
+        return { deskLaunches: 1 }
+    }
+}
+
+function isFirstDeskLaunch(root = ROOT) {
+    return (readLaunchState(root).deskLaunches || 0) === 0
+}
+
+function recordDeskLaunch(root = ROOT) {
+    try {
+        const state = readLaunchState(root)
+        const nowIso = new Date().toISOString()
+        const next = {
+            deskLaunches: (state.deskLaunches || 0) + 1,
+            firstLaunchAt: state.firstLaunchAt || nowIso,
+            lastLaunchAt: nowIso
+        }
+        fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+        fs.writeFileSync(path.join(root, LAUNCH_MARKER_REL), `${JSON.stringify(next, null, 2)}\n`)
+    } catch {
+        /* best-effort */
+    }
 }
 
 function runNpm(args) {
@@ -130,7 +235,7 @@ function runNpm(args) {
 }
 
 function launchAppWindow() {
-    const child = childProcess.spawn(process.execPath, ['./scripts/app-window.js'], {
+    const child = childProcess.spawn(process.execPath, ['./scripts/desk/app-window.js'], {
         cwd: ROOT,
         detached: true,
         stdio: 'ignore',
@@ -248,16 +353,26 @@ async function main() {
 
     if (shouldBuildRuntime(process.argv, ROOT, process.env)) {
         runNpm(['run', 'build'])
+        writeBuildMarker(ROOT)
     } else {
-        console.log('[START] Background launch: using existing dist build.')
+        console.log('[START] No source changes since the last build — reusing the existing dist.')
     }
     if (!isAttachLaunch()) {
         ensurePatchrightChromium({ root: ROOT })
     }
     if (shouldLaunchInterface()) {
-        console.log('[START] Opening app window. Use npm start -- --terminal for developer logs.')
-        launchAppWindow()
-        return
+        // First desk launch stays in the terminal so first-time installs and
+        // migrations are fully visible; the app window takes over from launch #2.
+        if (isFirstDeskLaunch(ROOT)) {
+            recordDeskLaunch(ROOT)
+            console.log('[START] First launch — running in the terminal so setup is fully visible.')
+            console.log('[START] The app window will open automatically from the next launch.')
+        } else {
+            recordDeskLaunch(ROOT)
+            console.log('[START] Opening app window. Use npm start -- --terminal for developer logs.')
+            launchAppWindow()
+            return
+        }
     }
     run(process.execPath, ['./dist/index.js', ...process.argv.slice(2)], 'bot')
 }
@@ -271,6 +386,12 @@ if (require.main === module) {
 
 module.exports = {
     bootstrapUserFiles,
+    computeSourceFingerprint,
+    sourceChangedSinceBuild,
+    writeBuildMarker,
+    isFirstDeskLaunch,
+    recordDeskLaunch,
+    readLaunchState,
     hasBuiltRuntime,
     hasGuiEnvironment,
     isHarvesterLaunch,

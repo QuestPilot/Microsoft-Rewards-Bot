@@ -8,22 +8,20 @@ const root = path.resolve(__dirname, '..')
 // PLUS every extracted module so these invariants are found wherever the code now
 // lives. (Behavioral coverage of the HTTP/UI contract lives in desk-behavior.test.js.)
 const source = (() => {
-    let combined = fs.readFileSync(path.join(root, 'scripts/app-window.js'), 'utf8')
+    // app-window.js now lives in scripts/desk/ alongside its extracted modules,
+    // so reading every scripts/desk/*.js file covers the whole Desk surface.
+    let combined = ''
     const deskDir = path.join(root, 'scripts', 'desk')
-    try {
-        for (const file of fs.readdirSync(deskDir)) {
-            if (file.endsWith('.js')) combined += '\n' + fs.readFileSync(path.join(deskDir, file), 'utf8')
-        }
-    } catch {
-        // no desk/ modules yet
+    for (const file of fs.readdirSync(deskDir)) {
+        if (file.endsWith('.js')) combined += '\n' + fs.readFileSync(path.join(deskDir, file), 'utf8')
     }
     return combined
 })()
 
 test('app window runs as a desktop-style launcher instead of the old browser page', () => {
     assert.match(source, /--app=\$\{url\}/)
-    assert.match(source, /APP_WINDOW_WIDTH = 1600/)
-    assert.match(source, /APP_WINDOW_HEIGHT = 950/)
+    assert.match(source, /APP_WINDOW_WIDTH = 1780/)
+    assert.match(source, /APP_WINDOW_HEIGHT = 1020/)
     assert.match(source, /--window-size=/)
     assert.match(source, /windowsHide:\s*true/)
     assert.match(source, /assets', 'logo\.png'/)

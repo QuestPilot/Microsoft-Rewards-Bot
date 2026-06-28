@@ -90,7 +90,7 @@ test('capture flag is opt-in (default false) and schema-validated', () => {
 })
 
 test('Desk wires the capture toggle as a Core, dual-dashboard, points-less control', () => {
-    const desk = read('scripts/app-window.js')
+    const desk = read('scripts/desk/app-window.js')
     // Toggle element + master key list.
     assert.match(desk, /id="tog-core-captureDashboardPages"/)
     assert.match(desk, /'captureDashboardPages'/)

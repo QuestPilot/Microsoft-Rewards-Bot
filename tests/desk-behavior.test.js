@@ -16,7 +16,7 @@ const net = require('node:net')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 
-const APP = path.join(__dirname, '..', 'scripts', 'app-window.js')
+const APP = path.join(__dirname, '..', 'scripts', 'desk', 'app-window.js')
 
 let child
 let port
