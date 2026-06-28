@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discord — setup help & questions
+    url: https://discord.gg/JWhCkhSYtg
+    about: For setup help, "best config?", "how much can I earn?", and general questions, ask in Discord — it's the fastest way to get help.
+  - name: 📖 Documentation
+    url: https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/main/docs
+    about: Install, troubleshooting, Core, plugins, scheduler, Docker, and more.
+  - name: ⭐ Core (premium) support
+    url: https://discord.gg/JWhCkhSYtg
+    about: Questions about the optional Core plugin, licenses, or the remote dashboard.

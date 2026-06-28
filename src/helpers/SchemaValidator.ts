@@ -115,7 +115,11 @@ export const ConfigSchema = z.object({
         queryEngines: z.array(QueryEngineSchema),
         searchResultVisitTime: NumberOrString,
         searchDelay: DelaySchema,
-        readDelay: DelaySchema
+        readDelay: DelaySchema,
+        // Account-safety pacing (all optional, safe defaults applied in code).
+        accountDelay: DelaySchema.optional(),
+        shuffleAccounts: z.boolean().default(true),
+        delayMultiplier: z.number().min(1).default(1)
     }),
     debugLogs: z.boolean(),
     proxy: z.object({
@@ -169,7 +173,8 @@ export const AccountSchema = z.object({
     geoLocale: z.string(),
     langCode: z.string(),
     proxy: z.object({
-        proxyAxios: z.boolean(),
+        // Default true: a configured proxy covers the HTTP client too (set false to opt out).
+        proxyAxios: z.boolean().default(true),
         url: z.string(),
         port: z.number(),
         password: z.string(),

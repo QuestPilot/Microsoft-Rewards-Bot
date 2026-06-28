@@ -111,6 +111,15 @@ export interface ConfigSearchSettings {
     searchResultVisitTime: number | string
     searchDelay: ConfigDelay
     readDelay: ConfigDelay
+    /** Account-safety pacing. Randomized pause between accounts in a multi-account run
+     *  (default ~40sec–4min). Avoids hitting Microsoft back-to-back from one machine. */
+    accountDelay?: ConfigDelay
+    /** Randomize account processing order each run (default true) so the same account
+     *  isn't always first/last — a more human, less predictable pattern. */
+    shuffleAccounts?: boolean
+    /** Opt-in extra-safe pacing: multiplies every randomized delay (default 1 = off).
+     *  e.g. 2 = twice as slow/cautious. Useful for large account counts. */
+    delayMultiplier?: number
 }
 
 export interface ConfigDelay {

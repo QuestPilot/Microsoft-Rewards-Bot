@@ -1,0 +1,35 @@
+name: 💡 Feature request
+description: Suggest an idea or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you trying to do that's hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like the bot (or Rewards Desk) to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or other approaches you've thought about.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - "Searches / earning tasks"
+        - "Rewards Desk (control panel)"
+        - "Account safety / anti-detection"
+        - "Notifications / reporting"
+        - "Plugins"
+        - "Core / remote dashboard"
+        - "Other"

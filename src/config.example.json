@@ -50,7 +50,13 @@
         "readDelay": {
             "min": "30sec",
             "max": "1min"
-        }
+        },
+        "accountDelay": {
+            "min": "40sec",
+            "max": "4min"
+        },
+        "shuffleAccounts": true,
+        "delayMultiplier": 1
     },
     "scheduler": {
         "enabled": false,

@@ -285,7 +285,10 @@ export class MicrosoftRewardsBot {
 
         // Load plugins from plugins/ directory
         await this.pluginManager.loadPlugins()
-        this.configureActionPacing()
+
+        // Account-safety: opt-in extra-safe pacing. Multiplies every randomized delay
+        // (default 1 = full speed). Lets cautious / large-fleet users slow the bot down.
+        this.utils.setRandomDelayMultiplier(this.config.searchSettings.delayMultiplier ?? 1)
 
         // Install plugin-registered tasks into ActivityRunner
         const tasks = this.pluginManager.getRegisteredTasks()
@@ -295,14 +298,14 @@ export class MicrosoftRewardsBot {
         await this.pluginManager.notifyBotInitialized()
     }
 
-    private configureActionPacing(): void {
-        if (!this.pluginManager.hasOfficialCoreEntitlement()) {
-            this.utils.setRandomDelayMultiplier(4)
-        }
-    }
-
     async run(): Promise<number> {
         const enabledAccounts = this.accounts.filter(account => account.enabled !== false)
+        // Account-safety: randomize order each run (opt-out via searchSettings.shuffleAccounts:false)
+        // so the same account isn't always processed first/last. Done here (not in runMaster) so
+        // cluster chunks inherit the shuffled order too.
+        if (this.config.searchSettings.shuffleAccounts !== false && enabledAccounts.length > 1) {
+            this.utils.shuffleArray(enabledAccounts)
+        }
         const totalAccounts = enabledAccounts.length
         const runStartTime = Date.now()
 
@@ -758,6 +761,22 @@ export class MicrosoftRewardsBot {
                     hasCore: this.pluginManager.hasOfficialCoreEntitlement(),
                     durationSeconds: parseFloat(durationSeconds)
                 })
+            }
+
+            // Account-safety pacing: pause a randomized interval before the next account so a
+            // multi-account run doesn't hit Microsoft back-to-back from one machine. Scales with
+            // searchSettings.delayMultiplier (via randomDelay). Skipped after the last account.
+            if (account !== accounts[accounts.length - 1]) {
+                const pauseMs = this.utils.randomDelay(
+                    this.config.searchSettings.accountDelay?.min ?? '40sec',
+                    this.config.searchSettings.accountDelay?.max ?? '4min'
+                )
+                this.logger.info(
+                    'main',
+                    'ACCOUNT-PACING',
+                    `Waiting ${Math.round(pauseMs / 1000)}s before the next account`
+                )
+                await this.utils.wait(pauseMs)
             }
         }
 
