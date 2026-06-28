@@ -312,6 +312,8 @@ function migrateLaunchers(root = ROOT, env = process.env) {
     try {
         const { createRuntimeLaunchers } = require('./launchers/runtime-launchers')
         const currentDir = createRuntimeLaunchers({ root }).runtimeDir
+        const legacy = path.join(root, '.core')
+        const legacyExists = fs.existsSync(legacy)
         const markerPath = path.join(root, 'data', '.launcher-state.json')
         let marker = {}
         try {
@@ -319,25 +321,29 @@ function migrateLaunchers(root = ROOT, env = process.env) {
         } catch {
             marker = {}
         }
-        if (!marker.launcherDir || path.resolve(marker.launcherDir) !== path.resolve(currentDir)) {
-            // Re-point installed desktop/start-menu shortcuts (only if the user has them).
-            try {
-                const { createDesktopInstallManager } = require('./launchers/desktop-install-manager')
-                const mgr = createDesktopInstallManager({ root })
-                const st = mgr.status()
-                if (st && (st.desktop || st.menu)) mgr.install()
-            } catch {
-                /* shortcuts absent or not writable — skip */
-            }
-            // Re-point enabled OS auto-start entries (desk and/or background agent).
-            try {
-                const { createStartupManager } = require('./launchers/startup-manager')
-                const sm = createStartupManager({ root })
-                const sst = sm.status()
-                if (sst && sst.desk && sst.desk.installed) sm.setDeskEnabled(true)
-                if (sst && sst.agent && sst.agent.installed) sm.setAgentEnabled(true)
-            } catch {
-                /* auto-start not enabled — skip */
+        const migrated = marker.launcherDir && path.resolve(marker.launcherDir) === path.resolve(currentDir)
+        if (!migrated) {
+            // Only pre-existing installs (which still carry a legacy .core launcher dir)
+            // need their shortcuts / OS auto-start re-pointed. Fresh installs already
+            // target scripts/runtime, so for them we just record the marker.
+            if (legacyExists) {
+                try {
+                    const { createDesktopInstallManager } = require('./launchers/desktop-install-manager')
+                    const mgr = createDesktopInstallManager({ root })
+                    const st = mgr.status()
+                    if (st && (st.desktop || st.menu)) mgr.install()
+                } catch {
+                    /* shortcuts absent or not writable — skip */
+                }
+                try {
+                    const { createStartupManager } = require('./launchers/startup-manager')
+                    const sm = createStartupManager({ root })
+                    const sst = sm.status()
+                    if (sst && sst.desk && sst.desk.installed) sm.setDeskEnabled(true)
+                    if (sst && sst.agent && sst.agent.installed) sm.setAgentEnabled(true)
+                } catch {
+                    /* auto-start not enabled — skip */
+                }
             }
             try {
                 fs.mkdirSync(path.join(root, 'data'), { recursive: true })
@@ -349,12 +355,12 @@ function migrateLaunchers(root = ROOT, env = process.env) {
                 /* best-effort */
             }
         }
-        // Retire the legacy .core directory once we are launched from the new path.
-        const legacy = path.join(root, '.core')
+        // Retire the legacy .core directory once we are actually running from the new
+        // launcher (signalled by MSRB_LAUNCHER_DIR). Safe: nothing references it now.
         if (
+            legacyExists &&
             env.MSRB_LAUNCHER_DIR &&
-            path.resolve(env.MSRB_LAUNCHER_DIR) === path.resolve(currentDir) &&
-            fs.existsSync(legacy)
+            path.resolve(env.MSRB_LAUNCHER_DIR) === path.resolve(currentDir)
         ) {
             try {
                 fs.rmSync(legacy, { recursive: true, force: true })
@@ -430,18 +436,15 @@ async function main() {
         ensurePatchrightChromium({ root: ROOT })
     }
     if (shouldLaunchInterface()) {
-        // First desk launch stays in the terminal so first-time installs and
-        // migrations are fully visible; the app window takes over from launch #2.
-        if (isFirstDeskLaunch(ROOT)) {
-            recordDeskLaunch(ROOT)
-            console.log('[START] First launch — running in the terminal so setup is fully visible.')
-            console.log('[START] The app window will open automatically from the next launch.')
-        } else {
-            recordDeskLaunch(ROOT)
-            console.log('[START] Opening app window. Use npm start -- --terminal for developer logs.')
-            launchAppWindow()
-            return
-        }
+        // Clicking the Rewards Desk shortcut ALWAYS opens the Desk (the control
+        // panel) — it never auto-runs the bot. The visible prep above (update check
+        // + smart build) is the first-launch terminal step; the Desk's own loading
+        // screen then takes over. Smart build keeps later launches fast.
+        const firstDesk = isFirstDeskLaunch(ROOT)
+        recordDeskLaunch(ROOT)
+        console.log(firstDesk ? '[START] Setup complete — opening Rewards Desk.' : '[START] Opening Rewards Desk…')
+        launchAppWindow()
+        return
     }
     run(process.execPath, ['./dist/index.js', ...process.argv.slice(2)], 'bot')
 }
