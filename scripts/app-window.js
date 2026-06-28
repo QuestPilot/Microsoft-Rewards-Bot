@@ -911,27 +911,42 @@ function html() {
     /* ── Hero ── */
     .hero{
       position:relative;border-radius:var(--r);overflow:hidden;
-      min-height:170px;display:flex;align-items:center;padding:28px 36px;
-      border:1px solid var(--border);
+      min-height:172px;display:flex;align-items:center;padding:30px 38px;
+      border:1px solid rgba(46,232,255,.15);
+      background:linear-gradient(118deg,#05101f 0%,#071a31 52%,#06243c 100%);
     }
     .hero-bg{
-      position:absolute;inset:0;
-      background-image:url('/banner-core.png');
-      background-size:cover;background-position:center top;z-index:0;
+      position:absolute;inset:0;z-index:0;
+      background:
+        radial-gradient(760px 300px at 86% -20%, rgba(46,232,255,.18), transparent 60%),
+        radial-gradient(560px 320px at 104% 130%, rgba(30,120,255,.20), transparent 56%);
     }
+    /* concentric signal rings radiating from a node on the right */
+    .hero-rings{
+      position:absolute;right:18px;top:50%;transform:translateY(-50%);
+      z-index:1;pointer-events:none;opacity:.9;
+      animation:heroBreath 7s ease-in-out infinite;
+    }
+    .hero-rings svg{width:300px;height:300px;display:block}
+    @keyframes heroBreath{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.035)}}
+    .hero-node{animation:heroNode 3.4s ease-in-out infinite}
+    @keyframes heroNode{0%,100%{opacity:.9}50%{opacity:.45}}
     .hero-overlay{
       position:absolute;inset:0;z-index:1;
-      background:linear-gradient(100deg,rgba(3,8,15,.92) 0%,rgba(3,8,15,.78) 45%,rgba(3,8,15,.35) 100%);
+      background:linear-gradient(100deg,rgba(4,11,22,.9) 0%,rgba(4,11,22,.62) 46%,rgba(4,11,22,.05) 100%);
     }
     .hero-content{position:relative;z-index:2;max-width:480px}
     .hero-content h1{
       font-size:clamp(24px,2.6vw,38px);font-weight:900;line-height:1.08;
       letter-spacing:-.4px;text-shadow:0 2px 20px rgba(0,0,0,.5);
     }
-    .hero-content h1 span{color:var(--cyan)}
+    .hero-content h1 span{
+      background:linear-gradient(95deg,var(--cyan),#7fe3ff 60%,#5aa6ff);
+      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    }
     .hero-content p{
-      margin-top:9px;font-size:13.5px;color:#aac4e0;line-height:1.6;
-      max-width:360px;text-shadow:0 1px 8px rgba(0,0,0,.4);
+      margin-top:10px;font-size:13.5px;color:#aac4e0;line-height:1.6;
+      max-width:368px;text-shadow:0 1px 8px rgba(0,0,0,.4);
     }
     .hero-btns{display:flex;gap:9px;margin-top:18px}
     .btn{
@@ -2185,6 +2200,15 @@ function html() {
     <!-- Hero -->
     <section class="hero">
       <div class="hero-bg"></div>
+      <div class="hero-rings">
+        <svg viewBox="0 0 300 300" fill="none">
+          <circle cx="210" cy="150" r="42" stroke="rgba(46,232,255,.45)" stroke-width="1.4"/>
+          <circle cx="210" cy="150" r="80" stroke="rgba(46,232,255,.28)" stroke-width="1.4"/>
+          <circle cx="210" cy="150" r="120" stroke="rgba(46,232,255,.17)" stroke-width="1.4"/>
+          <circle cx="210" cy="150" r="162" stroke="rgba(46,232,255,.09)" stroke-width="1.4"/>
+          <circle class="hero-node" cx="210" cy="150" r="11" fill="rgba(46,232,255,.9)"/>
+        </svg>
+      </div>
       <div class="hero-overlay"></div>
       <div class="hero-content">
         <h1>Automate more.<br><span>Earn more.</span></h1>
@@ -4660,9 +4684,8 @@ function html() {
     if(G('docs-back')) G('docs-back').addEventListener('click', function() { setView('dash'); });
     G('plugins-doc-btn').addEventListener('click', function() { window.open(PLUGIN_DOC_URL); });
     G('plugins-publish-btn').addEventListener('click', function() {
-      // Open the developer site in a dedicated Desk-style window (own cookie jar so
-      // Discord login works); fall back to the system browser if the Desk can't.
-      fetch('/api/open-portal', {method:'POST'}).then(function(r){ if(!r.ok) window.open('https://bot.lgtw.tf/?view=developers'); }).catch(function(){ window.open('https://bot.lgtw.tf/?view=developers'); });
+      // Open the developer portal in the user's real default browser.
+      window.open('https://bot.lgtw.tf/?view=developers');
     });
     G('plugins-refresh-btn').addEventListener('click', function() { loadPluginsCatalog(true); });
     var _pluginSearchT;
