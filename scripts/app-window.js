@@ -1852,59 +1852,96 @@ function html() {
       *,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
     }
 
-    /* ── Plugins page (unified catalog) ─────────────────────────── */
-    .plugins-wrap{display:none;flex-direction:column;gap:14px;overflow-y:auto;min-height:0;padding-bottom:8px}
+    /* ── Plugins page ────────────────────────────────────────────── */
+    .plugins-wrap{display:none;flex-direction:column;min-height:0;flex:1;overflow:hidden}
     .plugins-wrap.vis{display:flex}
-    .plugins-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-    .plugins-head h2{font-size:20px;font-weight:800;margin:0 0 4px}
-    .plugins-head p{font-size:13px;color:var(--muted);margin:0;max-width:580px;line-height:1.55}
-    .plugins-head-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .plugins-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .plugins-search{flex:1;min-width:180px;padding:9px 13px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+    .plugins-hero{padding:18px 24px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .plugins-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+    .plugins-hero h2{font-size:20px;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+    .plugins-hero p{font-size:12.5px;color:var(--muted);margin:0;max-width:520px;line-height:1.55}
+    .plugins-hero-actions{display:flex;gap:7px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+    .plugins-stats{display:flex;gap:20px}
+    .plugins-stat{display:flex;flex-direction:column}
+    .plugins-stat-num{font-size:20px;font-weight:800;line-height:1;color:var(--text)}
+    .plugins-stat-lbl{font-size:10.5px;color:var(--muted);margin-top:2px}
+    .plugins-toolbar{padding:11px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .plugins-search{flex:1;min-width:140px;padding:8px 13px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
     .plugins-search:focus{border-color:rgba(46,232,255,.32)}
     .plugins-search::placeholder{color:var(--muted)}
-    .psection{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 2px 0;display:flex;align-items:center;gap:7px}
-    .psection .pcount{color:var(--cyan)}
-    .plugins-catalog{display:flex;flex-direction:column;gap:10px}
-    .pcard{background:linear-gradient(180deg,rgba(10,22,40,.96),rgba(5,12,24,.97));border:1px solid var(--border);border-radius:14px;padding:15px 17px;display:flex;align-items:flex-start;gap:14px;transition:border-color .15s}
-    .pcard:hover{border-color:rgba(46,232,255,.22)}
-    .pcard.is-core{border-color:rgba(247,200,92,.3);background:linear-gradient(180deg,rgba(26,22,8,.96),rgba(12,10,3,.97))}
-    .pcard.is-core:hover{border-color:rgba(247,200,92,.45)}
-    .pcard-ico{width:42px;height:42px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.08);border:1px solid rgba(46,232,255,.18);color:var(--cyan);margin-top:1px}
-    .pcard.is-core .pcard-ico{background:rgba(247,200,92,.1);border-color:rgba(247,200,92,.28);color:var(--gold)}
-    .pcard-ico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .plugins-tabs{display:flex;gap:2px;background:rgba(255,255,255,.04);border-radius:10px;padding:3px;flex-shrink:0}
+    .plugins-tab{padding:5px 12px;border-radius:7px;border:none;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .plugins-tab.active{background:rgba(46,232,255,.12);color:var(--cyan);box-shadow:inset 0 0 0 1px rgba(46,232,255,.18)}
+    .plugins-body{flex:1;overflow-y:auto;padding:18px 24px 28px;display:flex;flex-direction:column;gap:22px;min-height:0}
+    /* Core featured card */
+    .pcore-card{border-radius:15px;border:1px solid rgba(247,200,92,.32);background:linear-gradient(135deg,rgba(28,22,6,.98),rgba(10,7,1,.97));padding:18px 20px;display:flex;align-items:flex-start;gap:16px;position:relative;overflow:hidden;flex-shrink:0}
+    .pcore-card::before{content:'';position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:radial-gradient(circle,rgba(247,200,92,.07),transparent 70%);pointer-events:none}
+    .pcore-ico{width:50px;height:50px;border-radius:13px;background:rgba(247,200,92,.1);border:1px solid rgba(247,200,92,.28);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
+    .pcore-ico svg{width:22px;height:22px;fill:currentColor}
+    .pcore-body{flex:1;min-width:0}
+    .pcore-name{font-size:16px;font-weight:800;color:#fde68a;display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+    .pcore-desc{font-size:12px;color:rgba(255,215,100,.65);line-height:1.55;margin-bottom:10px;max-width:500px}
+    .pcore-feats{display:flex;flex-wrap:wrap;gap:5px}
+    .pcore-feat{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(247,200,92,.09);color:rgba(253,225,120,.75);border:1px solid rgba(247,200,92,.18)}
+    .pcore-side{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex-shrink:0}
+    .pcore-locked{font-size:11px;color:var(--gold);display:flex;align-items:center;gap:5px;opacity:.8;margin-top:2px;white-space:nowrap}
+    .pcore-locked svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+    /* Section header */
+    .psect{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .psect-title{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+    .psect-count{font-size:11px;font-weight:700;color:var(--cyan);background:rgba(46,232,255,.1);padding:1px 7px;border-radius:20px;border:1px solid rgba(46,232,255,.15)}
+    /* Installed plugin rows */
+    .plist{display:flex;flex-direction:column;gap:8px}
+    .pcard{background:rgba(6,14,28,.75);border:1px solid var(--border);border-radius:13px;padding:13px 15px;display:flex;align-items:flex-start;gap:12px;transition:border-color .18s}
+    .pcard:hover{border-color:rgba(46,232,255,.2)}
+    .pcard-ico{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.07);border:1px solid rgba(46,232,255,.14);color:var(--cyan);margin-top:1px}
+    .pcard-ico svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
     .pcard-body{flex:1;min-width:0}
-    .pcard-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-    .pchip{font-size:9px;font-weight:800;letter-spacing:.04em;padding:2px 6px;border-radius:5px;text-transform:uppercase;white-space:nowrap}
-    .pchip-official{background:rgba(247,200,92,.16);color:var(--gold);border:1px solid rgba(247,200,92,.3)}
-    .pchip-mkt{background:rgba(56,224,200,.14);color:#38e0c8;border:1px solid rgba(56,224,200,.3)}
-    .pchip-ver{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border);text-transform:none;letter-spacing:0}
-    .pchip-installed{background:rgba(47,210,125,.14);color:var(--green);border:1px solid rgba(47,210,125,.3)}
-    .pchip-trusted{background:rgba(255,140,90,.14);color:#ffae7a;border:1px solid rgba(255,140,90,.32)}
-    .pchip-update{background:rgba(46,232,255,.14);color:var(--cyan);border:1px solid rgba(46,232,255,.32);text-transform:none;letter-spacing:0}
-    .pchip-stale{background:rgba(247,200,92,.14);color:var(--gold);border:1px solid rgba(247,200,92,.3);text-transform:none;letter-spacing:0}
-    .pchip-off{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
-    .pcard-meta{font-size:11.5px;color:var(--muted);margin-top:3px}
-    .pcard-desc{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5;max-width:580px}
-    .pcard-manage{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:9px}
-    .pmanage-trust{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#ffae7a;cursor:pointer}
+    .pcard-row1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px}
+    .pcard-name{font-size:13.5px;font-weight:700}
+    .pcard-meta{font-size:11px;color:var(--muted);margin-bottom:3px}
+    .pcard-desc{font-size:11.5px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .pcard-manage{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)}
+    .pcard-side{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0}
+    .pmanage-trust{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#ffae7a;cursor:pointer}
     .pmanage-trust input{accent-color:#ff8c5a}
-    .pmanage-au{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer}
+    .pmanage-au{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer}
     .pmanage-au input{accent-color:var(--cyan)}
     .plink{font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px;transition:color .15s}
     .plink:hover{color:var(--text)}
     .plink.danger:hover{color:var(--rose)}
-    .plink svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
-    .pcard-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;min-width:94px}
-    .pbtn{padding:7px 15px;font-size:12px;font-weight:700;border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,opacity .15s;border:1px solid transparent}
+    .plink svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2}
+    /* Marketplace grid */
+    .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:11px}
+    .pgcard{background:rgba(6,14,28,.75);border:1px solid var(--border);border-radius:14px;padding:15px;display:flex;flex-direction:column;gap:0;transition:border-color .18s,transform .14s;cursor:default}
+    .pgcard:hover{border-color:rgba(56,224,200,.25);transform:translateY(-1px)}
+    .pgcard-head{display:flex;align-items:flex-start;gap:11px;margin-bottom:9px}
+    .pgcard-ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(56,224,200,.08);border:1px solid rgba(56,224,200,.18);color:#38e0c8;flex-shrink:0}
+    .pgcard-ico svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+    .pgcard-info{flex:1;min-width:0;padding-top:1px}
+    .pgcard-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pgcard-author{font-size:10.5px;color:var(--muted);margin-top:2px}
+    .pgcard-desc{font-size:11.5px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:11px;flex:1}
+    .pgcard-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}
+    .pgcard-chips{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+    /* Chips */
+    .pchip{font-size:9px;font-weight:800;letter-spacing:.04em;padding:2px 6px;border-radius:5px;text-transform:uppercase;white-space:nowrap;border:1px solid}
+    .pchip-official{background:rgba(247,200,92,.14);color:var(--gold);border-color:rgba(247,200,92,.28)}
+    .pchip-mkt{background:rgba(56,224,200,.1);color:#38e0c8;border-color:rgba(56,224,200,.25)}
+    .pchip-ver{background:rgba(255,255,255,.05);color:var(--muted);border-color:var(--border);text-transform:none;letter-spacing:0;font-size:10px}
+    .pchip-installed{background:rgba(47,210,125,.1);color:var(--green);border-color:rgba(47,210,125,.25)}
+    .pchip-trusted{background:rgba(255,140,90,.1);color:#ffae7a;border-color:rgba(255,140,90,.25)}
+    .pchip-update{background:rgba(46,232,255,.1);color:var(--cyan);border-color:rgba(46,232,255,.25);text-transform:none;letter-spacing:0}
+    .pchip-stale{background:rgba(247,200,92,.1);color:var(--gold);border-color:rgba(247,200,92,.25);text-transform:none;letter-spacing:0}
+    .pchip-off{background:rgba(255,255,255,.04);color:var(--muted);border-color:var(--border)}
+    /* Buttons */
+    .pbtn{padding:6px 14px;font-size:12px;font-weight:700;border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,opacity .15s;border:1px solid transparent;flex-shrink:0}
     .pbtn:disabled{opacity:.5;cursor:not-allowed}
-    .pbtn-install{border-color:rgba(56,224,200,.4);background:rgba(56,224,200,.14);color:#38e0c8}
-    .pbtn-install:hover:not(:disabled){background:rgba(56,224,200,.24);border-color:rgba(56,224,200,.6)}
-    .pbtn-update{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.14);color:var(--cyan)}
-    .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.24)}
-    .pcard-locked{font-size:11px;color:var(--gold);margin-top:7px;display:flex;align-items:center;gap:5px}
-    .pcard-locked svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
-    .pempty{padding:34px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;border:1px dashed var(--border);border-radius:14px}
+    .pbtn-install{border-color:rgba(56,224,200,.38);background:rgba(56,224,200,.1);color:#38e0c8}
+    .pbtn-install:hover:not(:disabled){background:rgba(56,224,200,.2);border-color:rgba(56,224,200,.55)}
+    .pbtn-update{border-color:rgba(46,232,255,.38);background:rgba(46,232,255,.1);color:var(--cyan)}
+    .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.2)}
+    /* Empty state */
+    .pempty{padding:36px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;border:1px dashed rgba(255,255,255,.09);border-radius:14px}
     .pempty code{font-size:11px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px}
 
     /* ── Docs page ──────────────────────────────────────────────── */
@@ -2878,21 +2915,43 @@ function html() {
 
     <!-- Plugins view -->
     <div class="plugins-wrap" id="view-plugins">
-      <div class="plugins-head">
-        <div>
-          <h2>Plugins</h2>
-          <p>Browse and install community plugins from the marketplace. Core and everything you install is managed right here — sandboxed by default.</p>
+      <div class="plugins-hero">
+        <div class="plugins-hero-top">
+          <div>
+            <h2>
+              <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--cyan);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
+              Plugins
+            </h2>
+            <p>Browse and install community plugins. Core and all installed plugins are managed here — sandboxed by default.</p>
+          </div>
+          <div class="plugins-hero-actions">
+            <button class="btn btn-secondary btn-sm" id="plugins-refresh-btn">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;margin-right:5px;vertical-align:middle"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>Refresh
+            </button>
+            <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Dev guide ↗</button>
+            <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish / Manage ›</button>
+          </div>
         </div>
-        <div class="plugins-head-actions">
-          <button class="btn btn-primary btn-sm" id="plugins-publish-btn">Publish / Manage my plugins →</button>
+        <div class="plugins-stats">
+          <div class="plugins-stat">
+            <span class="plugins-stat-num" id="pstat-installed">—</span>
+            <span class="plugins-stat-lbl">Installed</span>
+          </div>
+          <div class="plugins-stat">
+            <span class="plugins-stat-num" id="pstat-available">—</span>
+            <span class="plugins-stat-lbl">In marketplace</span>
+          </div>
         </div>
       </div>
       <div class="plugins-toolbar">
         <input class="plugins-search" id="plugins-search" type="text" placeholder="Search plugins…" autocomplete="off" spellcheck="false">
-        <button class="btn btn-secondary btn-sm" id="plugins-refresh-btn">↻ Refresh</button>
-        <button class="btn btn-secondary btn-sm" id="plugins-doc-btn">Guide ↗</button>
+        <div class="plugins-tabs" id="plugins-tabs">
+          <button class="plugins-tab active" data-pfilter="all">All</button>
+          <button class="plugins-tab" data-pfilter="installed">Installed</button>
+          <button class="plugins-tab" data-pfilter="marketplace">Marketplace</button>
+        </div>
       </div>
-      <div class="plugins-catalog" id="plugins-catalog"></div>
+      <div class="plugins-body" id="plugins-catalog"></div>
     </div>
 
   <!-- Dedicated Account Edit Page -->
@@ -4623,6 +4682,15 @@ function html() {
       var q = this.value; clearTimeout(_pluginSearchT);
       _pluginSearchT = setTimeout(function(){ renderCatalog(q); }, 110);
     });
+    document.querySelectorAll('.plugins-tab').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _catalogFilter = btn.getAttribute('data-pfilter') || 'all';
+        document.querySelectorAll('.plugins-tab').forEach(function(b) {
+          b.classList.toggle('active', b === btn);
+        });
+        renderCatalog(G('plugins-search') ? G('plugins-search').value : '');
+      });
+    });
     G('docs-github').addEventListener('click', function() { window.open(DOCS_GITHUB_URL); });
     // Terminal / developer mode
     G('btn-terminal-mode').addEventListener('click', async function() {
@@ -5065,79 +5133,99 @@ function html() {
       renderCatalog(G('plugins-search') ? G('plugins-search').value : '');
     }
 
+    var _catalogFilter = 'all';
+
     function coreCardHtml(core) {
-      var star = '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>';
-      return '<div class="pcard is-core">' +
-        '<div class="pcard-ico"><svg viewBox="0 0 24 24">' + star + '</svg></div>' +
-        '<div class="pcard-body">' +
-          '<div class="pcard-name">Core<span class="pchip pchip-official">Official</span>' + (core.enabled ? '' : '<span class="pchip pchip-off">Off</span>') + '</div>' +
-          '<div class="pcard-desc">The official premium plugin — auto-claim, coupons, doubled search points, app rewards, read-to-earn, streak protection, punchcards and the remote dashboard.</div>' +
-          (_hasCoreLicense ? '' : '<div class="pcard-locked"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Activate a Core license to unlock</div>') +
+      var features = ['Auto-claim','Coupons','2× Search points','App rewards','Read-to-earn','Streak protection','Punchcards','Remote dashboard'];
+      var featsHtml = features.map(function(f){ return '<span class="pcore-feat">' + f + '</span>'; }).join('');
+      return '<div class="pcore-card">' +
+        '<div class="pcore-ico"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>' +
+        '<div class="pcore-body">' +
+          '<div class="pcore-name">Core <span class="pchip pchip-official">Official</span>' + (core.enabled ? '' : ' <span class="pchip pchip-off">Off</span>') + '</div>' +
+          '<div class="pcore-desc">The official premium plugin. Unlocks exclusive tasks and the remote dashboard.</div>' +
+          '<div class="pcore-feats">' + featsHtml + '</div>' +
         '</div>' +
-        '<div class="pcard-actions"><label class="toggle"><input type="checkbox" data-plugin="core"' + (core.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label></div>' +
+        '<div class="pcore-side">' +
+          '<label class="toggle"><input type="checkbox" data-plugin="core"' + (core.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>' +
+          (_hasCoreLicense ? '' : '<div class="pcore-locked"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Activate license</div>') +
+        '</div>' +
       '</div>';
     }
 
     function pluginCardHtml(p) {
-      var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"></path>';
+      var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/>';
       var updatable = p.installed && p.inCatalog && p.installedVersion && p.latest && cmpVer(p.latest, p.installedVersion) > 0;
       var held = p.installed && (p.pinned || p.autoUpdate === false || p.trust === 'full');
       var chips = '';
       if (p.installedVersion || p.version) chips += '<span class="pchip pchip-ver">v' + esc(p.installedVersion || p.version) + '</span>';
-      if (p.installed) chips += '<span class="pchip pchip-installed">Installed</span>';
-      else if (p.inCatalog) chips += '<span class="pchip pchip-mkt">Marketplace</span>';
       if (p.installed && p.trust === 'full') chips += '<span class="pchip pchip-trusted">Trusted</span>';
       if (p.installed && !p.enabled) chips += '<span class="pchip pchip-off">Off</span>';
-      if (p.installed && p.stale) chips += '<span class="pchip pchip-stale" title="Published for an older bot version — may be outdated, but still runs.">May be outdated</span>';
-      if (updatable) chips += '<span class="pchip pchip-update">' + (held ? 'Update v' + esc(p.latest) : 'Auto-updates to v' + esc(p.latest)) + '</span>';
+      if (p.installed && p.stale) chips += '<span class="pchip pchip-stale">Outdated</span>';
+      if (updatable) chips += '<span class="pchip pchip-update">v' + esc(p.latest) + ' available</span>';
       var meta = [];
       if (p.author) meta.push('by ' + esc(p.author));
       if (p.license) meta.push(esc(p.license));
       if (p.installed && !p.inCatalog) meta.push('local');
-
-      var actions;
-      if (!p.installed) {
-        actions = '<button class="pbtn pbtn-install" data-install="' + escAttr(p.name) + '" data-ver="' + escAttr(p.version) + '">Install</button>';
-      } else {
-        actions = '<label class="toggle"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>';
-        if (held && updatable) actions += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
-      }
-
+      var side = '<label class="toggle"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>';
+      if (held && updatable) side += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
       var manage = '';
       if (p.installed) {
         var mrow = '';
         if (p.source === 'marketplace') {
-          mrow += '<label class="pmanage-trust"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted Mode (full access)</label>';
+          mrow += '<label class="pmanage-trust"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted Mode</label>';
           if (!p.pinned) mrow += '<label class="pmanage-au"><input type="checkbox" data-autoupdate="' + escAttr(p.name) + '"' + (p.autoUpdate !== false ? ' checked' : '') + '> Auto-update</label>';
+          mrow += '<button class="plink" data-report="' + escAttr(p.name) + '" data-rv="' + escAttr(p.installedVersion || p.version) + '"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Report</button>';
         }
-        if (p.source === 'marketplace') mrow += '<button class="plink" data-report="' + escAttr(p.name) + '" data-rv="' + escAttr(p.installedVersion || p.version) + '"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Report</button>';
         mrow += '<button class="plink danger" data-remove="' + escAttr(p.name) + '"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>';
         manage = '<div class="pcard-manage">' + mrow + '</div>';
       }
-
-      return '<div class="pcard' + (p.installed ? ' is-installed' : '') + '">' +
+      return '<div class="pcard">' +
         '<div class="pcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
         '<div class="pcard-body">' +
-          '<div class="pcard-name">' + esc(p.name) + chips + '</div>' +
+          '<div class="pcard-row1"><span class="pcard-name">' + esc(p.name) + '</span>' + chips + '</div>' +
           (meta.length ? '<div class="pcard-meta">' + meta.join(' &middot; ') + '</div>' : '') +
           (p.description ? '<div class="pcard-desc">' + esc(p.description) + '</div>' : '') +
           manage +
         '</div>' +
-        '<div class="pcard-actions">' + actions + '</div>' +
+        '<div class="pcard-side">' + side + '</div>' +
+      '</div>';
+    }
+
+    function pluginGridCardHtml(p) {
+      var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/>';
+      var chips = '';
+      if (p.version) chips += '<span class="pchip pchip-ver">v' + esc(p.version) + '</span>';
+      if (p.license) chips += '<span class="pchip" style="background:rgba(255,255,255,.04);color:var(--muted);border-color:var(--border);font-size:9px;text-transform:none">' + esc(p.license) + '</span>';
+      return '<div class="pgcard">' +
+        '<div class="pgcard-head">' +
+          '<div class="pgcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
+          '<div class="pgcard-info">' +
+            '<div class="pgcard-name">' + esc(p.name) + '</div>' +
+            (p.author ? '<div class="pgcard-author">by ' + esc(p.author) + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        (p.description ? '<div class="pgcard-desc">' + esc(p.description) + '</div>' : '<div class="pgcard-desc" style="opacity:.4">No description provided.</div>') +
+        '<div class="pgcard-foot">' +
+          '<div class="pgcard-chips">' + chips + '</div>' +
+          '<button class="pbtn pbtn-install" data-install="' + escAttr(p.name) + '" data-ver="' + escAttr(p.version) + '">Install</button>' +
+        '</div>' +
       '</div>';
     }
 
     function marketplaceEmptyHtml() {
-      if (_catalogMeta.error) return '<div class="pempty">Could not reach the marketplace.<br><span style="font-size:11px;opacity:.7">' + esc(_catalogMeta.error) + '</span></div>';
-      return '<div class="pempty">No community plugins yet.<br><span style="font-size:11px;opacity:.7">When the catalog is published they appear here. Made one? Hit <b>Publish / Manage</b>.</span></div>';
+      if (_catalogMeta.error) return '<div class="pempty">Could not reach the marketplace.<br><span style="font-size:11px;opacity:.6">' + esc(_catalogMeta.error) + '</span></div>';
+      return '<div class="pempty">No community plugins yet.<br><span style="font-size:11px;opacity:.6">When the catalog is published, plugins appear here. Made one? Hit <b>Publish / Manage</b>.</span></div>';
     }
 
     function renderCatalog(filterQ) {
       var wrap = G('plugins-catalog');
       if (!wrap) return;
       var q = (filterQ || '').trim().toLowerCase();
+      var showInstalled = _catalogFilter !== 'marketplace';
+      var showMarket = _catalogFilter !== 'installed';
       var html = '';
-      if (_catalogCore) {
+      // Core card — always shown unless filter is strictly marketplace
+      if (_catalogCore && showInstalled) {
         var matchCore = !q || ('core official premium ' + (_catalogCore.description || '')).toLowerCase().indexOf(q) >= 0;
         if (matchCore) html += coreCardHtml(_catalogCore);
       }
@@ -5145,15 +5233,24 @@ function html() {
         if (!q) return true;
         return (p.name + ' ' + (p.author || '') + ' ' + (p.description || '')).toLowerCase().indexOf(q) >= 0;
       });
-      var inst = items.filter(function(p){ return p.installed; });
-      var avail = items.filter(function(p){ return !p.installed; });
+      var inst = showInstalled ? items.filter(function(p){ return p.installed; }) : [];
+      var avail = showMarket ? items.filter(function(p){ return !p.installed; }) : [];
       if (inst.length) {
-        html += '<div class="psection">Installed <span class="pcount">' + inst.length + '</span></div>';
-        html += inst.map(pluginCardHtml).join('');
+        html += '<div><div class="psect"><span class="psect-title">Installed</span><span class="psect-count">' + inst.length + '</span></div>';
+        html += '<div class="plist">' + inst.map(pluginCardHtml).join('') + '</div></div>';
       }
-      html += '<div class="psection">Marketplace' + (avail.length ? ' <span class="pcount">' + avail.length + '</span>' : '') + '</div>';
-      html += avail.length ? avail.map(pluginCardHtml).join('') : marketplaceEmptyHtml();
+      if (showMarket) {
+        html += '<div><div class="psect"><span class="psect-title">Marketplace</span>' + (avail.length ? '<span class="psect-count">' + avail.length + '</span>' : '') + '</div>';
+        html += avail.length ? '<div class="pgrid">' + avail.map(pluginGridCardHtml).join('') + '</div>' : marketplaceEmptyHtml();
+        html += '</div>';
+      }
+      if (!html) html = '<div class="pempty">No plugins match your search.</div>';
       wrap.innerHTML = html;
+      // Update stats
+      var totalInst = _catalog.filter(function(p){ return p.installed; }).length + (_catalogCore ? 1 : 0);
+      var totalAvail = _catalog.filter(function(p){ return !p.installed; }).length;
+      var si = G('pstat-installed'); if (si) si.textContent = totalInst;
+      var sa = G('pstat-available'); if (sa) sa.textContent = totalAvail;
       bindCatalogEvents();
     }
 
