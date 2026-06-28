@@ -1873,17 +1873,20 @@ function html() {
     .plugins-tab:hover{color:var(--text);background:rgba(255,255,255,.04)}
     .plugins-tab.active{background:rgba(46,232,255,.09);color:var(--cyan);border-color:rgba(46,232,255,.18)}
     .plugins-body{flex:1;overflow-y:auto;padding:14px 20px 28px;display:flex;flex-direction:column;gap:14px;min-height:0}
-    /* Core card — compact horizontal */
-    .pcore-card{border-radius:12px;border:1px solid rgba(247,200,92,.22);background:linear-gradient(130deg,rgba(20,15,3,.97),rgba(7,5,0,.97));padding:13px 15px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;flex-shrink:0}
-    .pcore-card::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(247,200,92,.04),transparent 60%);pointer-events:none}
-    .pcore-ico{width:38px;height:38px;border-radius:9px;background:rgba(247,200,92,.09);border:1px solid rgba(247,200,92,.2);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
-    .pcore-ico svg{width:17px;height:17px;fill:currentColor}
-    .pcore-body{flex:1;min-width:0;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-    .pcore-name{font-size:13px;font-weight:800;color:rgba(253,230,138,.9);display:flex;align-items:center;gap:6px;flex-shrink:0}
-    .pcore-feats{display:flex;flex-wrap:wrap;gap:3px;flex:1}
-    .pcore-feat{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:20px;background:rgba(247,200,92,.06);color:rgba(247,200,92,.6);border:1px solid rgba(247,200,92,.12)}
-    .pcore-side{display:flex;align-items:center;gap:8px;flex-shrink:0}
-    .pcore-locked{font-size:10.5px;color:rgba(247,200,92,.6);display:flex;align-items:center;gap:4px;white-space:nowrap}
+    /* Core card — spacious feature card */
+    .pcore-card{border-radius:15px;border:1px solid rgba(247,200,92,.26);background:linear-gradient(135deg,rgba(26,19,4,.98),rgba(9,6,1,.98));padding:17px 19px;display:flex;align-items:flex-start;gap:15px;position:relative;overflow:hidden;flex-shrink:0}
+    .pcore-card::after{content:'';position:absolute;top:-45%;right:-8%;width:320px;height:230px;background:radial-gradient(ellipse,rgba(247,200,92,.07),transparent 62%);pointer-events:none}
+    .pcore-ico{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,rgba(247,200,92,.18),rgba(247,200,92,.04));border:1px solid rgba(247,200,92,.3);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0;box-shadow:0 3px 14px rgba(247,200,92,.09)}
+    .pcore-ico svg{width:21px;height:21px;fill:currentColor}
+    .pcore-main{flex:1;min-width:0;position:relative;z-index:1}
+    .pcore-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+    .pcore-name{font-size:15.5px;font-weight:800;color:#fde8a6;letter-spacing:.01em}
+    .pcore-head .pcore-side{margin-left:auto}
+    .pcore-desc{font-size:11.5px;color:rgba(247,212,142,.58);line-height:1.5;margin-bottom:11px;max-width:470px}
+    .pcore-feats{display:flex;flex-wrap:wrap;gap:5px}
+    .pcore-feat{font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(247,200,92,.07);color:rgba(247,200,92,.72);border:1px solid rgba(247,200,92,.15)}
+    .pcore-side{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .pcore-locked{font-size:10.5px;font-weight:600;color:rgba(247,200,92,.72);display:flex;align-items:center;gap:4px;white-space:nowrap}
     .pcore-locked svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2}
     /* Section label */
     .psect{display:flex;align-items:center;gap:8px;margin-bottom:6px}
@@ -1902,10 +1905,13 @@ function html() {
     .pcard-desc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.7}
     .pcard-manage{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)}
     .pcard-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
-    .pmanage-trust{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:rgba(210,145,74,.85);cursor:pointer}
-    .pmanage-trust input{accent-color:#d4914a;width:12px;height:12px}
-    .pmanage-au{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted);cursor:pointer}
-    .pmanage-au input{accent-color:var(--cyan);width:12px;height:12px}
+    .pmanage-trust{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:rgba(210,145,74,.85);cursor:pointer;user-select:none}
+    .pmanage-au{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none}
+    .pmanage-trust input,.pmanage-au input{appearance:none;-webkit-appearance:none;margin:0;width:14px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);cursor:pointer;position:relative;flex-shrink:0;transition:background .15s,border-color .15s}
+    .pmanage-trust input:hover,.pmanage-au input:hover{border-color:rgba(255,255,255,.3)}
+    .pmanage-trust input:checked{background:#d4914a;border-color:#d4914a}
+    .pmanage-au input:checked{background:var(--cyan);border-color:var(--cyan)}
+    .pmanage-trust input:checked::after,.pmanage-au input:checked::after{content:'';position:absolute;left:4px;top:1px;width:3px;height:7px;border:solid #0a0e15;border-width:0 2px 2px 0;transform:rotate(45deg)}
     .plink{font-size:10.5px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:3px;transition:color .15s}
     .plink:hover{color:var(--text)}
     .plink.danger:hover{color:var(--rose)}
@@ -5118,18 +5124,22 @@ function html() {
     var _catalogFilter = 'all';
 
     function coreCardHtml(core) {
-      var features = ['Auto-claim','Coupons','2× Search points','App rewards','Read-to-earn','Streak protection','Punchcards','Remote dashboard'];
+      var features = ['Auto-claim','Coupons','2× Search points','App rewards','Read-to-earn','Streak shield','Punchcards','Remote dashboard'];
       var featsHtml = features.map(function(f){ return '<span class="pcore-feat">' + f + '</span>'; }).join('');
       return '<div class="pcore-card">' +
         '<div class="pcore-ico"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>' +
-        '<div class="pcore-body">' +
-          '<div class="pcore-name">Core <span class="pchip pchip-official">Official</span>' + (core.enabled ? '' : ' <span class="pchip pchip-off">Off</span>') + '</div>' +
-          '<div class="pcore-desc">The official premium plugin. Unlocks exclusive tasks and the remote dashboard.</div>' +
+        '<div class="pcore-main">' +
+          '<div class="pcore-head">' +
+            '<span class="pcore-name">Core</span>' +
+            '<span class="pchip pchip-official">Official</span>' +
+            (core.enabled ? '' : '<span class="pchip pchip-off">Off</span>') +
+            '<div class="pcore-side">' +
+              (_hasCoreLicense ? '' : '<div class="pcore-locked"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Unlock</div>') +
+              '<label class="toggle"><input type="checkbox" data-plugin="core"' + (core.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>' +
+            '</div>' +
+          '</div>' +
+          '<div class="pcore-desc">The official premium plugin — unlocks every bonus task and the remote dashboard.</div>' +
           '<div class="pcore-feats">' + featsHtml + '</div>' +
-        '</div>' +
-        '<div class="pcore-side">' +
-          '<label class="toggle"><input type="checkbox" data-plugin="core"' + (core.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>' +
-          (_hasCoreLicense ? '' : '<div class="pcore-locked"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Activate license</div>') +
         '</div>' +
       '</div>';
     }
