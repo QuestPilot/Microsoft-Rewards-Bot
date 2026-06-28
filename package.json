@@ -48,7 +48,7 @@
         "diagnostics:dashboard:live": "node ./scripts/dashboard-live-diagnostics.js",
         "capture:pages": "node ./scripts/capture-rewards-pages.js",
         "test": "node --test",
-        "test:dashboard:mock": "npm run build && node -e \"process.env.MSRB_DASHBOARD_MOCK_TEST='1'; require('child_process').execFileSync(process.execPath, ['--test', 'tests/rewards-side-panel.test.js'], { stdio: 'inherit', env: process.env })\""
+        "test:dashboard:mock": "npm run build && node -e \"process.env.MSRB_DASHBOARD_MOCK_TEST='1'; require('child_process').execFileSync(process.execPath, ['--test', 'scripts/tests/rewards-side-panel.test.js'], { stdio: 'inherit', env: process.env })\""
     },
     "keywords": [
         "Bing Rewards",
