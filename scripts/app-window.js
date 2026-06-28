@@ -101,21 +101,21 @@ function cachedAccountPointsMap() {
     return _accPtsCache
 }
 
-// Maps masked email → SHA-256 hash of real email (first 16 chars) so the
-// Home page can request avatars without knowing the real email address.
-function buildAvatarMap() {
-    const out = {}
-    if (!Array.isArray(accountCache)) return out
+// Returns the masked account list enriched with an `avatarId` (the 16-char hash
+// of the real email) so the Home page can load the right avatar file without
+// ever seeing the real address. Aligned by index with accountCache — both come
+// from the same worker result, so masked[i] always matches the raw account[i].
+function accountsWithAvatarId() {
+    const masked = Array.isArray(state.accounts) ? state.accounts : []
+    const raw = Array.isArray(accountCache) ? accountCache : []
+    if (!raw.length) return masked
     const crypto = require('crypto')
-    for (const a of accountCache) {
-        if (!a || !a.email) continue
-        const e = String(a.email)
-        const at = e.indexOf('@')
-        if (at < 0) continue
-        const masked = e.slice(0, 2) + '***' + e.slice(at)
-        out[masked] = crypto.createHash('sha256').update(e.toLowerCase().trim()).digest('hex').slice(0, 16)
-    }
-    return out
+    return masked.map((m, i) => {
+        const r = raw[i]
+        if (!r || !r.email) return m
+        const avatarId = crypto.createHash('sha256').update(String(r.email).toLowerCase().trim()).digest('hex').slice(0, 16)
+        return { ...m, avatarId }
+    })
 }
 
 // ─── Desk UI State (replaces multiple .desk-*.json files) ──────────────
@@ -323,13 +323,44 @@ function maskEmail(email) {
     return `${visible}@${domain}`
 }
 
+// Strips a leading CLI-spinner frame so consecutive frames of the same animated
+// line can be detected and collapsed. Restricted to unambiguous spinner glyphs —
+// braille dots (ora's default), circle quadrants and block bars — so it never
+// eats a real "- bullet" / "| pipe" / "/ path" line.
+function stripSpinnerFrame(s) {
+    return String(s).replace(/^[⠀-⣿▁-█◐-◓◴-◷]+[ \t]+/, '')
+}
+
 function pushLog(level, message) {
     const clean = String(message || '').replace(/\x1b\[[0-9;]*m/g, '').trim()
     if (!clean) return
 
     updateStateFromLine(clean)
-    state.logs.push({ at: new Date().toISOString(), level, message: toFriendlyLog(clean) })
-    state.consoleLogs.push({ at: new Date().toISOString(), level, message: clean })
+
+    const now = new Date().toISOString()
+    const stripped = stripSpinnerFrame(clean)
+    const isSpinnerFrame = stripped !== clean && stripped.length > 0
+
+    // Collapse a run of spinner frames ("⠧ Verifying…", "⠇ Verifying…", …) into a
+    // single entry that updates in place instead of flooding the console with
+    // dozens of near-identical lines.
+    const prevConsole = state.consoleLogs[state.consoleLogs.length - 1]
+    if (isSpinnerFrame && prevConsole && prevConsole.spinner && stripSpinnerFrame(prevConsole.message) === stripped) {
+        prevConsole.message = stripped
+        prevConsole.at = now
+    } else {
+        state.consoleLogs.push({ at: now, level, message: isSpinnerFrame ? stripped : clean, spinner: isSpinnerFrame })
+    }
+
+    // The friendly log feed dedupes spinner frames the same way.
+    const prevFriendly = state.logs[state.logs.length - 1]
+    if (isSpinnerFrame && prevFriendly && stripSpinnerFrame(prevFriendly.message) === stripSpinnerFrame(toFriendlyLog(clean))) {
+        prevFriendly.message = toFriendlyLog(clean)
+        prevFriendly.at = now
+    } else {
+        state.logs.push({ at: now, level, message: toFriendlyLog(clean) })
+    }
+
     if (state.logs.length > 160) state.logs.splice(0, state.logs.length - 160)
     if (state.consoleLogs.length > 400) state.consoleLogs.splice(0, state.consoleLogs.length - 400)
 }
@@ -982,6 +1013,7 @@ function html() {
     .info-banner-icon{width:28px;height:28px;border-radius:8px;background:rgba(46,232,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .info-banner-icon svg{width:14px;height:14px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .info-banner-text{flex:1;min-width:0;font-size:clamp(11px,.88vw,12.5px);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .info-banner-text strong{color:var(--text);font-weight:700}
     .info-banner-arrow{color:var(--muted);font-size:13px;flex-shrink:0}
     .ctx-menu{
       position:fixed;z-index:9000;min-width:190px;padding:5px;
@@ -1120,48 +1152,64 @@ function html() {
     .console-wrap{display:none;flex-direction:column;gap:10px;min-height:0;overflow:hidden}
     .console-wrap.vis{display:flex}
     .console-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-    .console-head-left{display:flex;align-items:center;gap:10px}
+    .console-head-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .console-head-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-    .console-line-count{font-size:10.5px;color:var(--muted);font-weight:600;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.05)}
-    .console-filters{display:flex;align-items:center;gap:4px}
-    .console-filter{background:none;border:1px solid rgba(255,255,255,.1);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:10.5px;font-weight:600;cursor:pointer;transition:all .15s}
-    .console-filter:hover{border-color:var(--cyan);color:var(--cyan)}
-    .console-filter.active{border-color:var(--cyan);color:var(--cyan);background:rgba(46,232,255,.08)}
-    .console-filter.active[data-level="error"]{border-color:#ff8098;color:#ff8098;background:rgba(255,128,152,.08)}
-    .console-filter.active[data-level="warn"]{border-color:var(--gold);color:var(--gold);background:rgba(247,200,92,.08)}
-    .console-search{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text);border-radius:7px;padding:3px 9px;font-size:11.5px;width:110px;outline:none;transition:all .15s;font-family:inherit}
-    .console-search:focus{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.04);width:150px}
+    .console-line-count{font-size:10.5px;color:var(--muted);font-weight:600;padding:0 8px;height:28px;display:flex;align-items:center;border-radius:7px;background:rgba(255,255,255,.05);white-space:nowrap}
+    /* Segmented filter control — one pill group, same height as the buttons */
+    .console-filters{display:inline-flex;align-items:center;gap:2px;height:28px;padding:2px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)}
+    .console-filter{background:none;border:none;color:var(--muted);border-radius:6px;padding:0 11px;height:100%;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;font-family:inherit}
+    .console-filter:hover{color:var(--text)}
+    .console-filter.active{color:var(--cyan);background:rgba(46,232,255,.12)}
+    .console-filter.active[data-level="error"]{color:#ff8098;background:rgba(255,128,152,.12)}
+    .console-filter.active[data-level="warn"]{color:var(--gold);background:rgba(247,200,92,.12)}
+    .console-filter.active[data-level="success"]{color:var(--green);background:rgba(47,210,125,.12)}
+    .console-search{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text);border-radius:8px;padding:0 10px;height:28px;font-size:11.5px;width:120px;outline:none;transition:width .15s,border-color .15s,background .15s;font-family:inherit}
+    .console-search:focus{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.04);width:160px}
     .console-search::placeholder{color:var(--muted)}
+    /* Console toolbar buttons — uniform height with the filter group & search */
+    .console-head-actions .btn{height:28px;padding:0 12px;font-size:11.5px;border-radius:8px;display:inline-flex;align-items:center}
     .console-box{
       flex:1;background:#020610;border:1px solid var(--border);
       border-radius:var(--r);padding:14px 16px;overflow-y:auto;overflow-anchor:none;
       font-family:"Cascadia Code",Consolas,"Courier New",monospace;font-size:12px;
-      line-height:1.7;color:#cfe3f2;word-break:break-word;
-      scroll-behavior:smooth;cursor:text;
+      line-height:1.7;color:#cfe3f2;word-break:break-word;cursor:text;
     }
     .console-box::-webkit-scrollbar{width:9px}
     .console-box::-webkit-scrollbar-thumb{background:rgba(110,146,184,.28);border-radius:6px;border:2px solid #020610}
     .console-box::-webkit-scrollbar-thumb:hover{background:rgba(110,146,184,.48)}
+    .console-empty{color:var(--muted);font-style:italic;opacity:.6;padding:4px 0}
     /* Individual log line */
-    .clog{display:flex;gap:10px;padding:1px 0;line-height:1.65;border-radius:3px}
-    .clog:hover{background:rgba(255,255,255,.025)}
-    .clog-ts{color:rgba(110,146,184,.4);font-size:10.5px;flex-shrink:0;padding-top:2px;font-variant-numeric:tabular-nums;min-width:54px}
+    .clog{display:flex;gap:10px;padding:1.5px 6px;margin:0 -6px;line-height:1.65;border-radius:5px;transition:background .12s}
+    .clog:hover{background:rgba(255,255,255,.03)}
+    .clog-ts{color:rgba(110,146,184,.42);font-size:10.5px;flex-shrink:0;padding-top:1px;font-variant-numeric:tabular-nums;min-width:58px;user-select:none}
     .clog-msg{flex:1;min-width:0;word-break:break-word;white-space:pre-wrap}
     .clog-error .clog-msg{color:#ff8098}
     .clog-warn .clog-msg{color:var(--gold)}
     .clog-success .clog-msg{color:var(--green)}
     .clog-info .clog-msg{color:#cfe3f2}
-    @keyframes clogIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-    .clog-new{animation:clogIn .16s ease-out both}
+    /* Coloured accent bar on non-info lines */
+    .clog-error,.clog-warn,.clog-success{position:relative}
+    .clog-error::before,.clog-warn::before,.clog-success::before{content:'';position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:2px}
+    .clog-error::before{background:#ff8098}
+    .clog-warn::before{background:var(--gold)}
+    .clog-success::before{background:var(--green)}
+    @keyframes clogIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+    .clog-new{animation:clogIn .18s ease-out both}
+    /* Animated spinner glyph — spins only on the active (last) line */
+    .clog-spin{display:inline-flex;width:11px;height:11px;flex-shrink:0;align-self:flex-start;margin-top:3px;border:1.6px solid rgba(46,232,255,.25);border-top-color:var(--cyan);border-radius:50%}
+    .clog:last-child .clog-spin{animation:spin .7s linear infinite}
+    .clog-spinline .clog-msg{color:var(--cyan)}
+    @keyframes spin{to{transform:rotate(360deg)}}
     .console-jump{
-      position:absolute;right:20px;bottom:18px;display:none;align-items:center;gap:6px;
-      padding:6px 12px;border-radius:100px;border:1px solid rgba(46,232,255,.32);
-      background:rgba(7,18,34,.96);color:var(--cyan);font-size:11.5px;font-weight:600;
-      cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4);transition:all .15s;z-index:5;
+      position:absolute;right:18px;bottom:16px;display:none;align-items:center;justify-content:center;gap:6px;
+      height:34px;padding:0 14px;border-radius:100px;border:1px solid rgba(46,232,255,.28);
+      background:rgba(9,20,36,.92);backdrop-filter:blur(10px);color:var(--cyan);font-size:11.5px;font-weight:600;
+      cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.45);transition:transform .15s,background .15s,opacity .2s;z-index:5;opacity:0;
     }
-    .console-jump:hover{background:rgba(46,232,255,.14)}
-    .console-jump.show{display:inline-flex}
-    .console-jump svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .console-jump:hover{background:rgba(46,232,255,.16);transform:translateY(-1px)}
+    .console-jump.show{display:inline-flex;animation:jumpIn .2s ease-out both}
+    @keyframes jumpIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .console-jump svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 
     /* Footer */
     .footer{
@@ -2067,7 +2115,7 @@ function html() {
         <div class="info-banner-icon">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         </div>
-        <span class="info-banner-text">Stay informed — news, tips and important information from the team</span>
+        <span class="info-banner-text"><strong>Don't believe the rumors.</strong> False claims are circulating about this project &mdash; it's 100% clean, open-source and safe. <strong>Click to see the facts.</strong></span>
         <span class="info-banner-arrow">›</span>
       </div>
       <div class="cards">
@@ -3160,6 +3208,11 @@ function html() {
       if (v === 'core') renderCoreView();
       if (v === 'plugins') loadPluginsCatalog(false);
       if (v === 'docs') loadDocs();
+      if (v === 'console') {
+        // Entering the console always snaps to the latest line.
+        var cb = G('console-box');
+        if (cb) { cb._stick = true; updateConsoleBox(false); cb.scrollTop = cb.scrollHeight; updateJumpBtn(cb); }
+      }
       var active = v === 'dash' ? G('view-dash') : G('view-' + v);
       if (active) {
         active.classList.remove('view-animate');
@@ -3196,9 +3249,10 @@ function html() {
 
     function makeLogEl(l, animate) {
       var div = document.createElement('div');
-      div.className = 'clog clog-' + getConsoleLvl(l) + (animate ? ' clog-new' : '');
+      div.className = 'clog clog-' + getConsoleLvl(l) + (l.spinner ? ' clog-spinline' : '') + (animate ? ' clog-new' : '');
       var ts = new Date(l.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-      div.innerHTML = '<span class="clog-ts">' + ts + '</span><span class="clog-msg">' + esc(l.message) + '</span>';
+      var spin = l.spinner ? '<span class="clog-spin"></span>' : '';
+      div.innerHTML = '<span class="clog-ts">' + ts + '</span>' + spin + '<span class="clog-msg">' + esc(l.message) + '</span>';
       return div;
     }
 
@@ -3208,47 +3262,59 @@ function html() {
       return true;
     }
 
+    function consoleAtBottom(b) {
+      return (b.scrollHeight - b.scrollTop - b.clientHeight) < 24;
+    }
+    function updateJumpBtn(b) {
+      var jump = G('console-jump');
+      if (jump) jump.classList.toggle('show', view === 'console' && !consoleAtBottom(b));
+    }
+
     function updateConsoleBox(incremental) {
       var b = G('console-box');
       if (!b) return;
-      var stick = (b.scrollHeight - b.scrollTop - b.clientHeight) < 60;
-      var prevTop = b.scrollTop;
+      // Stick to the bottom unless the user has deliberately scrolled up.
+      var wasBottom = b._stick !== false;
+      var hasFilter = _consoleFilter !== 'all' || _consoleSearch;
+      var filtered = hasFilter ? _consoleLogs.filter(matchesConsoleFilter) : _consoleLogs;
 
-      var filtered = _consoleLogs.filter(matchesConsoleFilter);
-
-      if (incremental && _consoleFilter === 'all' && !_consoleSearch) {
-        // Fast path: only append the lines that aren't in the DOM yet
-        var existingCount = b.querySelectorAll('.clog').length;
-        var toAdd = _consoleLogs.slice(existingCount);
-        if (toAdd.length) {
+      if (!filtered.length) {
+        b.innerHTML = '<div class="console-empty">' + (hasFilter ? 'No lines match this filter.' : 'No output yet — start a run to see live logs.') + '</div>';
+      } else if (incremental && !hasFilter) {
+        // Fast path: reconcile only the tail. Handles both newly-appended lines
+        // and in-place spinner updates (where the last line's text changed but
+        // the count stayed the same) without re-rendering the whole console.
+        var rows = b.querySelectorAll('.clog');
+        if (rows.length === _consoleLogs.length && rows.length) {
+          var lastLog = _consoleLogs[_consoleLogs.length - 1];
+          var lastRow = rows[rows.length - 1];
+          var msgEl = lastRow.querySelector('.clog-msg');
+          if (!msgEl || msgEl.textContent !== String(lastLog.message) || lastRow.classList.contains('clog-spinline') !== !!lastLog.spinner) {
+            lastRow.replaceWith(makeLogEl(lastLog, false));
+          }
+        } else if (rows.length < _consoleLogs.length) {
+          var toAdd = _consoleLogs.slice(rows.length);
           var frag = document.createDocumentFragment();
           for (var i = 0; i < toAdd.length; i++) {
-            frag.appendChild(makeLogEl(toAdd[i], i >= toAdd.length - 5));
+            frag.appendChild(makeLogEl(toAdd[i], i >= toAdd.length - 6));
           }
           b.appendChild(frag);
+        } else {
+          b.innerHTML = filtered.map(function(l) { return makeLogEl(l, false).outerHTML; }).join('');
         }
       } else {
-        b.innerHTML = filtered.map(function(l) {
-          return makeLogEl(l, false).outerHTML;
-        }).join('');
+        b.innerHTML = filtered.map(function(l) { return makeLogEl(l, false).outerHTML; }).join('');
       }
 
       var cnt = G('console-line-count');
-      if (cnt) {
-        var shown = _consoleFilter !== 'all' || _consoleSearch ? filtered.length + '/' + _consoleLogs.length : _consoleLogs.length;
-        cnt.textContent = shown + ' lines';
-      }
+      if (cnt) cnt.textContent = (hasFilter ? filtered.length + '/' + _consoleLogs.length : _consoleLogs.length) + ' lines';
 
-      if (stick) b.scrollTop = b.scrollHeight;
-      else if (!incremental) b.scrollTop = prevTop;
-
-      var farUp = (b.scrollHeight - b.scrollTop - b.clientHeight) > 80;
-      var jump = G('console-jump');
-      if (jump) jump.classList.toggle('show', view === 'console' && farUp);
+      if (wasBottom) b.scrollTop = b.scrollHeight;
+      updateJumpBtn(b);
     }
 
     // ── Dashboard accounts (masked list) ──────
-    function renderAccounts(accounts, active, loading, ptsMap, avatarMap) {
+    function renderAccounts(accounts, active, loading, ptsMap) {
       if (loading) {
         return '<div class="loading-block"><span class="inline-spinner"></span><span>Loading protected accounts…</span></div>';
       }
@@ -3260,8 +3326,9 @@ function html() {
         var disabled = !a.enabled;
         var pts = ptsMap && a.email ? ptsMap[a.email] : 0;
         var badge = pts > 0 ? '<span class="acc-pts-badge"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>+' + pts.toLocaleString() + '</span>' : '';
-        // Use pre-computed hash from avatarMap so masked email resolves to the right avatar file
-        var avatarKey = (avatarMap && a.email && avatarMap[a.email]) ? avatarMap[a.email] : encodeURIComponent(a.email||'');
+        // avatarId is the real-email hash (server-computed, index-aligned) so the
+        // masked Home list still resolves to the correct avatar file.
+        var avatarKey = a.avatarId || encodeURIComponent(a.email||'');
         return '<div class="acc-row' + (isActive?' is-active':'') + (disabled?' is-disabled':'') + '">' +
           '<div class="acc-avatar"><img src="/avatars/' + avatarKey + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block"></div>' +
           '<div class="acc-info"><div class="acc-email">' + esc(a.email||'') + '</div>' +
@@ -3342,15 +3409,23 @@ function html() {
       if (sbBtn) sbBtn.style.display = headlessRun ? '' : 'none';
       G('btn-stop').disabled = !running;
       if (data.accountPointsMap) _accPtsMap = data.accountPointsMap;
-      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady, data.accountPointsMap, data.avatarMap);
+      G('acc-list').innerHTML = renderAccounts(data.accounts, data.activeAccount, !boot.accountsReady, data.accountPointsMap);
 
       if (data.consoleLogs) {
         var newLogs = _consoleClearedAt
           ? data.consoleLogs.filter(function(l) { return new Date(l.at).getTime() > _consoleClearedAt; })
           : data.consoleLogs;
-        var grew = newLogs.length > _consoleLogs.length;
+        var oldLogs = _consoleLogs;
+        var n = newLogs.length, o = oldLogs.length;
+        // Detect a head-trim (server dropped the oldest lines past the cap) — that
+        // shifts every row, so a full re-render is required, not an append.
+        var trimmed = n && o && newLogs[0].at !== oldLogs[0].at && newLogs[0].message !== oldLogs[0].message;
+        // Re-render when the count changed or the last line's text changed (covers
+        // the in-place spinner collapse, where the count stays the same).
+        var changed = n !== o || trimmed ||
+          (n && o && (newLogs[n-1].message !== oldLogs[o-1].message || !!newLogs[n-1].spinner !== !!oldLogs[o-1].spinner));
         _consoleLogs = newLogs;
-        if (grew) updateConsoleBox(true);
+        if (changed) updateConsoleBox(!trimmed);
       }
 
       var fdot = G('fdot');
@@ -4175,7 +4250,15 @@ function html() {
       }).catch(function(){});
     });
     G('console-jump').addEventListener('click', function() {
-      var b = G('console-box'); b.scrollTop = b.scrollHeight;
+      var b = G('console-box');
+      b._stick = true;
+      b.scrollTo({ top: b.scrollHeight, behavior: 'smooth' });
+    });
+    // Track whether the user is following the tail. Only show the jump button
+    // when they've scrolled meaningfully up — never while pinned to the bottom.
+    G('console-box').addEventListener('scroll', function() {
+      this._stick = consoleAtBottom(this);
+      updateJumpBtn(this);
     });
     window.addEventListener('beforeunload', function() {
       fetch('/api/close', {method:'POST', keepalive:true}).catch(function(){});
@@ -5305,10 +5388,10 @@ const server = http.createServer((req, res) => {
         const gs = readBotStats()
         res.end(JSON.stringify({
             ...state,
+            accounts: accountsWithAvatarId(),
             corePluginEnabled: isPluginEnabled('core'),
             claimedPoints: gs.claimedPoints,
-            accountPointsMap: cachedAccountPointsMap(),
-            avatarMap: buildAvatarMap()
+            accountPointsMap: cachedAccountPointsMap()
         }))
         return
     }
@@ -5472,8 +5555,8 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'GET' && req.url.startsWith('/avatars/')) {
         const input = decodeURIComponent(req.url.split('/avatars/')[1] || '')
-        // Accept a pre-computed 16-char hex hash directly (from avatarMap) so the
-        // Home page can load avatars using masked emails without reversing them.
+        // Accept a pre-computed 16-char hex hash directly (the account avatarId)
+        // so the masked Home list can load avatars without reversing the email.
         const hash = /^[0-9a-f]{16}$/.test(input)
             ? input
             : require('crypto').createHash('sha256').update(input.toLowerCase().trim()).digest('hex').substring(0, 16)
