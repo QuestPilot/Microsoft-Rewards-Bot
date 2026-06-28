@@ -28,10 +28,9 @@ interface BrowserCreationResult {
     fingerprint: BrowserFingerprintWithHeaders
 }
 
-type BrowserChannel = 'chrome' | 'msedge'
-
 class BrowserManager {
     private readonly bot: MicrosoftRewardsBot
+    private static readonly BROWSER_CLOSE_TIMEOUT_MS = 10_000
     private readonly activeBrowsers = new Set<rebrowser.Browser>()
     // True when "headless" was requested from the Desk on a real desktop: the
     // window is launched off-screen (hidden) instead of truly headless, so the
@@ -89,14 +88,35 @@ class BrowserManager {
         }
     }
 
+    private async closeBrowserWithTimeout(browser: rebrowser.Browser): Promise<void> {
+        let timeout: NodeJS.Timeout | undefined
+        try {
+            await Promise.race([
+                browser.close(),
+                new Promise<void>((_, reject) => {
+                    timeout = setTimeout(
+                        () =>
+                            reject(
+                                new Error(
+                                    `Browser close timed out after ${BrowserManager.BROWSER_CLOSE_TIMEOUT_MS}ms`
+                                )
+                            ),
+                        BrowserManager.BROWSER_CLOSE_TIMEOUT_MS
+                    )
+                })
+            ])
+        } finally {
+            if (timeout) clearTimeout(timeout)
+        }
+    }
+
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
         let browser: rebrowser.Browser
-        let channel: BrowserChannel | undefined
         try {
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BROWSER',
-                'Initializing browser — detecting available channel (Chromium › Chrome › Edge)...'
+                'Initializing browser — verifying Patchright bundled Chromium...'
             )
 
             const proxyConfig = account.proxy.url
@@ -152,8 +172,7 @@ class BrowserManager {
             )
 
             const fingerprint =
-                sessionData.fingerprint ??
-                (await this.generateFingerprint(this.bot.isMobile, channel === 'msedge' ? 'edge' : 'chrome'))
+                sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile, 'chrome'))
 
             const context = await newInjectedContext(browser as any, {
                 fingerprint,
@@ -162,9 +181,11 @@ class BrowserManager {
                     screen: DESKTOP_BROWSER_VIEWPORT
                 }
             })
-            context.once('close', () => {
+            context.once('close', async () => {
                 this.activeBrowsers.delete(browser)
-                void browser.close().catch(() => {})
+                if (browser.isConnected()) {
+                    await this.closeBrowserWithTimeout(browser).catch(() => {})
+                }
             })
 
             await context.addInitScript(() => {
@@ -239,7 +260,7 @@ class BrowserManager {
             return { context: context as unknown as BrowserContext, fingerprint }
         } catch (error) {
             this.activeBrowsers.delete(browser)
-            await browser.close().catch(() => {})
+            await this.closeBrowserWithTimeout(browser).catch(() => {})
             throw error
         }
     }
@@ -251,7 +272,7 @@ class BrowserManager {
         }
         const browsers = [...this.activeBrowsers]
         this.activeBrowsers.clear()
-        await Promise.allSettled(browsers.map(browser => browser.close()))
+        await Promise.allSettled(browsers.map(browser => this.closeBrowserWithTimeout(browser)))
     }
 
     private static isDocker(): boolean {
