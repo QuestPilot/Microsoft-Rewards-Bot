@@ -97,7 +97,7 @@ function createStartupManager(options = {}) {
 
     function installLaunchAgent(label, mode) {
         const executable = launcher(mode)
-        const logDir = path.join(root, 'logs')
+        const logDir = path.join(root, 'data', 'logs')
         fs.mkdirSync(logDir, { recursive: true })
         atomicWrite(
             launchAgentPath(label),

@@ -5,7 +5,7 @@ function createRuntimeLaunchers(options = {}) {
     const root = path.resolve(options.root || process.cwd())
     const platform = options.platform || process.platform
     const nodePath = options.nodePath || process.execPath
-    const runtimeDir = path.join(root, '.core')
+    const runtimeDir = path.join(root, 'scripts', 'runtime')
     const startScript = path.join(root, 'scripts', 'start.js')
 
     function atomicWrite(filePath, content, mode = 0o600) {
@@ -55,6 +55,7 @@ function createRuntimeLaunchers(options = {}) {
                     'echo   Rewards Desk is preparing...',
                     'echo   Updates and local files are being checked.',
                     'echo.',
+                    `set "MSRB_LAUNCHER_DIR=${runtimeDir}"`,
                     `"${nodePath}" "${startScript}"`,
                     'set "MSRB_EXIT=%errorlevel%"',
                     'if not "%MSRB_EXIT%"=="0" (',
@@ -72,7 +73,7 @@ function createRuntimeLaunchers(options = {}) {
         const filePath = path.join(runtimeDir, 'start-desk.sh')
         atomicWrite(
             filePath,
-            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nprintf '\\n  Rewards Desk is preparing...\\n  Updates and local files are being checked.\\n\\n'\n${shellQuote(nodePath)} ${shellQuote(startScript)}\nstatus=$?\nif [ "$status" -ne 0 ]; then printf '\\nStartup failed. Press Enter to close.\\n'; read answer; fi\nexit "$status"\n`,
+            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nprintf '\\n  Rewards Desk is preparing...\\n  Updates and local files are being checked.\\n\\n'\nexport MSRB_LAUNCHER_DIR=${shellQuote(runtimeDir)}\n${shellQuote(nodePath)} ${shellQuote(startScript)}\nstatus=$?\nif [ "$status" -ne 0 ]; then printf '\\nStartup failed. Press Enter to close.\\n'; read answer; fi\nexit "$status"\n`,
             0o700
         )
         return filePath
@@ -80,7 +81,7 @@ function createRuntimeLaunchers(options = {}) {
 
     function ensureAgentLauncher() {
         fs.mkdirSync(runtimeDir, { recursive: true })
-        const logsDir = path.join(root, 'logs')
+        const logsDir = path.join(root, 'data', 'logs')
         fs.mkdirSync(logsDir, { recursive: true })
         if (platform === 'win32') {
             const filePath = path.join(runtimeDir, 'start-background.cmd')
@@ -89,6 +90,7 @@ function createRuntimeLaunchers(options = {}) {
                 [
                     '@echo off',
                     `cd /d "${root}"`,
+                    `set "MSRB_LAUNCHER_DIR=${runtimeDir}"`,
                     `"${nodePath}" "${startScript}" --background >> "${path.join(logsDir, 'background-agent.log')}" 2>&1`,
                     ''
                 ].join('\r\n')
@@ -99,7 +101,7 @@ function createRuntimeLaunchers(options = {}) {
         const filePath = path.join(runtimeDir, 'start-background.sh')
         atomicWrite(
             filePath,
-            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nexec ${shellQuote(nodePath)} ${shellQuote(startScript)} --background\n`,
+            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nexport MSRB_LAUNCHER_DIR=${shellQuote(runtimeDir)}\nexec ${shellQuote(nodePath)} ${shellQuote(startScript)} --background\n`,
             0o700
         )
         return filePath

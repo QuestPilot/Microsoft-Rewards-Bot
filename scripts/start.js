@@ -303,6 +303,70 @@ async function deskCommand(action) {
     }
 }
 
+// One-time migration of the generated launchers out of the legacy .core directory.
+// Re-points any installed desktop shortcuts and OS auto-start entries to the new
+// scripts/runtime launchers, then removes .core once we're actually running from
+// the new launcher (signalled by MSRB_LAUNCHER_DIR). Best-effort and idempotent;
+// never allowed to block startup.
+function migrateLaunchers(root = ROOT, env = process.env) {
+    try {
+        const { createRuntimeLaunchers } = require('./runtime-launchers')
+        const currentDir = createRuntimeLaunchers({ root }).runtimeDir
+        const markerPath = path.join(root, 'data', '.launcher-state.json')
+        let marker = {}
+        try {
+            marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'))
+        } catch {
+            marker = {}
+        }
+        if (!marker.launcherDir || path.resolve(marker.launcherDir) !== path.resolve(currentDir)) {
+            // Re-point installed desktop/start-menu shortcuts (only if the user has them).
+            try {
+                const { createDesktopInstallManager } = require('./desktop-install-manager')
+                const mgr = createDesktopInstallManager({ root })
+                const st = mgr.status()
+                if (st && (st.desktop || st.menu)) mgr.install()
+            } catch {
+                /* shortcuts absent or not writable — skip */
+            }
+            // Re-point enabled OS auto-start entries (desk and/or background agent).
+            try {
+                const { createStartupManager } = require('./startup-manager')
+                const sm = createStartupManager({ root })
+                const sst = sm.status()
+                if (sst && sst.desk && sst.desk.installed) sm.setDeskEnabled(true)
+                if (sst && sst.agent && sst.agent.installed) sm.setAgentEnabled(true)
+            } catch {
+                /* auto-start not enabled — skip */
+            }
+            try {
+                fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+                fs.writeFileSync(
+                    markerPath,
+                    `${JSON.stringify({ launcherDir: currentDir, migratedAt: new Date().toISOString() }, null, 2)}\n`
+                )
+            } catch {
+                /* best-effort */
+            }
+        }
+        // Retire the legacy .core directory once we are launched from the new path.
+        const legacy = path.join(root, '.core')
+        if (
+            env.MSRB_LAUNCHER_DIR &&
+            path.resolve(env.MSRB_LAUNCHER_DIR) === path.resolve(currentDir) &&
+            fs.existsSync(legacy)
+        ) {
+            try {
+                fs.rmSync(legacy, { recursive: true, force: true })
+            } catch {
+                /* may still be in use — retried on the next launch */
+            }
+        }
+    } catch {
+        /* migration is never allowed to block startup */
+    }
+}
+
 async function main() {
     if (process.argv[2] === 'desk') {
         await deskCommand(process.argv[3])
@@ -316,6 +380,11 @@ async function main() {
         process.env.MSRB_EPHEMERAL_RUN = '1'
         process.env.MSRB_DISABLE_PLUGINS = '1'
         process.env.MSRB_TERMINAL_MODE = '1'
+    }
+
+    // Migrate generated launchers out of legacy .core (interactive launches only).
+    if (!isBackgroundLaunch() && !harvesterLaunch) {
+        migrateLaunchers(ROOT, process.env)
     }
 
     if (shouldRunUpdater()) {

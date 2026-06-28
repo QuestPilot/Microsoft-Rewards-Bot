@@ -47,7 +47,7 @@ test('Windows installer creates icon shortcuts and a visible startup launcher', 
     assert.equal(result.menu, true)
     assert.equal(result.complete, true)
     assert.equal(calls.filter(([command]) => command === 'powershell.exe').length, 2)
-    const launcher = fs.readFileSync(path.join(root, '.core', 'start-desk.cmd'), 'utf8')
+    const launcher = fs.readFileSync(path.join(root, 'scripts', 'runtime', 'start-desk.cmd'), 'utf8')
     assert.match(launcher, /Rewards Desk is preparing/)
     assert.match(launcher, /scripts\\start\.js/)
     assert.match(launcher, /\.msrb-write-test-/)

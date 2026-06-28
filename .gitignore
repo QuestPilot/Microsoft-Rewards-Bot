@@ -9,6 +9,7 @@ src/accounts.enc.json
 src/config.json
 /.vscode
 /.core/
+scripts/runtime/
 /diagnostics
 note
 accounts.dev.json

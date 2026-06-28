@@ -51,8 +51,8 @@ test('Windows uses per-user Startup entries without administrator rights', () =>
     assert.equal(status.desk.method, 'startup-folder')
     assert.equal(status.agent.method, 'startup-folder')
     assert.equal(calls.some(([command, args]) => command === 'schtasks.exe' && args[0] === '/Create'), false)
-    assert.match(fs.readFileSync(path.join(root, '.core', 'start-desk.cmd'), 'utf8'), /scripts\\start\.js"/)
-    assert.match(fs.readFileSync(path.join(root, '.core', 'start-background.cmd'), 'utf8'), /--background/)
+    assert.match(fs.readFileSync(path.join(root, 'scripts', 'runtime', 'start-desk.cmd'), 'utf8'), /scripts\\start\.js"/)
+    assert.match(fs.readFileSync(path.join(root, 'scripts', 'runtime', 'start-background.cmd'), 'utf8'), /--background/)
 })
 
 test('Windows requests elevation only to remove an inaccessible legacy task', () => {
