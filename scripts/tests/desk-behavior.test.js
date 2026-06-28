@@ -152,6 +152,11 @@ test('OPTIONS preflight from the pinned Nexus origin is allowed', async () => {
     assert.equal(res.headers['access-control-allow-private-network'], 'true')
 })
 
+test('POST /api/alive is accepted (lets a refreshed page cancel a pending shutdown)', async () => {
+    const res = await request('/api/alive', { method: 'POST', token })
+    assert.equal(res.status, 204)
+})
+
 test('GET /api/plugins returns the plugin listing shape', async () => {
     const res = await request('/api/plugins', { token })
     assert.equal(res.status, 200)

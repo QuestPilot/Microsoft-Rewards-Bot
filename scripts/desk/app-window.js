@@ -9,9 +9,6 @@ const { createDesktopInstallManager } = require('../launchers/desktop-install-ma
 const { createStartupManager } = require('../launchers/startup-manager')
 
 const ROOT = path.resolve(__dirname, '..', '..')
-// Stable default port so the LAN URL is bookmarkable on a phone; falls back to a
-// small deterministic range, then an OS-assigned port, under contention.
-const DEFAULT_DESK_PORT = 7700
 // Desk server coordinates, finalized at listen() time (see startDeskServer below).
 let deskBoundPort = null
 let deskLanEnabled = false
@@ -79,7 +76,10 @@ function getLanIPv4() {
 // Discovery/embed is a Core feature → only premium Desks announce (open-source never
 // phones home here).
 function reportDeskPresence() {
-    if (state.deskLicense.tier !== 'premium' || !deskBoundPort) return
+    // Announce when discoverable: either Core (for the Nexus same-machine embed) or LAN
+    // access opted in (free phone access on the same Wi-Fi via the routing page). The
+    // server keys it by public IP, so it's only ever offered to the same household.
+    if ((state.deskLicense.tier !== 'premium' && !deskLanEnabled) || !deskBoundPort) return
     try {
         const u = new URL(DASHBOARD_URL + '/api/desk/presence')
         const transport = u.protocol === 'http:' ? require('http') : require('https')
@@ -2226,6 +2226,32 @@ function html() {
     }
     .fb-textarea:focus { border-color: var(--cyan); background:rgba(255,255,255,.03); box-shadow:0 0 0 3px rgba(46,232,255,.15), inset 0 2px 6px rgba(0,0,0,.2); }
     .fb-textarea::placeholder { color:rgba(110,146,184,.4); }
+
+    /* ── Mobile (Desk opened from a phone over the LAN) ────────────────────────
+       The Desk targets a desktop window: a fixed-height flex row (sidebar + main)
+       with an internal-scroll grid. On a narrow screen, stack the sidebar above the
+       content and let the page flow & scroll naturally. First pass — some inner views
+       use inline-styled grids that can't be reflowed from here. */
+    @media (max-width: 720px) {
+      html, body { height: auto; overflow: auto; }
+      body { flex-direction: column; min-height: 100%; }
+      .sidebar {
+        width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px;
+        border-right: none; border-bottom: 1px solid var(--border);
+        padding: 10px 12px;
+      }
+      .brand { flex: 1 1 100%; margin-bottom: 4px; padding-bottom: 8px; }
+      nav { flex-direction: row; flex-wrap: wrap; flex: 1 1 100%; gap: 6px; }
+      .nav-item { flex: 1 1 auto; justify-content: center; }
+      .sidebar-bottom { flex: 1 1 100%; margin-top: 8px; flex-direction: row; flex-wrap: wrap; border-top: none; padding-top: 0; }
+      .sidebar-bottom > * { flex: 1 1 auto; }
+      .main { display: flex; flex-direction: column; overflow: visible; padding: 12px; gap: 12px; }
+      .hero { min-height: 0; padding: 18px 16px; }
+      /* Stack the desktop multi-column grids (class-based ones) on a narrow screen. */
+      .toggle-grid, .startup-grid, .acc-grid-2, .settings-input-row, .mini-grid,
+      .core-features, .core-real-grid, .install-status-grid, .csell-strip,
+      .modal-actions, .lic-plan-grid { grid-template-columns: 1fr !important; }
+    }
   </style>
 </head>
 <body>
@@ -2297,6 +2323,10 @@ function html() {
         <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         <span id="lic-sidebar-label">Activate Core</span>
         <span class="lic-sidebar-dot" id="lic-sidebar-dot"></span>
+      </button>
+      <button class="install-btn" id="remote-btn" style="border-color:rgba(46,232,255,.28); background:rgba(46,232,255,.08); color:#9ce9f5">
+        <svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/></svg>
+        Use on phone / remote
       </button>
       <button class="discord-btn" id="discord-btn">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037 13.8 13.8 0 0 0-.61 1.253 18.3 18.3 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.253.077.077 0 0 0-.079-.037A19.7 19.7 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.08.08 0 0 0 .031.055 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.8 19.8 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
@@ -2868,11 +2898,10 @@ function html() {
             </div>
             <div id="lan-url-row" class="advanced-block term-row" style="margin-top:12px; display:none">
               <div class="toggle-wrap-left">
-                <div class="toggle-label">Your Desk address on this network</div>
-                <div class="toggle-sub">Open or bookmark this on another device on the same Wi-Fi:</div>
-                <div id="lan-url-value" style="margin-top:6px; font-family:monospace; color:#3bc9ff; user-select:all; word-break:break-all"></div>
+                <div class="toggle-label">Connect a phone</div>
+                <div class="toggle-sub">Your Desk's local address stays private. Use the <b>Use on phone / remote</b> button (bottom-left) to get a link that routes your phone here automatically.</div>
               </div>
-              <button class="btn btn-secondary" id="btn-copy-lan-url" style="flex-shrink:0">Copy</button>
+              <button class="btn btn-secondary" id="btn-open-remote" style="flex-shrink:0">Use on phone</button>
             </div>
           </div>
           <div class="settings-section">
@@ -3324,6 +3353,41 @@ function html() {
       <div id="cfg-modal-body"></div>
       <div class="modal-actions" style="grid-template-columns:1fr">
         <button class="btn btn-primary" id="cfg-modal-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phone & remote access -->
+  <div class="modal-bg" id="remote-modal">
+    <div class="modal" style="max-width:480px">
+      <h2>Control from your phone or anywhere</h2>
+      <p>Use this Desk from another device &mdash; free on your home network, or from anywhere with Core.</p>
+      <div style="border:1px solid var(--border); border-radius:12px; padding:14px; margin-top:6px">
+        <div style="font-weight:650; font-size:13.5px; display:flex; align-items:center; gap:8px">
+          <span style="font-size:10px; font-weight:800; letter-spacing:.05em; padding:2px 7px; border-radius:5px; background:rgba(47,210,125,.16); color:#7fe6ad">FREE</span>
+          Same Wi-Fi (your home network)
+        </div>
+        <div id="remote-lan-on" style="display:none; margin-top:10px">
+          <div style="font-size:12px; color:var(--muted)">On your phone (same Wi-Fi), open this link &mdash; it takes you straight to your Desk:</div>
+          <div id="remote-go-url" style="margin-top:6px; font-family:monospace; color:#3bc9ff; word-break:break-all; user-select:all">${DASHBOARD_URL}/go</div>
+          <button class="btn btn-secondary" id="remote-copy" style="margin-top:10px">Copy link</button>
+          <div style="font-size:11px; color:var(--muted); margin-top:8px; opacity:.85">Your Desk's local address stays private &mdash; the link routes you there automatically, only on your own network.</div>
+        </div>
+        <div id="remote-lan-off" style="display:none; margin-top:10px">
+          <div style="font-size:12px; color:var(--muted)">Turn on <b>Local network access</b> to allow your phone (on the same Wi-Fi) to reach this Desk.</div>
+          <button class="btn btn-secondary" id="remote-goto-settings" style="margin-top:10px">Open Settings</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:12px; padding:14px; margin-top:12px">
+        <div style="font-weight:650; font-size:13.5px; display:flex; align-items:center; gap:8px">
+          <span style="font-size:10px; font-weight:800; letter-spacing:.05em; padding:2px 7px; border-radius:5px; background:rgba(247,200,92,.18); color:var(--gold)">CORE</span>
+          From anywhere
+        </div>
+        <div style="font-size:12px; color:var(--muted); margin-top:10px">Open Nexus and sign in with your license &mdash; see and control this Desk from any network. On the same Wi-Fi, Nexus also finds this Desk automatically.</div>
+        <button class="btn btn-primary" id="remote-open-nexus" style="margin-top:10px">Open Nexus &rarr;</button>
+      </div>
+      <div class="modal-actions" style="grid-template-columns:1fr; margin-top:14px">
+        <button class="btn btn-secondary" id="remote-close">Close</button>
       </div>
     </div>
   </div>
@@ -4559,8 +4623,7 @@ function html() {
       var anWarn = G('analytics-warning'); if (anWarn) anWarn.style.display = analyticsEnabled ? 'none' : 'block';
       // Local network access (LAN) — toggle + bookmarkable address for other devices
       var lan = G('tog-lanAccess'); if (lan) lan.checked = s.deskLanAccess === true;
-      var lanVal = G('lan-url-value'); if (lanVal) lanVal.textContent = s.deskLanUrl || '';
-      var lanRow = G('lan-url-row'); if (lanRow) lanRow.style.display = (s.deskLanAccess && s.deskLanUrl) ? '' : 'none';
+      var lanRow = G('lan-url-row'); if (lanRow) lanRow.style.display = s.deskLanAccess ? '' : 'none';
       // Search tuning (advanced)
       var ss = s.searchSettings || {};
       if (G('tog-parallelSearching')) G('tog-parallelSearching').checked = ss.parallelSearching === true;
@@ -4753,6 +4816,26 @@ function html() {
       var i = G('acc-password'); i.type = i.type === 'password' ? 'text' : 'password';
     });
     G('discord-btn').addEventListener('click', function() { window.open('https://discord.gg/JWhCkhSYtg'); });
+    // Phone / remote access info modal — clarifies what's free (same Wi-Fi LAN URL) vs Core (Nexus).
+    G('remote-btn').addEventListener('click', function() {
+      fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
+        var on = !!(s && s.deskLanAccess); // LAN opt-in → the free same-Wi-Fi phone path works
+        G('remote-lan-on').style.display = on ? 'block' : 'none';
+        G('remote-lan-off').style.display = on ? 'none' : 'block';
+      }).catch(function(){
+        G('remote-lan-on').style.display = 'none';
+        G('remote-lan-off').style.display = 'block';
+      });
+      G('remote-modal').classList.add('open');
+    });
+    G('remote-close').addEventListener('click', function(){ G('remote-modal').classList.remove('open'); });
+    G('remote-modal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('open'); });
+    G('remote-copy').addEventListener('click', function(){
+      var v = G('remote-go-url').textContent || '';
+      if (v) navigator.clipboard.writeText(v).then(function(){ showToast('Link copied to clipboard'); }).catch(function(){ showToast('Could not copy', true); });
+    });
+    G('remote-goto-settings').addEventListener('click', function(){ G('remote-modal').classList.remove('open'); setView('settings'); });
+    G('remote-open-nexus').addEventListener('click', function(){ window.open('https://bot.lgtw.tf'); });
     G('nav-dash').addEventListener('click', function() { setView('dash'); });
     G('nav-accounts').addEventListener('click', function() { setView('accounts'); });
     G('nav-console').addEventListener('click', function() { setView('console'); });
@@ -4864,13 +4947,8 @@ function html() {
         ? 'LAN access enabled — restart the Desk to apply.'
         : 'LAN access disabled — restart the Desk to apply.');
     });
-    var _lanCopy = G('btn-copy-lan-url');
-    if (_lanCopy) _lanCopy.addEventListener('click', function() {
-      var v = (G('lan-url-value') || {}).textContent || '';
-      if (!v) return;
-      navigator.clipboard.writeText(v).then(function(){ showToast('Address copied to clipboard'); })
-        .catch(function(){ showToast('Could not copy address', true); });
-    });
+    var _openRemote = G('btn-open-remote');
+    if (_openRemote) _openRemote.addEventListener('click', function() { var b = G('remote-btn'); if (b) b.click(); });
     // Free-text search-tuning fields (debounced save on change; brief saved pulse).
     var TEXT_MAP = {
       'set-visitTime':'searchSettings.searchResultVisitTime',
@@ -4981,8 +5059,16 @@ function html() {
       this._stick = consoleAtBottom(this);
       updateJumpBtn(this);
     });
+    // Tell the Desk a page is alive so it cancels any shutdown a prior refresh scheduled.
+    fetch('/api/alive', {method:'POST'}).catch(function(){});
     window.addEventListener('beforeunload', function() {
-      fetch('/api/close', {method:'POST', keepalive:true}).catch(function(){});
+      // Only the dedicated app window (top-level, loopback) should ask the Desk to quit
+      // when it closes. The Desk embedded inside Nexus (an iframe) or opened from a phone
+      // over the LAN must NEVER shut it down — and a refresh is rescued by /api/alive above.
+      var loopback = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+      if (window.top === window.self && loopback) {
+        fetch('/api/close', {method:'POST', keepalive:true}).catch(function(){});
+      }
     });
     // Prime scheduler cache for the home "next run" indicator
     // ── Core Activation Overlay ────────────────────────────────────
@@ -6347,6 +6433,13 @@ const server = http.createServer((req, res) => {
         res.end()
         return
     }
+    if (req.method === 'POST' && req.url === '/api/alive') {
+        // A page (re)loaded — cancel a shutdown a just-fired refresh may have scheduled.
+        cancelShutdown()
+        res.writeHead(204)
+        res.end()
+        return
+    }
 
     if (req.method === 'POST' && req.url === '/api/open-accounts') {
         res.writeHead(openAccountsFile() ? 204 : 404)
@@ -6817,15 +6910,14 @@ function startDeskServer() {
     deskLanIp = deskLanEnabled ? getLanIPv4() : null
     const host = deskLanEnabled ? '0.0.0.0' : '127.0.0.1'
 
-    // An explicit MSRB_APP_PORT wins (tests pin a free port; 0 = OS-assigned). Otherwise
-    // a stable default (config desk.port or 7700) so the LAN URL is bookmarkable; under
-    // contention we walk a small deterministic range the remote dashboard can also probe.
+    // Rotating port by design: a fixed port is scriptable/bookmarkable; a random one
+    // (OS-assigned, default) changes every launch and the Desk announces it to the server,
+    // so discovery still works without ever exposing a stable address. An explicit
+    // MSRB_APP_PORT (tests) or a pinned config desk.port still wins for those who want it.
     const explicit = process.env.MSRB_APP_PORT
     const hasExplicit = explicit != null && explicit !== ''
-    const desired = hasExplicit
-        ? Number.parseInt(explicit, 10) || 0
-        : Number.parseInt(deskCfg.port || DEFAULT_DESK_PORT, 10) || DEFAULT_DESK_PORT
-    listenWithFallback(host, desired, hasExplicit ? 0 : 9)
+    const desired = hasExplicit ? Number.parseInt(explicit, 10) || 0 : Number.parseInt(deskCfg.port, 10) || 0
+    listenWithFallback(host, desired, 0)
 }
 
 function listenWithFallback(host, port, attemptsLeft) {
@@ -6859,7 +6951,7 @@ function finalizeDeskServer() {
     void refreshAgentState()
     setInterval(() => void refreshAgentState(), 900)
     // Announce presence to Nexus (premium only; re-announced before the 90s server TTL).
-    setTimeout(reportDeskPresence, 6000)
+    setTimeout(reportDeskPresence, 3000)
     setInterval(reportDeskPresence, 60_000)
 }
 
@@ -6892,8 +6984,15 @@ function shutdown() {
 }
 
 function scheduleShutdown() {
-    if (shutdownTimer) return
-    shutdownTimer = setTimeout(shutdown, 500)
+    if (shutdownTimer || shuttingDown) return
+    // Grace period: a page *refresh* fires beforeunload (→ /api/close) then immediately
+    // reloads and pings /api/alive, which cancels this. Only a real window close (no
+    // reload, so no cancel) falls through to an actual shutdown.
+    shutdownTimer = setTimeout(shutdown, 1500)
+}
+
+function cancelShutdown() {
+    if (shutdownTimer) { clearTimeout(shutdownTimer); shutdownTimer = null }
 }
 
 function closeServerAndExit() {
