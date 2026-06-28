@@ -39,7 +39,7 @@
                                                                  "compatibleArtifactSource":  "linux-x64-node-24.15.0"
                                                              },
                                  "win32-x64-node-24.15.0":  {
-                                                                "indexSha256":  "39e09d641cfce8d6a94cca1147241e0f5442379075d139a67814cb610f70f52f",
+                                                                "indexSha256":  "7f2617e8ce3ee0408bf6c36faff0487b0ec5ce5c9bfa5d422b2df1368bca45df",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "win32",
