@@ -5249,7 +5249,7 @@ function html() {
         inp.addEventListener('change', function() {
           var name = inp.getAttribute('data-trust');
           if (inp.checked) {
-            if (!window.confirm('Trusted Mode lets "' + name + '" access more of the bot\'s internal APIs. It still runs inside the bot process — no OS, admin or filesystem access is granted. Enable only if you trust this plugin\'s author. Continue?')) { inp.checked = false; return; }
+            if (!window.confirm('Trusted Mode lets "' + name + '" access more of the bot\\'s internal APIs. It still runs inside the bot process — no OS, admin or filesystem access is granted. Enable only if you trust this plugin\\'s author. Continue?')) { inp.checked = false; return; }
           }
           fetch('/api/plugins', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, trust: inp.checked ? 'full' : 'sandbox'})}).catch(function(){});
         });
