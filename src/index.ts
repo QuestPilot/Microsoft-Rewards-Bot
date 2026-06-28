@@ -369,6 +369,11 @@ export class MicrosoftRewardsBot {
             'ACCOUNT-SAFETY',
             `You have configured ${this.accounts.length} accounts. Running more than 4 accounts is strongly discouraged and may increase account risk.`
         )
+        this.logger.warn(
+            'main',
+            'ACCOUNT-SAFETY',
+            'For safety, accounts are spaced out and shuffled. To be more cautious, raise "searchSettings.delayMultiplier" (e.g. 2) or widen "searchSettings.accountDelay", and use a per-account proxy.'
+        )
 
         const schedulerEnabled = isSchedulerEnabled(this.config.scheduler)
 
