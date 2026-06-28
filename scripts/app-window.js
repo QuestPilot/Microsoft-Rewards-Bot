@@ -1486,6 +1486,41 @@ function html() {
     .hint-bar-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
     .hint-bar-close{background:none;border:none;color:rgba(110,146,184,.45);cursor:pointer;padding:0 0 0 10px;font-size:17px;line-height:1;transition:color .14s;flex-shrink:0}
     .hint-bar-close:hover{color:var(--text)}
+    /* Inline settings panel hints */
+    .sett-hint{display:none;align-items:flex-start;gap:9px;background:rgba(46,232,255,.04);border:1px solid rgba(46,232,255,.11);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);line-height:1.6}
+    .sett-hint.show{display:flex}
+    .sett-hint svg{flex-shrink:0;color:var(--cyan);width:14px;height:14px;margin-top:1px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .sett-hint-close{background:none;border:none;color:rgba(110,146,184,.4);cursor:pointer;padding:0 0 0 8px;font-size:16px;line-height:1;flex-shrink:0;margin-left:auto;transition:color .14s}
+    .sett-hint-close:hover{color:var(--text)}
+    /* Notification dedicated pages */
+    .notif-page-head{display:flex;align-items:center;gap:16px;padding:18px 24px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+    .notif-page-identity{display:flex;align-items:center;gap:14px;flex:1;min-width:0}
+    .notif-page-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);flex-shrink:0}
+    .notif-page-icon svg{width:20px;height:20px}
+    .notif-page-title{font-size:17px;font-weight:800;letter-spacing:-.02em}
+    .notif-page-sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .notif-page-toggle{display:flex;align-items:center;gap:9px;flex-shrink:0;font-size:13px;font-weight:600;color:var(--muted)}
+    .notif-page-body{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+    /* Notification channel nav buttons (in settings panel) */
+    .notif-nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border-radius:11px;border:1px solid var(--border);background:rgba(255,255,255,.02);cursor:pointer;transition:all .15s;color:var(--text);font:inherit;text-align:left}
+    .notif-nav-btn:hover{border-color:rgba(46,232,255,.28);background:rgba(46,232,255,.05)}
+    .notif-nav-btn-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.08);flex-shrink:0}
+    .notif-nav-btn-icon svg{width:18px;height:18px}
+    .notif-nav-btn-info{flex:1;min-width:0}
+    .notif-nav-btn-name{font-size:13px;font-weight:600}
+    .notif-nav-btn-sub{font-size:11.5px;color:var(--muted);margin-top:1px}
+    .notif-nav-btn-arrow{color:var(--muted);font-size:18px;margin-left:auto;flex-shrink:0;line-height:1}
+    /* Context menu additions */
+    .ctx-sep{height:1px;background:rgba(255,255,255,.07);margin:4px 5px}
+    .ctx-item-danger,.ctx-item-danger svg{color:#ff4b6e}
+    .ctx-item-danger:hover{background:rgba(255,75,110,.1);color:#ff4b6e}
+    /* Reset config inline warning */
+    .reset-warning{background:rgba(255,170,0,.07);border:1px solid rgba(255,170,0,.24);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#f5c542;line-height:1.55;margin-top:12px}
+    .reset-warning p{margin:0 0 10px}
+    .reset-warning-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn-danger-sm{padding:6px 14px;border-radius:8px;background:#f5c542;color:#0d0a00;border:none;font:inherit;font-size:12px;font-weight:800;cursor:pointer;transition:filter .15s}
+    .btn-danger-sm:hover{filter:brightness(1.1)}
+    .btn-danger-sm:disabled{opacity:.5;cursor:default}
     .core-view{display:none;flex-direction:column;gap:28px;padding:28px;overflow-y:auto;flex:1}
     .core-view.vis{display:flex}
     .core-hero{background:linear-gradient(135deg,rgba(10,22,40,.98) 0%,rgba(5,12,24,1) 100%);border:1px solid rgba(247,200,92,.2);border-radius:16px;padding:36px 32px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px}
@@ -2244,6 +2279,66 @@ function html() {
       </div>
     </div>
 
+    <!-- Notification config: Discord -->
+    <div class="view-full" id="view-notif-discord">
+      <div class="notif-page-head">
+        <button class="btn btn-secondary btn-sm" id="notif-discord-back">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;margin-right:5px;vertical-align:middle"><polyline points="15 18 9 12 15 6"/></svg>Settings
+        </button>
+        <div class="notif-page-identity">
+          <div class="notif-page-icon" style="background:rgba(88,101,242,.12);border-color:rgba(88,101,242,.28)">
+            <svg viewBox="0 0 24 24" fill="#7289da" stroke="none" style="width:20px;height:20px"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+          </div>
+          <div>
+            <div class="notif-page-title">Discord log webhook</div>
+            <div class="notif-page-sub">Stream filtered console logs to a Discord channel.</div>
+          </div>
+        </div>
+        <div class="notif-page-toggle">
+          <span>Enabled</span>
+          <label class="toggle"><input type="checkbox" id="tog-wh-discord"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="notif-page-body" id="notif-discord-body">
+        <div id="hint-notif-discord" class="sett-hint">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Paste your Discord webhook URL and toggle <strong>Enabled</strong>. All config changes save automatically.</span>
+          <button class="sett-hint-close" onclick="dismissHint('notif-discord')">&#215;</button>
+        </div>
+        <!-- form injected by loadNotifPage('discord') -->
+      </div>
+    </div>
+
+    <!-- Notification config: ntfy -->
+    <div class="view-full" id="view-notif-ntfy">
+      <div class="notif-page-head">
+        <button class="btn btn-secondary btn-sm" id="notif-ntfy-back">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;margin-right:5px;vertical-align:middle"><polyline points="15 18 9 12 15 6"/></svg>Settings
+        </button>
+        <div class="notif-page-identity">
+          <div class="notif-page-icon" style="background:rgba(46,232,255,.08);border-color:rgba(46,232,255,.2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div>
+            <div class="notif-page-title">ntfy push</div>
+            <div class="notif-page-sub">Send notifications to an ntfy topic or self-hosted server.</div>
+          </div>
+        </div>
+        <div class="notif-page-toggle">
+          <span>Enabled</span>
+          <label class="toggle"><input type="checkbox" id="tog-wh-ntfy"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="notif-page-body" id="notif-ntfy-body">
+        <div id="hint-notif-ntfy" class="sett-hint">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Set your ntfy Server URL and Topic, then toggle <strong>Enabled</strong>. The access token is only needed for private topics.</span>
+          <button class="sett-hint-close" onclick="dismissHint('notif-ntfy')">&#215;</button>
+        </div>
+        <!-- form injected by loadNotifPage('ntfy') -->
+      </div>
+    </div>
+
     <!-- Console view -->
     <div class="console-wrap" id="view-console" style="position:relative">
       <div class="console-head">
@@ -2296,8 +2391,11 @@ function html() {
           <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notifications
         </button>
         <span class="sett-nav-section">System</span>
+        <button class="sett-nav-item" data-panel="security">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-5"/></svg>Security
+        </button>
         <button class="sett-nav-item" data-panel="privacy">
-          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Privacy
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Privacy
         </button>
         <button class="sett-nav-item" data-panel="advanced">
           <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Advanced
@@ -2467,20 +2565,82 @@ function html() {
         <div class="sett-panel" id="sett-notifications">
           <div class="sett-panel-header">
             <div class="sett-panel-title">Notifications</div>
-            <div class="sett-panel-sub">Free, open-source channels. Click Configure on any channel to set it up.</div>
+            <div class="sett-panel-sub">Free, open-source alerting channels. Click a channel to configure it.</div>
+          </div>
+          <div id="hint-sett-notifications" class="sett-hint">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>Enable a channel, then click it to enter the URL and configure filtering. Changes save automatically.</span>
+            <button class="sett-hint-close" onclick="dismissHint('sett-notifications')">&#215;</button>
           </div>
           <div class="settings-section">
-            <div class="toggle-grid-1">
-              <div class="cfg-wrap">
-                <div class="toggle-wrap-left"><div class="toggle-label">Discord log webhook</div><div class="toggle-sub">Stream filtered console logs to a Discord channel</div></div>
-                <button class="btn-cfg" data-cfg="discord">Configure</button>
-                <label class="toggle"><input type="checkbox" id="tog-wh-discord"><span class="toggle-slider"></span></label>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="notif-nav-btn" data-notif="discord">
+                <div class="notif-nav-btn-icon" style="background:rgba(88,101,242,.12);border-color:rgba(88,101,242,.25)">
+                  <svg viewBox="0 0 24 24" fill="#7289da" stroke="none"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+                </div>
+                <div class="notif-nav-btn-info">
+                  <div class="notif-nav-btn-name">Discord log webhook</div>
+                  <div class="notif-nav-btn-sub">Stream filtered console logs to a channel</div>
+                </div>
+                <span class="notif-nav-btn-arrow">&#8250;</span>
+              </button>
+              <button class="notif-nav-btn" data-notif="ntfy">
+                <div class="notif-nav-btn-icon" style="background:rgba(46,232,255,.08);border-color:rgba(46,232,255,.2)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </div>
+                <div class="notif-nav-btn-info">
+                  <div class="notif-nav-btn-name">ntfy push</div>
+                  <div class="notif-nav-btn-sub">Send notifications to an ntfy topic or server</div>
+                </div>
+                <span class="notif-nav-btn-arrow">&#8250;</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security (account protection — moved out of Advanced) -->
+        <div class="sett-panel" id="sett-security">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Security</div>
+            <div class="sett-panel-sub">Account storage encryption and key management.</div>
+          </div>
+          <div id="hint-sett-security" class="sett-hint">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>Your accounts are encrypted automatically with AES-256-GCM. Export a backup before rotating the key or disabling encryption.</span>
+            <button class="sett-hint-close" onclick="dismissHint('sett-security')">&#215;</button>
+          </div>
+          <div class="settings-section">
+            <div class="advanced-block">
+              <div class="storage-panel">
+                <div class="storage-shield"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3z"/><path d="m9 12 2 2 4-5"/></svg></div>
+                <div class="advanced-copy">
+                  <div class="toggle-label">Account protection</div>
+                  <div class="toggle-sub">Automatic AES-256-GCM encryption with the key protected by your operating system.</div>
+                  <div class="storage-state" id="account-storage-status">Checking protected storage…</div>
+                </div>
               </div>
-              <div class="cfg-wrap">
-                <div class="toggle-wrap-left"><div class="toggle-label">ntfy push</div><div class="toggle-sub">Send notifications to an ntfy topic / server</div></div>
-                <button class="btn-cfg" data-cfg="ntfy">Configure</button>
-                <label class="toggle"><input type="checkbox" id="tog-wh-ntfy"><span class="toggle-slider"></span></label>
+              <div class="advanced-actions">
+                <button class="btn btn-secondary btn-sm" id="storage-export">Export protected backup</button>
+                <button class="btn btn-secondary btn-sm" id="storage-toggle">Disable encryption</button>
               </div>
+            </div>
+            <details class="storage-tools">
+              <summary>Security and recovery options</summary>
+              <div class="advanced-caption">These actions are rarely needed. Disabling protection requires an explicit local-user confirmation and writes credentials to plaintext JSON.</div>
+              <div class="advanced-actions" style="margin-top:10px">
+                <button class="btn btn-secondary btn-sm" id="storage-rotate">Rotate local key</button>
+                <button class="btn btn-secondary btn-sm" id="storage-import">Import protected backup</button>
+              </div>
+            </details>
+          </div>
+          <div class="settings-section">
+            <h3>Shortcuts</h3>
+            <div class="advanced-block term-row">
+              <div class="toggle-wrap-left">
+                <div class="toggle-label">Desktop shortcuts</div>
+                <div class="toggle-sub">Remove the Desktop and application-menu shortcuts. Autostart settings are not changed.</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="desktop-uninstall" style="flex-shrink:0">Uninstall shortcuts</button>
             </div>
           </div>
         </div>
@@ -2503,7 +2663,12 @@ function html() {
         <div class="sett-panel" id="sett-advanced">
           <div class="sett-panel-header">
             <div class="sett-panel-title">Advanced</div>
-            <div class="sett-panel-sub">Rarely-needed options — defaults are fine for most setups.</div>
+            <div class="sett-panel-sub">Rarely-needed options — defaults are fine for most setups. Only change these if you know what you are doing.</div>
+          </div>
+          <div id="hint-sett-advanced" class="sett-hint">
+            <svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span><strong>Heads up:</strong> the defaults work well for most users. Only adjust search tuning if you experience detection issues or performance problems.</span>
+            <button class="sett-hint-close" onclick="dismissHint('sett-advanced')">&#215;</button>
           </div>
           <div class="settings-section">
             <h3>Developer</h3>
@@ -2537,35 +2702,24 @@ function html() {
             </div>
           </div>
           <div class="settings-section">
-            <h3>Account protection &amp; maintenance</h3>
-            <div class="advanced-block">
-              <div class="storage-panel">
-                <div class="storage-shield"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3z"/><path d="m9 12 2 2 4-5"/></svg></div>
-                <div class="advanced-copy">
-                  <div class="toggle-label">Account protection</div>
-                  <div class="toggle-sub">Automatic AES-256-GCM encryption with the key protected by your operating system.</div>
-                  <div class="storage-state" id="account-storage-status">Checking protected storage…</div>
+            <h3>Installation</h3>
+            <div class="settings-section-note">Open the folder where the bot is installed, or reset the full configuration to the official defaults.</div>
+            <div class="acc-grid-2">
+              <button class="btn btn-secondary" id="btn-open-folder" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Open installation folder
+              </button>
+              <button class="btn btn-secondary" id="btn-reset-config" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border-color:rgba(255,170,0,.38);color:#f5c542">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>Reset config to defaults
+              </button>
+            </div>
+            <div id="reset-confirm-area" style="display:none">
+              <div class="reset-warning">
+                <p>This replaces your entire <strong>config.json</strong> with the official defaults fetched from GitHub. Your accounts are <strong>not</strong> affected. This cannot be undone.</p>
+                <div class="reset-warning-actions">
+                  <button class="btn-danger-sm" id="reset-confirm-yes">Yes, reset config</button>
+                  <button class="btn btn-secondary btn-sm" id="reset-confirm-no">Cancel</button>
                 </div>
               </div>
-              <div class="advanced-actions">
-                <button class="btn btn-secondary btn-sm" id="storage-export">Export protected backup</button>
-                <button class="btn btn-secondary btn-sm" id="storage-toggle">Disable encryption</button>
-              </div>
-            </div>
-            <details class="storage-tools">
-              <summary>Security and recovery options</summary>
-              <div class="advanced-caption">These actions are rarely needed. Disabling protection requires an explicit local-user confirmation and writes credentials to plaintext JSON.</div>
-              <div class="advanced-actions" style="margin-top:10px">
-                <button class="btn btn-secondary btn-sm" id="storage-rotate">Rotate local key</button>
-                <button class="btn btn-secondary btn-sm" id="storage-import">Import protected backup</button>
-              </div>
-            </details>
-            <div class="advanced-block term-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-              <div class="toggle-wrap-left">
-                <div class="toggle-label">Desktop shortcuts</div>
-                <div class="toggle-sub">Remove the Desktop and application-menu shortcuts. Autostart settings are not changed.</div>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="desktop-uninstall" style="flex-shrink:0">Uninstall shortcuts</button>
             </div>
           </div>
         </div>
@@ -3101,19 +3255,58 @@ function html() {
     var DOCS_GITHUB_URL = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot/tree/main/docs';
 
     var _ctxMenu = null;
+    var _ctxAccIdx = -1;
     document.addEventListener('contextmenu', function(e) {
       if (e.target && e.target.closest && e.target.closest('#console-box')) return;
       e.preventDefault();
       if (!_ctxMenu) _ctxMenu = G('ctx-menu');
       if (!_ctxMenu) return;
+      // Detect if a right-click is on an account row
+      var accRow = e.target.closest && e.target.closest('[data-email]');
+      var accItems = _ctxMenu.querySelectorAll('.ctx-acc-only');
+      if (accRow) {
+        var email = accRow.getAttribute('data-email');
+        _ctxAccIdx = _raw ? _raw.findIndex(function(a) { return (a.email || '') === email; }) : -1;
+        var acc = _ctxAccIdx >= 0 && _raw ? _raw[_ctxAccIdx] : null;
+        var toggleLabel = G('ctx-acc-toggle-label');
+        if (toggleLabel) toggleLabel.textContent = acc && acc.enabled === false ? 'Enable account' : 'Disable account';
+        accItems.forEach(function(el) { el.style.display = ''; });
+      } else {
+        _ctxAccIdx = -1;
+        accItems.forEach(function(el) { el.style.display = 'none'; });
+      }
       _ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 210) + 'px';
       _ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 60) + 'px';
       _ctxMenu.classList.add('open');
     });
     document.addEventListener('click', function(e) {
       if (_ctxMenu) _ctxMenu.classList.remove('open');
-      if (e.target && e.target.closest && e.target.closest('#ctx-open-folder')) {
+      var t = e.target && e.target.closest ? e.target : null;
+      if (!t) return;
+      if (t.closest('#ctx-open-folder') || t.closest('#btn-open-folder')) {
         fetch('/api/open-folder', {method:'POST'}).catch(function(){});
+        return;
+      }
+      if (t.closest('#ctx-acc-edit')) {
+        if (_ctxAccIdx >= 0) openAccEdit(_ctxAccIdx);
+        return;
+      }
+      if (t.closest('#ctx-acc-toggle')) {
+        if (_ctxAccIdx >= 0) toggleAcc(_ctxAccIdx);
+        return;
+      }
+      if (t.closest('#ctx-acc-copy')) {
+        var acc = _ctxAccIdx >= 0 && _raw ? _raw[_ctxAccIdx] : null;
+        if (acc && acc.email) {
+          navigator.clipboard.writeText(acc.email).then(function() {
+            showToast('Email copied to clipboard');
+          }).catch(function() {});
+        }
+        return;
+      }
+      if (t.closest('#ctx-acc-delete')) {
+        if (_ctxAccIdx >= 0) deleteAcc(_ctxAccIdx);
+        return;
       }
     });
     document.addEventListener('dragstart', function(e) { e.preventDefault(); });
@@ -3304,6 +3497,25 @@ function html() {
       if (form.advanced) form.advanced.forEach(_cfgBind);
       G('cfg-modal').classList.add('open');
     }
+    async function loadNotifPage(key) {
+      var form = CFG_FORMS[key]; if (!form) return;
+      var s = {}; try { s = await fetch('/api/settings').then(function(r){return r.json();}); } catch(e) {}
+      var bodyEl = G('notif-' + key + '-body'); if (!bodyEl) return;
+      var html = '<div class="settings-section" style="border:none;padding:0;background:none">' +
+        form.essential.map(function(f){ return _cfgFieldHtml(f, getPath(s, f.path)); }).join('');
+      if (form.advanced && form.advanced.length) {
+        html += '<details class="cfg-adv"><summary>Advanced settings</summary>' +
+          form.advanced.map(function(f){ return _cfgFieldHtml(f, getPath(s, f.path)); }).join('') + '</details>';
+      }
+      html += '</div>';
+      bodyEl.innerHTML = html;
+      form.essential.forEach(_cfgBind);
+      if (form.advanced) form.advanced.forEach(_cfgBind);
+      // Sync toggle state from current settings
+      var wh = (s.webhook || {})[key] || {};
+      var tog = G('tog-wh-' + key);
+      if (tog) tog.checked = !!wh.enabled;
+    }
 
     // ── View ──────────────────────────────────
     function setView(v) {
@@ -3321,9 +3533,13 @@ function html() {
       G('view-plugins').className = v === 'plugins' ? 'plugins-wrap vis' : 'plugins-wrap';
       G('view-docs').className = v === 'docs' ? 'docs-wrap vis' : 'docs-wrap';
       G('view-accedit').className = v === 'accedit' ? 'view-full vis' : 'view-full';
+      G('view-notif-discord').className = v === 'notif-discord' ? 'view-full vis' : 'view-full';
+      G('view-notif-ntfy').className = v === 'notif-ntfy' ? 'view-full vis' : 'view-full';
       G('footer-bar').style.display = (v === 'dash' || v === 'accounts') ? '' : 'none';
+      // Nav highlight — notif sub-pages keep 'settings' nav active
+      var navActive = (v === 'notif-discord' || v === 'notif-ntfy') ? 'settings' : v;
       ['dash','accounts','console','settings','core','plugins','docs'].forEach(function(n) {
-        var el = G('nav-' + n); if (el) el.classList.toggle('active', n === v);
+        var el = G('nav-' + n); if (el) el.classList.toggle('active', n === navActive);
       });
       if (v === 'accounts') {
         loadAccEditor();
@@ -3331,6 +3547,8 @@ function html() {
         else showHint('acc-rclick', 700);
       }
       if (v === 'settings') { _settGo(_settTab); loadSettings(); }
+      if (v === 'notif-discord') { loadNotifPage('discord'); showHint('notif-discord', 400); }
+      if (v === 'notif-ntfy') { loadNotifPage('ntfy'); showHint('notif-ntfy', 400); }
       if (v === 'core') renderCoreView();
       if (v === 'plugins') loadPluginsCatalog(false);
       if (v === 'docs') loadDocs();
@@ -3339,7 +3557,8 @@ function html() {
         var cb = G('console-box');
         if (cb) { cb._stick = true; updateConsoleBox(false); cb.scrollTop = cb.scrollHeight; updateJumpBtn(cb); }
       }
-      var active = v === 'dash' ? G('view-dash') : G('view-' + v);
+      var viewId = (v === 'dash') ? 'view-dash' : 'view-' + v;
+      var active = G(viewId);
       if (active) {
         active.classList.remove('view-animate');
         void active.offsetWidth;
@@ -4189,9 +4408,50 @@ function html() {
       document.querySelectorAll('.sett-panel').forEach(function(p) {
         p.classList.toggle('active', p.id === 'sett-' + panel);
       });
+      showHint('sett-' + panel, 300);
     }
     document.querySelectorAll('.sett-nav-item').forEach(function(b) {
       b.addEventListener('click', function() { _settGo(b.getAttribute('data-panel')); });
+    });
+    // Notification sub-page nav buttons
+    document.querySelectorAll('.notif-nav-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var key = btn.getAttribute('data-notif');
+        if (key) setView('notif-' + key);
+      });
+    });
+    // Notification sub-page back buttons
+    if (G('notif-discord-back')) G('notif-discord-back').addEventListener('click', function() {
+      setView('settings'); _settGo('notifications');
+    });
+    if (G('notif-ntfy-back')) G('notif-ntfy-back').addEventListener('click', function() {
+      setView('settings'); _settGo('notifications');
+    });
+    // Settings: Open installation folder
+    if (G('btn-open-folder')) G('btn-open-folder').addEventListener('click', function() {
+      fetch('/api/open-folder', {method:'POST'}).catch(function(){});
+    });
+    // Settings: Reset config to defaults
+    if (G('btn-reset-config')) G('btn-reset-config').addEventListener('click', function() {
+      var area = G('reset-confirm-area');
+      if (area) area.style.display = area.style.display === 'none' ? '' : 'none';
+    });
+    if (G('reset-confirm-no')) G('reset-confirm-no').addEventListener('click', function() {
+      var area = G('reset-confirm-area'); if (area) area.style.display = 'none';
+    });
+    if (G('reset-confirm-yes')) G('reset-confirm-yes').addEventListener('click', function() {
+      var btn = G('reset-confirm-yes');
+      if (btn) { btn.disabled = true; btn.textContent = 'Resetting…'; }
+      fetch('/api/reset-config', {method:'POST'}).then(function(r) {
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        return r.json();
+      }).then(function() {
+        showToast('Config reset to defaults. Reloading…');
+        setTimeout(function() { location.reload(); }, 1200);
+      }).catch(function(e) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Yes, reset config'; }
+        showToast('Reset failed: ' + (e.message || 'unknown error'), true);
+      });
     });
     // ── Listeners ─────────────────────────────
     G('btn-run').addEventListener('click', async function() {
@@ -5484,6 +5744,25 @@ function html() {
       <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       Open bot folder
     </div>
+    <div class="ctx-sep ctx-acc-only" style="display:none"></div>
+    <div class="ctx-item ctx-acc-only" id="ctx-acc-edit" style="display:none">
+      <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Edit account
+    </div>
+    <div class="ctx-item ctx-acc-only" id="ctx-acc-toggle" style="display:none">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <span id="ctx-acc-toggle-label">Enable / Disable</span>
+    </div>
+    <div class="ctx-sep ctx-acc-only" style="display:none"></div>
+    <div class="ctx-item ctx-acc-only" id="ctx-acc-copy" style="display:none">
+      <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy email
+    </div>
+    <div class="ctx-sep ctx-acc-only" style="display:none"></div>
+    <div class="ctx-item ctx-item-danger ctx-acc-only" id="ctx-acc-delete" style="display:none">
+      <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      Delete account
+    </div>
   </div>
 </body>
 </html>`
@@ -5828,6 +6107,26 @@ const server = http.createServer((req, res) => {
         })
         return
     }
+    if (req.method === 'POST' && req.url === '/api/reset-config') {
+        const _https = require('https')
+        const _cfgUrl = 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/refs/heads/main/src/config.example.json'
+        _https.get(_cfgUrl, function(r) {
+            let _raw = ''
+            r.on('data', function(c) { _raw += c })
+            r.on('end', function() {
+                try {
+                    const obj = JSON.parse(_raw)
+                    const cfgSrc = path.join(ROOT, 'config.json')
+                    const cfgDist = path.join(ROOT, 'dist', 'config.json')
+                    fs.writeFileSync(cfgSrc, JSON.stringify(obj, null, 4), 'utf8')
+                    if (fs.existsSync(cfgDist)) fs.writeFileSync(cfgDist, JSON.stringify(obj, null, 4), 'utf8')
+                    res.writeHead(200, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ ok: true }))
+                } catch(e) { res.writeHead(500); res.end(String(e.message)) }
+            })
+        }).on('error', function(e) { res.writeHead(502); res.end(String(e.message)) })
+        return
+    }
     if (req.method === 'POST' && req.url === '/api/open-discord') {
         openDiscord()
         res.writeHead(204)
@@ -6007,7 +6306,8 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'POST' && req.url === '/api/open-folder') {
         try {
-            childProcess.spawn('explorer', [ROOT], { detached: true, stdio: 'ignore' }).unref()
+            const _cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open'
+            childProcess.spawn(_cmd, [ROOT], { detached: true, stdio: 'ignore' }).unref()
             res.writeHead(204); res.end()
         } catch(e) {
             res.writeHead(500); res.end(String(e.message))
