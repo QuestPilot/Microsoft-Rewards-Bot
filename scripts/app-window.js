@@ -13,8 +13,8 @@ const PORT = Number.parseInt(process.env.MSRB_APP_PORT || '0', 10)
 const APP_TITLE = 'Rewards Desk'
 const APP_ICON_PATH = path.join(ROOT, 'assets', 'logo.ico')
 const APP_BANNER_PATH = path.join(ROOT, 'assets', 'banner-core.png')
-const APP_WINDOW_WIDTH = 1650
-const APP_WINDOW_HEIGHT = 980
+const APP_WINDOW_WIDTH = 1780
+const APP_WINDOW_HEIGHT = 1020
 const API_TOKEN = crypto.randomBytes(32).toString('base64url')
 const MAX_API_BODY_BYTES = 64 * 1024
 const accountStorage = createAccountStorage({ root: ROOT })
@@ -911,9 +911,10 @@ function html() {
     /* ── Hero ── */
     .hero{
       position:relative;border-radius:var(--r);overflow:hidden;
-      min-height:170px;display:flex;align-items:center;padding:28px 36px;
+      min-height:158px;display:flex;align-items:center;padding:24px 34px;
       border:1px solid var(--border);
     }
+    .hero::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 90% at 92% 8%,rgba(46,232,255,.14),transparent 55%)}
     .hero-bg{
       position:absolute;inset:0;
       background-image:url('/banner-core.png');
@@ -928,7 +929,10 @@ function html() {
       font-size:clamp(24px,2.6vw,38px);font-weight:900;line-height:1.08;
       letter-spacing:-.4px;text-shadow:0 2px 20px rgba(0,0,0,.5);
     }
-    .hero-content h1 span{color:var(--cyan)}
+    .hero-content h1 span{background:linear-gradient(90deg,var(--cyan),#8af1ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--cyan)}
+    .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--cyan);margin-bottom:12px;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+    .hero-eyebrow-dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);flex-shrink:0}
+    .hero-eyebrow-dot.run{animation:pulse 1.3s infinite}
     .hero-content p{
       margin-top:9px;font-size:13.5px;color:#aac4e0;line-height:1.6;
       max-width:360px;text-shadow:0 1px 8px rgba(0,0,0,.4);
@@ -1550,6 +1554,69 @@ function html() {
     .core-remote-link:hover{background:rgba(46,232,255,.22);box-shadow:0 0 18px rgba(46,232,255,.25)}
     .core-footer-cta{background:rgba(247,200,92,.06);border:1px solid rgba(247,200,92,.18);border-radius:14px;padding:24px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
     .core-footer-cta p{font-size:13px;color:var(--muted);margin:0}
+    /* ── Core sales page (shown when no license) ──────────────────── */
+    .csell-section{display:flex;flex-direction:column}
+    .csell-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+    .csell-h2{font-size:clamp(20px,2vw,28px);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin:0 0 10px}
+    .csell-lead{font-size:14px;color:var(--muted);line-height:1.65;max-width:680px;margin:0}
+    /* Hero */
+    .csell-hero{position:relative;overflow:hidden;border-radius:20px;border:1px solid rgba(247,200,92,.28);background:radial-gradient(120% 130% at 82% -10%,rgba(247,200,92,.16),transparent 55%),linear-gradient(135deg,rgba(20,15,4,.96),rgba(6,9,16,.99));padding:clamp(28px,4vw,52px) clamp(24px,4vw,52px)}
+    .csell-hero-inner{position:relative;z-index:1;max-width:660px;display:flex;flex-direction:column;align-items:flex-start}
+    .csell-badge{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 12px;border-radius:100px;background:rgba(247,200,92,.14);color:var(--gold);border:1px solid rgba(247,200,92,.32);margin-bottom:18px}
+    .csell-badge svg{width:13px;height:13px;fill:currentColor}
+    .csell-title{font-size:clamp(30px,4.4vw,50px);font-weight:900;letter-spacing:-.03em;line-height:1.05;margin:0}
+    .csell-title span{background:linear-gradient(90deg,var(--gold),#ffe9a8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .csell-sub{font-size:clamp(14px,1.3vw,16px);color:#c7d2e2;line-height:1.6;margin:16px 0 0;max-width:560px}
+    .csell-value{display:flex;align-items:center;gap:15px;margin:26px 0 2px;padding:16px 22px;border-radius:16px;background:rgba(247,200,92,.07);border:1px solid rgba(247,200,92,.22)}
+    .csell-value-num{font-size:clamp(28px,3.4vw,40px);font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px;white-space:nowrap}
+    .csell-value-lbl{font-size:12px;color:rgba(247,212,142,.85);font-weight:600;line-height:1.45}
+    .csell-hero-cta{display:flex;flex-wrap:wrap;gap:11px;margin-top:26px}
+    .btn-csell-primary{display:inline-flex;align-items:center;gap:8px;padding:13px 26px;border-radius:12px;border:none;cursor:pointer;font-size:14.5px;font-weight:800;background:linear-gradient(135deg,#e6ac00,#f5c518 55%,#ffd75e);color:#1a1300;box-shadow:0 10px 30px rgba(230,172,0,.3);transition:transform .15s,box-shadow .15s,filter .15s}
+    .btn-csell-primary:hover{transform:translateY(-2px);box-shadow:0 14px 38px rgba(230,172,0,.42);filter:brightness(1.05)}
+    .btn-csell-primary svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .btn-csell-ghost{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:12px;cursor:pointer;font-size:14px;font-weight:700;background:rgba(88,101,242,.14);border:1px solid rgba(88,101,242,.34);color:#c4cbff;transition:background .15s,border-color .15s,color .15s}
+    .btn-csell-ghost:hover{background:rgba(88,101,242,.26);color:#fff;border-color:rgba(88,101,242,.5)}
+    .btn-csell-ghost svg{width:16px;height:16px;fill:currentColor}
+    .csell-trust{margin-top:18px;font-size:12px;color:var(--muted);opacity:.85}
+    /* Value strip */
+    .csell-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .csell-strip-item{text-align:center;padding:18px 12px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid var(--border)}
+    .csell-strip-num{font-size:clamp(22px,2.4vw,30px);font-weight:900;color:var(--gold);line-height:1;letter-spacing:-.5px}
+    .csell-strip-lbl{font-size:11.5px;color:var(--muted);margin-top:6px;font-weight:600;line-height:1.35}
+    @media (max-width:680px){.csell-strip{grid-template-columns:repeat(2,1fr)}}
+    /* Comparison table */
+    .ccompare{border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:4px}
+    .ccompare-row{display:grid;grid-template-columns:1fr 88px 88px;align-items:center}
+    .ccompare-row+.ccompare-row{border-top:1px solid rgba(255,255,255,.05)}
+    .ccompare-feat{padding:13px 18px;font-size:13.5px;font-weight:600;color:var(--text)}
+    .ccompare-free,.ccompare-core{padding:13px 10px;text-align:center}
+    .ccompare-core{background:rgba(247,200,92,.05)}
+    .ccompare-head .ccompare-feat,.ccompare-head .ccompare-free,.ccompare-head .ccompare-core{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+    .ccompare-head .ccompare-core{color:var(--gold)}
+    .ccompare-head{background:rgba(255,255,255,.02)}
+    .cmark{width:18px;height:18px;display:inline-block;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+    .cmark-yes{stroke:var(--green)}
+    .cmark-no{stroke:rgba(110,146,184,.35)}
+    /* Steps */
+    .csteps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px}
+    .cstep{padding:22px 20px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid var(--border)}
+    .cstep-n{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#1a1300;background:linear-gradient(135deg,#e6ac00,#f5c518);margin-bottom:13px}
+    .cstep-t{font-size:14.5px;font-weight:700;margin-bottom:5px}
+    .cstep-d{font-size:12.5px;color:var(--muted);line-height:1.55}
+    @media (max-width:680px){.csteps{grid-template-columns:1fr}}
+    /* FAQ */
+    .cfaq{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+    .cfaq-item{border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02);overflow:hidden;transition:border-color .15s}
+    .cfaq-item[open]{border-color:rgba(247,200,92,.22)}
+    .cfaq-item>summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:10px;user-select:none}
+    .cfaq-item>summary::-webkit-details-marker{display:none}
+    .cfaq-item>summary:after{content:'+';font-size:19px;color:var(--gold);font-weight:400;transition:transform .2s;flex-shrink:0;line-height:1}
+    .cfaq-item[open]>summary:after{transform:rotate(45deg)}
+    .cfaq-item p{margin:0;padding:0 16px 15px;font-size:13px;color:var(--muted);line-height:1.6}
+    /* Final CTA */
+    .csell-final{text-align:center;border-radius:20px;padding:clamp(28px,4vw,46px);border:1px solid rgba(247,200,92,.28);background:radial-gradient(100% 140% at 50% 0%,rgba(247,200,92,.14),transparent 60%),rgba(10,8,2,.6);display:flex;flex-direction:column;align-items:center;gap:14px}
+    .csell-final h2{font-size:clamp(22px,2.4vw,32px);font-weight:900;letter-spacing:-.02em;margin:0}
+    .csell-final p{font-size:14px;color:var(--muted);margin:0;max-width:480px;line-height:1.6}
     .toggle-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .toggle-grid-1{display:flex;flex-direction:column;gap:8px}
     .startup-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1569,7 +1636,7 @@ function html() {
     .startup-badge{display:inline-flex;margin-left:6px;font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
     .startup-method{font-size:10px;color:rgba(110,146,184,.7);margin-top:4px}
     .view-animate{animation:viewIn .24s cubic-bezier(.2,.8,.2,1)}
-    body.core-enhanced .hero,body.core-enhanced .core-active-hero{animation:coreAura 4s ease-in-out infinite}
+    body.core-enhanced .hero,body.core-enhanced .cmember-hero{animation:coreAura 4s ease-in-out infinite}
     body.core-enhanced .nav-item-core{background:linear-gradient(90deg,rgba(247,200,92,.1),transparent)}
     /* Configurable row (toggle + Configure button) */
     .cfg-wrap{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid var(--border);transition:border-color .15s}
@@ -1855,24 +1922,36 @@ function html() {
     /* ── Plugins page ────────────────────────────────────────────── */
     .plugins-wrap{display:none;flex-direction:column;min-height:0;flex:1;overflow:hidden}
     .plugins-wrap.vis{display:flex}
-    .plugins-topbar{display:flex;align-items:center;gap:8px;padding:11px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
-    .plugins-topbar-title{font-size:14px;font-weight:800;flex:1;display:flex;align-items:center;gap:7px}
-    .plugins-topbar-title svg{opacity:.7;flex-shrink:0}
-    .ptopbar-sep{width:1px;height:15px;background:var(--border);margin:0 2px;flex-shrink:0}
-    .pbtn-icon{width:27px;height:27px;border-radius:7px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
-    .pbtn-icon:hover{color:var(--text);border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.05)}
-    .pbtn-icon svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-    .ptxt-btn{font-size:12px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;transition:color .15s;white-space:nowrap}
-    .ptxt-btn:hover{color:var(--text)}
-    .plugins-toolbar{padding:9px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
-    .plugins-search{flex:1;min-width:100px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:12.5px;outline:none;transition:border-color .15s}
-    .plugins-search:focus{border-color:rgba(46,232,255,.3)}
+    /* Header */
+    .plugins-head{padding:clamp(14px,1.8vh,20px) clamp(16px,1.8vw,24px) 0;flex-shrink:0;border-bottom:1px solid var(--border)}
+    .plugins-head-top{display:flex;align-items:center;gap:13px}
+    .plugins-head-ico{width:40px;height:40px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.08);border:1px solid rgba(46,232,255,.18);color:var(--cyan)}
+    .plugins-head-ico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .plugins-head-titles{flex:1;min-width:0}
+    .plugins-head-title{font-size:clamp(16px,1.5vw,20px);font-weight:800;letter-spacing:-.02em}
+    .plugins-head-sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .plugins-head-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .plugins-search-wrap{position:relative;display:flex;align-items:center}
+    .plugins-search-ico{position:absolute;left:11px;width:14px;height:14px;color:var(--muted);pointer-events:none;fill:none;stroke:currentColor;stroke-width:2}
+    .plugins-search{width:clamp(150px,16vw,210px);padding:8px 12px 8px 32px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:12.5px;outline:none;transition:border-color .15s,background .15s,width .18s}
+    .plugins-search:focus{border-color:rgba(46,232,255,.35);background:rgba(46,232,255,.04)}
     .plugins-search::placeholder{color:var(--muted)}
-    .plugins-tabs{display:flex;gap:2px;flex-shrink:0}
-    .plugins-tab{padding:5px 9px;border-radius:7px;border:1px solid transparent;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
-    .plugins-tab:hover{color:var(--text);background:rgba(255,255,255,.04)}
-    .plugins-tab.active{background:rgba(46,232,255,.09);color:var(--cyan);border-color:rgba(46,232,255,.18)}
-    .plugins-body{flex:1;overflow-y:auto;padding:14px 20px 28px;display:flex;flex-direction:column;gap:14px;min-height:0}
+    .pbtn-icon{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+    .pbtn-icon:hover{color:var(--text);border-color:rgba(46,232,255,.3);background:rgba(46,232,255,.06)}
+    .pbtn-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .pbtn-primary{display:inline-flex;align-items:center;gap:6px;padding:0 15px;height:34px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--blue),#4f7cff);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;transition:filter .15s,box-shadow .15s,transform .15s;flex-shrink:0;white-space:nowrap;box-shadow:0 4px 14px rgba(30,155,255,.25)}
+    .pbtn-primary:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 7px 20px rgba(30,155,255,.34)}
+    .pbtn-primary svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+    /* Tabs */
+    .plugins-tabsrow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:13px}
+    .plugins-tabs{display:flex;gap:2px}
+    .plugins-tab{position:relative;padding:9px 14px;border:none;background:none;color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:color .15s;white-space:nowrap}
+    .plugins-tab:hover{color:var(--text)}
+    .plugins-tab.active{color:var(--cyan)}
+    .plugins-tab.active::after{content:'';position:absolute;left:14px;right:14px;bottom:0;height:2px;border-radius:2px 2px 0 0;background:var(--cyan)}
+    .ptxt-btn{font-size:12px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:6px 4px;border-radius:6px;transition:color .15s;white-space:nowrap}
+    .ptxt-btn:hover{color:var(--cyan)}
+    .plugins-body{flex:1;overflow-y:auto;padding:18px clamp(16px,1.8vw,24px) 28px;display:flex;flex-direction:column;gap:18px;min-height:0}
     /* Core card — spacious feature card */
     .pcore-card{border-radius:15px;border:1px solid rgba(247,200,92,.26);background:linear-gradient(135deg,rgba(26,19,4,.98),rgba(9,6,1,.98));padding:17px 19px;display:flex;align-items:flex-start;gap:15px;position:relative;overflow:hidden;flex-shrink:0}
     .pcore-card::after{content:'';position:absolute;top:-45%;right:-8%;width:320px;height:230px;background:radial-gradient(ellipse,rgba(247,200,92,.07),transparent 62%);pointer-events:none}
@@ -1888,65 +1967,64 @@ function html() {
     .pcore-side{display:flex;align-items:center;gap:10px;flex-shrink:0}
     .pcore-locked{font-size:10.5px;font-weight:600;color:rgba(247,200,92,.72);display:flex;align-items:center;gap:4px;white-space:nowrap}
     .pcore-locked svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2}
-    /* Section label */
-    .psect{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-    .psect-title{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:rgba(110,146,184,.45);white-space:nowrap}
+    /* Section header */
+    .psection{display:flex;flex-direction:column;gap:11px}
+    .psect{display:flex;align-items:center;gap:9px}
+    .psect-title{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+    .psect-count{font-size:10.5px;font-weight:700;color:var(--cyan);background:rgba(46,232,255,.1);border:1px solid rgba(46,232,255,.18);border-radius:20px;padding:1px 8px;line-height:1.5}
     .psect-line{flex:1;height:1px;background:rgba(255,255,255,.06)}
-    /* Installed rows */
-    .plist{display:flex;flex-direction:column;gap:5px}
-    .pcard{background:rgba(5,12,25,.6);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;transition:border-color .18s}
-    .pcard:hover{border-color:rgba(46,232,255,.15)}
-    .pcard-ico{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.05);border:1px solid rgba(46,232,255,.1);color:rgba(46,232,255,.6);margin-top:1px}
-    .pcard-ico svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .pcard-body{flex:1;min-width:0}
-    .pcard-row1{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-    .pcard-name{font-size:13px;font-weight:700}
-    .pcard-meta{font-size:10.5px;color:var(--muted);margin-top:2px;margin-bottom:2px;opacity:.65}
-    .pcard-desc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.7}
-    .pcard-manage{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)}
-    .pcard-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
-    .pmanage-trust{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:rgba(210,145,74,.85);cursor:pointer;user-select:none}
-    .pmanage-au{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none}
-    .pmanage-trust input,.pmanage-au input{appearance:none;-webkit-appearance:none;margin:0;width:14px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);cursor:pointer;position:relative;flex-shrink:0;transition:background .15s,border-color .15s}
+    /* ── Unified plugin card (installed + store share one look) ── */
+    .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:11px}
+    .pcard{display:flex;flex-direction:column;gap:9px;background:rgba(8,16,30,.55);border:1px solid var(--border);border-radius:14px;padding:14px 15px;transition:border-color .18s,transform .15s,box-shadow .18s}
+    .pcard:hover{border-color:rgba(46,232,255,.22);transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.28)}
+    .pcard.is-off{opacity:.62}
+    .pcard.is-off:hover{opacity:1}
+    .pcard-top{display:flex;align-items:center;gap:11px}
+    .pcard-ico{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(46,232,255,.07);border:1px solid rgba(46,232,255,.14);color:var(--cyan)}
+    .pcard-ico svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .pcard-id{flex:1;min-width:0}
+    .pcard-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pcard-author{font-size:11px;color:var(--muted);margin-top:2px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pcard-chips{display:flex;flex-wrap:wrap;gap:4px}
+    .pcard-desc{font-size:12px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:1;min-height:0}
+    .pcard-desc-empty{font-style:italic;opacity:.4}
+    .pcard-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid rgba(255,255,255,.05);min-height:34px}
+    .pcard-foot-l{display:flex;align-items:center;gap:13px;flex-wrap:wrap;min-width:0}
+    .pcard-foot-r{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto}
+    /* Management checkboxes (store plugins) */
+    .pmanage-trust{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:rgba(210,145,74,.9);cursor:pointer;user-select:none;white-space:nowrap}
+    .pmanage-au{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
+    .pmanage-trust input,.pmanage-au input{appearance:none;-webkit-appearance:none;margin:0;width:15px;height:15px;border-radius:4px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);cursor:pointer;position:relative;flex-shrink:0;transition:background .15s,border-color .15s}
     .pmanage-trust input:hover,.pmanage-au input:hover{border-color:rgba(255,255,255,.3)}
     .pmanage-trust input:checked{background:#d4914a;border-color:#d4914a}
     .pmanage-au input:checked{background:var(--cyan);border-color:var(--cyan)}
-    .pmanage-trust input:checked::after,.pmanage-au input:checked::after{content:'';position:absolute;left:4px;top:1px;width:3px;height:7px;border:solid #0a0e15;border-width:0 2px 2px 0;transform:rotate(45deg)}
-    .plink{font-size:10.5px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:3px;transition:color .15s}
-    .plink:hover{color:var(--text)}
-    .plink.danger:hover{color:var(--rose)}
-    .plink svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2}
-    /* Marketplace grid */
-    .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px}
-    .pgcard{background:rgba(5,12,25,.6);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 12px 10px;display:flex;flex-direction:column;transition:border-color .18s,transform .13s}
-    .pgcard:hover{border-color:rgba(56,224,200,.18);transform:translateY(-1px)}
-    .pgcard-head{display:flex;align-items:center;gap:9px;margin-bottom:7px}
-    .pgcard-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(56,224,200,.05);border:1px solid rgba(56,224,200,.12);color:rgba(56,224,200,.7);flex-shrink:0}
-    .pgcard-ico svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .pgcard-info{flex:1;min-width:0}
-    .pgcard-name{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pgcard-author{font-size:10px;color:var(--muted);margin-top:1px;opacity:.65}
-    .pgcard-desc{font-size:10.5px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;opacity:.7;margin-bottom:8px;flex:1}
-    .pgcard-foot{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-top:auto}
-    .pgcard-chips{display:flex;gap:3px;flex-wrap:wrap;flex:1}
+    .pmanage-trust input:checked::after,.pmanage-au input:checked::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #0a0e15;border-width:0 2px 2px 0;transform:rotate(45deg)}
     /* Chips */
-    .pchip{font-size:9px;font-weight:800;letter-spacing:.03em;padding:1px 5px;border-radius:4px;text-transform:uppercase;white-space:nowrap;border:1px solid}
+    .pchip{font-size:9px;font-weight:800;letter-spacing:.03em;padding:2px 6px;border-radius:5px;text-transform:uppercase;white-space:nowrap;border:1px solid}
     .pchip-official{background:rgba(247,200,92,.09);color:rgba(247,200,92,.85);border-color:rgba(247,200,92,.2)}
-    .pchip-ver{background:transparent;color:rgba(110,146,184,.6);border-color:rgba(255,255,255,.08);text-transform:none;letter-spacing:0;font-size:9.5px}
+    .pchip-ver{background:transparent;color:rgba(110,146,184,.7);border-color:rgba(255,255,255,.08);text-transform:none;letter-spacing:0;font-size:9.5px}
     .pchip-installed{background:rgba(47,210,125,.07);color:rgba(47,210,125,.85);border-color:rgba(47,210,125,.18)}
     .pchip-trusted{background:rgba(210,145,74,.08);color:rgba(210,145,74,.85);border-color:rgba(210,145,74,.2)}
     .pchip-update{background:rgba(46,232,255,.07);color:var(--cyan);border-color:rgba(46,232,255,.18);text-transform:none;letter-spacing:0}
     .pchip-stale{background:rgba(247,200,92,.07);color:rgba(247,200,92,.75);border-color:rgba(247,200,92,.18);text-transform:none;letter-spacing:0}
     .pchip-off{background:transparent;color:rgba(110,146,184,.45);border-color:rgba(255,255,255,.07)}
     /* Action buttons */
-    .pbtn{padding:5px 11px;font-size:11.5px;font-weight:700;border-radius:7px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,opacity .15s;border:1px solid transparent;flex-shrink:0}
-    .pbtn:disabled{opacity:.4;cursor:not-allowed}
-    .pbtn-install{border-color:rgba(56,224,200,.28);background:rgba(56,224,200,.07);color:rgba(56,224,200,.9)}
-    .pbtn-install:hover:not(:disabled){background:rgba(56,224,200,.14);border-color:rgba(56,224,200,.45)}
-    .pbtn-update{border-color:rgba(46,232,255,.28);background:rgba(46,232,255,.07);color:var(--cyan)}
-    .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.14)}
+    .pbtn{padding:6px 14px;font-size:11.5px;font-weight:700;border-radius:8px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,filter .15s,opacity .15s;border:1px solid transparent;flex-shrink:0}
+    .pbtn:disabled{opacity:.5;cursor:not-allowed}
+    .pbtn-install{border-color:rgba(46,232,255,.3);background:rgba(46,232,255,.1);color:var(--cyan)}
+    .pbtn-install:hover:not(:disabled){background:rgba(46,232,255,.18);border-color:rgba(46,232,255,.5)}
+    .pbtn-update{border-color:rgba(46,232,255,.3);background:rgba(46,232,255,.1);color:var(--cyan)}
+    .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.18);border-color:rgba(46,232,255,.5)}
+    /* Icon links (report / remove) */
+    .plink{font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px;transition:color .15s,background .15s,border-color .15s}
+    .plink:hover{color:var(--text)}
+    .plink.danger:hover{color:var(--rose)}
+    .plink-ico{width:30px;height:30px;border-radius:8px;justify-content:center;border:1px solid var(--border);background:rgba(255,255,255,.03)}
+    .plink-ico:hover{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14)}
+    .plink-ico.danger:hover{background:rgba(255,107,138,.1);border-color:rgba(255,107,138,.25)}
+    .plink-ico svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
     /* Empty state */
-    .pempty{padding:30px 20px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.6;border:1px dashed rgba(255,255,255,.07);border-radius:10px;opacity:.7}
+    .pempty{padding:34px 20px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.6;border:1px dashed rgba(255,255,255,.08);border-radius:12px;opacity:.75}
 
     /* ── Docs page ──────────────────────────────────────────────── */
     .docs-wrap{display:none;flex-direction:column;min-height:0;flex:1;gap:12px;overflow:hidden}
@@ -2020,22 +2098,21 @@ function html() {
     .changelog-msg{font-size:13px;color:var(--text);line-height:1.55}
     .changelog-empty{color:var(--muted);font-size:13px;padding:24px 0;text-align:center}
 
-    /* ── Core "active" retention view ───────────────────────────── */
-    .core-active-hero{
-      background:linear-gradient(135deg,rgba(47,210,125,.1),rgba(46,232,255,.05));
-      border:1px solid rgba(47,210,125,.25);border-radius:18px;padding:32px;
-      display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;
-    }
-    .core-active-badge{
-      font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
-      padding:4px 12px;border-radius:100px;background:rgba(47,210,125,.16);
-      color:var(--green);border:1px solid rgba(47,210,125,.32);
-      display:inline-flex;align-items:center;gap:7px;
-    }
-    .core-active-badge:before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green)}
-    .core-active-title{font-size:2rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
-    .core-active-title span{color:var(--green)}
-    .core-active-sub{font-size:13.5px;color:var(--muted);max-width:560px;line-height:1.6}
+    /* ── Core member (retention) view ───────────────────────────── */
+    .cmember-hero{position:relative;overflow:hidden;border-radius:18px;border:1px solid rgba(47,210,125,.25);background:radial-gradient(120% 130% at 85% -20%,rgba(47,210,125,.14),transparent 55%),linear-gradient(135deg,rgba(8,20,14,.96),rgba(6,9,16,.99));padding:clamp(24px,3vw,34px)}
+    .cmember-hero-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+    .cmember-badge{display:inline-flex;align-items:center;gap:8px;font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 12px;border-radius:100px;background:rgba(47,210,125,.14);color:var(--green);border:1px solid rgba(47,210,125,.32)}
+    .cmember-badge-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green)}
+    .cmember-status{font-size:12.5px;font-weight:700;color:var(--green);background:rgba(47,210,125,.08);border:1px solid rgba(47,210,125,.2);border-radius:100px;padding:4px 13px}
+    .cmember-title{font-size:clamp(22px,2.6vw,32px);font-weight:900;letter-spacing:-.02em;line-height:1.1;margin:0}
+    .cmember-title span{background:linear-gradient(90deg,var(--green),#8ff0bd);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .cmember-sub{font-size:14px;color:var(--muted);line-height:1.55;margin:10px 0 0;max-width:520px}
+    .cmember-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+    .btn-cmember{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:11px;border:1px solid rgba(46,232,255,.3);background:rgba(46,232,255,.1);color:var(--cyan);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
+    .btn-cmember:hover{background:rgba(46,232,255,.18);box-shadow:0 0 18px rgba(46,232,255,.2)}
+    .btn-cmember svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .btn-cmember-ghost{padding:11px 18px;border-radius:11px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--muted);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .15s}
+    .btn-cmember-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.06)}
     .core-real-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px 22px}
     .core-real-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px}
     .core-real-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text)}
@@ -2047,32 +2124,11 @@ function html() {
     .core-real-lbl{font-size:11px;color:var(--muted);margin-top:3px}
     .core-real-empty{color:var(--muted);font-size:13px;padding:10px 2px 2px;line-height:1.5}
     @media (max-width:560px){.core-real-grid{grid-template-columns:repeat(2,1fr)}}
-    .core-est-card{
-      background:linear-gradient(135deg,rgba(247,200,92,.1),rgba(247,200,92,.03));
-      border:1px solid rgba(247,200,92,.28);border-radius:16px;padding:26px 30px;
-      display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;
-    }
-    .core-est-label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
-    .core-est-value{font-size:3.4rem;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-2px}
-    .core-est-unit{font-size:14px;color:var(--gold);font-weight:700}
-    .core-est-note{font-size:11.5px;color:var(--muted);margin-top:6px;max-width:420px;line-height:1.5;opacity:.85}
-    .core-breakdown{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
-    .core-bd-row{
-      display:flex;align-items:center;gap:13px;
-      background:rgba(10,22,40,.9);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
-    }
-    .core-bd-ico{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(247,200,92,.1);border:1px solid rgba(247,200,92,.2);color:var(--gold)}
-    .core-bd-ico svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-    .core-bd-txt{flex:1;min-width:0}
-    .core-bd-name{font-size:13px;font-weight:700}
-    .core-bd-pts{font-size:12px;color:var(--green);font-weight:700;margin-top:1px}
-    .core-compare{
-      display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center;
-      background:rgba(255,107,138,.05);border:1px solid rgba(255,107,138,.18);
-      border-radius:14px;padding:20px 26px;text-align:center;
-    }
-    .core-compare .c-vs{font-size:13px;color:var(--muted);max-width:560px;line-height:1.6}
-    .core-compare .c-vs b{color:var(--rose)}
+    .cmember-auto{border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.02);padding:18px 20px}
+    .cmember-auto-head{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:13px}
+    .cmember-auto-chips{display:flex;flex-wrap:wrap;gap:8px}
+    .cmember-chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#d6e4f2;padding:7px 13px;border-radius:100px;background:rgba(47,210,125,.06);border:1px solid rgba(47,210,125,.18)}
+    .cmember-chip svg{width:13px;height:13px;fill:none;stroke:var(--green);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 
     /* Feedback Modal */
     .fb-modal-content h2{
@@ -2187,8 +2243,12 @@ function html() {
       <div class="hero-bg"></div>
       <div class="hero-overlay"></div>
       <div class="hero-content">
+        <div class="hero-eyebrow">
+          <span class="hero-eyebrow-dot" id="hero-dot"></span>
+          <span id="hero-eyebrow-txt">Ready when you are</span>
+        </div>
         <h1>Automate more.<br><span>Earn more.</span></h1>
-        <p>Rewards Desk — local control panel for Microsoft Rewards Bot. Runs daily sets, searches, and coupons automatically.</p>
+        <p>Your local control panel for Microsoft Rewards.</p>
       </div>
       <div class="hero-pills">
         <span class="pill pill-muted" id="core-pill" style="display:none">
@@ -2771,26 +2831,35 @@ function html() {
     <!-- Core view -->
     <div class="core-view" id="view-core">
       <!-- Active / retention sub-view (shown when Core license is valid) -->
-      <div id="core-view-active" style="display:none;flex-direction:column;gap:24px">
-        <div class="core-active-hero">
-          <div class="core-active-badge">Core active</div>
-          <h1 class="core-active-title">Core is <span>working for you</span></h1>
-          <p class="core-active-sub">Your license is valid and the premium engine is running. Here's a realistic estimate of the points Core adds on top of the free open-source bot — based on typical Microsoft Rewards values across your enabled features and accounts.</p>
-          <div style="display:flex;gap:10px;margin-top:14px;justify-content:center">
-            <button class="btn btn-secondary btn-sm" id="core-manage-license">Manage this license</button>
-            <button class="btn btn-secondary btn-sm" id="core-manual-rate">Rate Core</button>
+      <div id="core-view-active" style="display:none;flex-direction:column;gap:16px">
+        <!-- Member status -->
+        <div class="cmember-hero">
+          <div class="cmember-hero-row">
+            <div class="cmember-badge"><span class="cmember-badge-dot"></span>Core active</div>
+            <div class="cmember-status" id="cmember-status">Active</div>
+          </div>
+          <h1 class="cmember-title">Welcome back — <span>Core is running</span></h1>
+          <p class="cmember-sub">Every premium automation is working across your accounts, hands-off. Thanks for being a Core member.</p>
+          <div class="cmember-actions">
+            <button class="btn-cmember" onclick="window.open('https://bot.lgtw.tf')">
+              <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Open remote dashboard
+            </button>
+            <button class="btn-cmember-ghost" id="core-manage-license">Manage license</button>
+            <button class="btn-cmember-ghost" id="core-manual-rate">Rate Core</button>
           </div>
         </div>
+        <!-- Renewal nudge (shown only when expiry is near) -->
         <div class="core-expiry-band" id="core-expiry-band">
           <div class="core-expiry-left">
             <div class="core-expiry-text"><span id="core-expiry-days">—</span> remaining</div>
-            <div class="core-expiry-sub">Renew before <span id="core-expiry-date">—</span> to keep your streak protected &amp; all features active</div>
+            <div class="core-expiry-sub">Renew before <span id="core-expiry-date">—</span> to keep every feature active</div>
           </div>
           <button class="core-expiry-btn" onclick="window.open('https://discord.gg/JWhCkhSYtg')">Renew on Discord →</button>
         </div>
+        <!-- Real results snapshot -->
         <div class="core-real-card" id="core-real-card">
           <div class="core-real-head">
-            <div class="core-real-title">Your actual results</div>
+            <div class="core-real-title">Your results</div>
             <div class="core-real-since" id="cr-since"></div>
           </div>
           <div class="core-real-grid">
@@ -2801,47 +2870,57 @@ function html() {
             <div class="core-real-stat"><div class="core-real-val" id="cr-claimed">—</div><div class="core-real-lbl">Claimed points</div></div>
             <div class="core-real-stat"><div class="core-real-val" id="cr-coupons">—</div><div class="core-real-lbl">Coupons applied</div></div>
           </div>
-          <div class="core-real-empty" id="cr-empty" style="display:none">No runs recorded yet — run the bot once and your real numbers will appear here.</div>
+          <div class="core-real-empty" id="cr-empty" style="display:none">No runs recorded yet — start a run and your numbers will appear here.</div>
         </div>
-        <div class="core-est-card">
-          <div class="core-est-label">Estimated extra points / month</div>
-          <div class="core-est-value" id="core-est-value">—</div>
-          <div class="core-est-unit">points you'd likely miss without Core</div>
-          <div class="core-est-note" id="core-est-note">Estimate based on your enabled Core features and <span id="core-est-accounts">1</span> account(s). Real numbers vary with Microsoft's offers and your activity.</div>
-        </div>
-        <div>
-          <h3 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px">What Core is adding</h3>
-          <div class="core-breakdown" id="core-breakdown"></div>
-        </div>
-        <div class="core-compare">
-          <div class="c-vs">Without Core, the same accounts would leave an estimated <b id="core-compare-pts">0</b> points on the table every month — coupons unclaimed, double-search promos skipped, app &amp; read-to-earn rewards ignored, and streaks left unprotected.</div>
-        </div>
-        <div class="core-remote-band">
-          <div class="core-remote-ico">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          </div>
-          <div class="core-remote-txt">
-            <div class="core-remote-title">Your remote dashboard is unlocked</div>
-            <div class="core-remote-sub">Manage every machine running the bot from anywhere — phone, tablet, or browser.</div>
-          </div>
-          <button class="core-remote-link" onclick="window.open('https://bot.lgtw.tf')">Open dashboard &rarr;</button>
+        <!-- Active automations (what Core is doing for the member) -->
+        <div class="cmember-auto">
+          <div class="cmember-auto-head">Core is handling for you</div>
+          <div class="cmember-auto-chips" id="cmember-auto-chips"></div>
         </div>
       </div>
 
       <!-- Marketing sub-view (shown when no license) -->
-      <div id="core-view-market" style="display:flex;flex-direction:column;gap:28px">
-      <div class="core-hero">
-        <div class="core-hero-badge">PLUGIN</div>
-        <h1 class="core-hero-title"><span>Core</span></h1>
-        <p class="core-hero-sub">The official premium plugin for Microsoft Rewards Bot. It adds automation the open-source build can't do — auto-claim points, auto-apply coupons, double search points, read-to-earn, app rewards, daily check-in, daily streak &amp; streak protection, temporary punchcards and rich dashboard data. Every feature is yours to toggle in Settings, and Core unlocks the remote dashboard at bot.lgtw.tf.</p>
-        <div class="core-hero-actions">
-          <button class="btn-core-cta" onclick="window.open('https://discord.gg/JWhCkhSYtg')">Get Core &rarr;</button>
-          <button class="btn-core-discord" onclick="window.open('https://discord.gg/JWhCkhSYtg')">
-            <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.08.114 18.1.131 18.11a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.027c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-            Ask on Discord
-          </button>
+      <div id="core-view-market" style="display:flex;flex-direction:column;gap:34px">
+      <!-- Sales hero -->
+      <div class="csell-hero">
+        <div class="csell-hero-inner">
+          <div class="csell-badge">
+            <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Official premium plugin
+          </div>
+          <h1 class="csell-title">Stop leaving points<br><span>on the table.</span></h1>
+          <p class="csell-sub">The free bot collects the basics. <strong style="color:#e9eefb;font-weight:700">Core grabs everything else</strong> — auto-claimed every day, on every account.</p>
+          <div class="csell-value">
+            <div class="csell-value-num" id="csell-value-num">+~2,150</div>
+            <div class="csell-value-lbl">estimated bonus points<br>per account, every month</div>
+          </div>
+          <div class="csell-hero-cta">
+            <button class="btn-csell-primary" onclick="window.open('https://discord.gg/JWhCkhSYtg')">Get Core <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+            <button class="btn-csell-ghost" onclick="window.open('https://discord.gg/JWhCkhSYtg')">
+              <svg viewBox="0 0 24 24"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.08.114 18.1.131 18.11a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.027c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+              Ask on Discord
+            </button>
+          </div>
+          <div class="csell-trust">Activated with a license key · Covers all your accounts · Renew anytime on Discord</div>
         </div>
       </div>
+      <!-- Value strip -->
+      <div class="csell-strip">
+        <div class="csell-strip-item"><div class="csell-strip-num">9</div><div class="csell-strip-lbl">bonus automations</div></div>
+        <div class="csell-strip-item"><div class="csell-strip-num">&infin;</div><div class="csell-strip-lbl">accounts covered</div></div>
+        <div class="csell-strip-item"><div class="csell-strip-num">24/7</div><div class="csell-strip-lbl">remote dashboard</div></div>
+        <div class="csell-strip-item"><div class="csell-strip-num">100%</div><div class="csell-strip-lbl">hands-off</div></div>
+      </div>
+      <!-- Problem -->
+      <div class="csell-section">
+        <div class="csell-eyebrow">The problem</div>
+        <h2 class="csell-h2">Every day without Core, you lose points.</h2>
+        <p class="csell-lead">Coupons, promos, read-to-earn, app tasks, punchcards — the free bot can't reach them. So they expire, untouched, every single day.</p>
+      </div>
+      <!-- What you get (wraps the features grid) -->
+      <div class="csell-section">
+        <div class="csell-eyebrow">What you get</div>
+        <h2 class="csell-h2" style="margin-bottom:16px">Premium automations the free bot can't do.</h2>
       <div class="core-features">
         <div class="core-feature">
           <div class="core-feature-icon">
@@ -2900,43 +2979,89 @@ function html() {
           <div class="core-feature-desc">Detects and applies available dashboard coupons, then reports the points you saved in the run summary.</div>
         </div>
       </div>
-      <div class="core-remote-band">
-        <div class="core-remote-ico">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div><!-- /what-you-get section -->
+      <!-- Free vs Core comparison -->
+      <div class="csell-section">
+        <div class="csell-eyebrow">Free vs Core</div>
+        <h2 class="csell-h2" style="margin-bottom:14px">See exactly what changes.</h2>
+        <div class="ccompare">
+          <div class="ccompare-row ccompare-head"><div class="ccompare-feat">Feature</div><div class="ccompare-free">Free</div><div class="ccompare-core">Core</div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Daily set &amp; activities</div><div class="ccompare-free"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Desktop &amp; mobile Bing searches</div><div class="ccompare-free"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Special &amp; more promotions</div><div class="ccompare-free"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Auto-claim ready points</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Auto-apply coupons</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Double search-point promos</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Read-to-earn articles</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">App &amp; daily check-in rewards</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Daily streak protection</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Temporary punchcards</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Remote web dashboard</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="ccompare-row"><div class="ccompare-feat">Live telemetry &amp; history</div><div class="ccompare-free"><svg class="cmark cmark-no" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div><div class="ccompare-core"><svg class="cmark cmark-yes" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
         </div>
-        <div class="core-remote-txt">
-          <div class="core-remote-title">Remote dashboard — Core only</div>
-          <div class="core-remote-sub">Once your license is active, manage every machine from the same dashboard as Desk, anywhere:</div>
-        </div>
-        <button class="core-remote-link" onclick="window.open('https://bot.lgtw.tf')">bot.lgtw.tf &rarr;</button>
       </div>
-      <div class="core-footer-cta">
-        <p>Ready to upgrade? Join the Discord server and get your Core license to unlock all features.</p>
-        <button class="btn-core-cta" onclick="window.open('https://discord.gg/JWhCkhSYtg')">Get Core on Discord &rarr;</button>
+      <!-- How to get it -->
+      <div class="csell-section">
+        <div class="csell-eyebrow">Get started</div>
+        <h2 class="csell-h2" style="margin-bottom:14px">Up and running in three steps.</h2>
+        <div class="csteps">
+          <div class="cstep"><div class="cstep-n">1</div><div class="cstep-t">Join the Discord</div><div class="cstep-d">Hop into the community server, where Core licenses are handed out and supported.</div></div>
+          <div class="cstep"><div class="cstep-n">2</div><div class="cstep-t">Get your license key</div><div class="cstep-d">Follow the pinned instructions to grab your personal Core key — the team will sort you out.</div></div>
+          <div class="cstep"><div class="cstep-n">3</div><div class="cstep-t">Activate in Desk</div><div class="cstep-d">Paste the key into Desk. The bot picks up Core on its next run — fully hands-off from there.</div></div>
+        </div>
+      </div>
+      <!-- FAQ -->
+      <div class="csell-section">
+        <div class="csell-eyebrow">Questions</div>
+        <h2 class="csell-h2" style="margin-bottom:14px">Good to know.</h2>
+        <div class="cfaq">
+          <details class="cfaq-item"><summary>Is Core a different bot?</summary><p>No. Core is an official plugin that sits on top of the same open-source bot. Every free feature keeps working exactly as before — Core just adds the premium automations and the remote dashboard.</p></details>
+          <details class="cfaq-item"><summary>How do I get a license?</summary><p>Join the Discord server and follow the instructions there. You'll receive a personal license key to activate inside Desk.</p></details>
+          <details class="cfaq-item"><summary>Does it cover all my accounts?</summary><p>Yes. Once Core is active it applies to every account the bot runs, across all your configured clusters — no per-account fees.</p></details>
+          <details class="cfaq-item"><summary>What happens when my license expires?</summary><p>The premium features simply pause and the bot falls back to the free open-source tasks. Renew on Discord anytime to switch everything back on.</p></details>
+          <details class="cfaq-item"><summary>Where do I get help?</summary><p>The Discord community — that's where setup, licenses and support all live. Real people, quick answers.</p></details>
+        </div>
+      </div>
+      <!-- Final CTA -->
+      <div class="csell-final">
+        <h2>Ready to collect everything?</h2>
+        <p>Grab your Core license on Discord, paste it into Desk, and let the bot sweep up every point Microsoft offers.</p>
+        <button class="btn-csell-primary" onclick="window.open('https://discord.gg/JWhCkhSYtg')">Get Core on Discord <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
       </div><!-- /core-view-market -->
     </div>
 
     <!-- Plugins view -->
     <div class="plugins-wrap" id="view-plugins">
-      <div class="plugins-topbar">
-        <div class="plugins-topbar-title">
-          <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--cyan);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
-          Plugins
+      <div class="plugins-head">
+        <div class="plugins-head-top">
+          <div class="plugins-head-ico">
+            <svg viewBox="0 0 24 24"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
+          </div>
+          <div class="plugins-head-titles">
+            <div class="plugins-head-title">Plugins</div>
+            <div class="plugins-head-sub">Extend your bot with official and community add-ons.</div>
+          </div>
+          <div class="plugins-head-actions">
+            <div class="plugins-search-wrap">
+              <svg class="plugins-search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="plugins-search" id="plugins-search" type="text" placeholder="Search plugins…" autocomplete="off" spellcheck="false">
+            </div>
+            <button class="pbtn-icon" id="plugins-refresh-btn" title="Refresh store">
+              <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+            </button>
+            <button class="pbtn-primary" id="plugins-publish-btn">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Publish
+            </button>
+          </div>
         </div>
-        <button class="pbtn-icon" id="plugins-refresh-btn" title="Refresh catalog">
-          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
-        </button>
-        <div class="ptopbar-sep"></div>
-        <button class="ptxt-btn" id="plugins-doc-btn">Dev guide ↗</button>
-        <button class="btn btn-primary btn-sm" id="plugins-publish-btn" style="font-size:12px;padding:5px 11px;border-radius:8px">Publish ›</button>
-      </div>
-      <div class="plugins-toolbar">
-        <input class="plugins-search" id="plugins-search" type="text" placeholder="Search plugins…" autocomplete="off" spellcheck="false">
-        <div class="plugins-tabs" id="plugins-tabs">
-          <button class="plugins-tab active" data-pfilter="all">All</button>
-          <button class="plugins-tab" data-pfilter="installed" id="ptab-installed">Installed</button>
-          <button class="plugins-tab" data-pfilter="marketplace" id="ptab-marketplace">Marketplace</button>
+        <div class="plugins-tabsrow">
+          <div class="plugins-tabs" id="plugins-tabs">
+            <button class="plugins-tab active" data-pfilter="all">All</button>
+            <button class="plugins-tab" data-pfilter="installed" id="ptab-installed">Installed</button>
+            <button class="plugins-tab" data-pfilter="marketplace" id="ptab-marketplace">Store</button>
+          </div>
+          <button class="ptxt-btn" id="plugins-doc-btn">Dev guide ↗</button>
         </div>
       </div>
       <div class="plugins-body" id="plugins-catalog"></div>
@@ -3753,6 +3878,8 @@ function html() {
       setRing(m.progress || 0);
       var rw = document.querySelector('.ring-wrap');
       if (rw) rw.classList.toggle('run', !!running);
+      var heDot = G('hero-dot'); if (heDot) heDot.classList.toggle('run', !!running);
+      var heTxt = G('hero-eyebrow-txt'); if (heTxt) heTxt.textContent = running ? 'Running now' : (s === 'Complete' ? 'Last run complete' : 'Ready when you are');
       updateNextRun();
 
       var coreOk = m.core === 'Active';
@@ -4996,39 +5123,36 @@ function html() {
       var mk = G('core-view-market'), ac = G('core-view-active');
       if (mk) mk.style.display = active ? 'none' : 'flex';
       if (ac) ac.style.display = active ? 'flex' : 'none';
-      if (!active) return;
-      void loadCoreRealStats();
-      var settings = {}, accounts = 1, acctList = [];
-      try { settings = await fetch('/api/settings').then(function(r){return r.json();}); } catch(e) {}
-      try { var st = await fetch('/api/state').then(function(r){return r.json();}); acctList = (st.accounts||[]).filter(function(a){return a.enabled!==false;}); accounts = Math.max(1, acctList.length || 1); } catch(e) {}
-      var core = settings.core || {};
-      var rows = '', totalPerAcct = 0;
-      Object.keys(CORE_EST).forEach(function(k) {
-        var on = core[k];
-        if (on === false) return;
-        var f = CORE_EST[k];
-        totalPerAcct += f.pts;
-        rows += '<div class="core-bd-row"><div class="core-bd-ico"><svg viewBox="0 0 24 24"><path d="'+f.d+'"/></svg></div>' +
-                '<div class="core-bd-txt"><div class="core-bd-name">'+f.name+'</div>' +
-                '<div class="core-bd-pts">+~'+f.pts.toLocaleString()+' pts / mo</div></div></div>';
-      });
-      var total = totalPerAcct * accounts;
-      // Accounts forced onto the classic (ASP) dashboard earn nothing from the
-      // Next-only features (applyCoupons / setGoal / temporaryPunchcards), so drop
-      // their estimated points for those accounts. NOTE: auto-detected legacy is
-      // NOT skipped here — only an explicit dashboardMode==='legacy' override —
-      // because the detected dashboard variant isn't plumbed to the renderer.
-      var legacyForced = acctList.filter(function(a){ return a.dashboardMode === 'legacy'; }).length;
-      if (legacyForced) {
-        Object.keys(CORE_NEXT_ONLY).forEach(function(k) {
-          if (core[k] !== false && CORE_EST[k]) total -= CORE_EST[k].pts * legacyForced;
-        });
-        if (total < 0) total = 0;
+      if (!active) {
+        // Sales hero headline value — sum of the product's own per-account monthly estimates.
+        var perAcct = 0; Object.keys(CORE_EST).forEach(function(k){ perAcct += CORE_EST[k].pts; });
+        var cv = G('csell-value-num'); if (cv) cv.textContent = '+~' + perAcct.toLocaleString();
+        return;
       }
-      G('core-est-value').textContent = '+' + total.toLocaleString();
-      G('core-est-accounts').textContent = String(accounts);
-      G('core-compare-pts').textContent = total.toLocaleString();
-      G('core-breakdown').innerHTML = rows || '<div style="color:var(--muted);font-size:13px;padding:12px">Enable Core features in Settings to see their estimated value.</div>';
+      void loadCoreRealStats();
+      var settings = {};
+      try { settings = await fetch('/api/settings').then(function(r){return r.json();}); } catch(e) {}
+      var core = settings.core || {};
+      // Active automations — what Core is currently running for the member (reassurance, no sales numbers).
+      var check = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+      var chips = '';
+      Object.keys(CORE_EST).forEach(function(k) {
+        if (core[k] === false) return;
+        chips += '<span class="cmember-chip">' + check + CORE_EST[k].name + '</span>';
+      });
+      var chipsWrap = G('cmember-auto-chips');
+      if (chipsWrap) chipsWrap.innerHTML = chips || '<span style="color:var(--muted);font-size:12.5px">Turn on Core features in Settings to see them here.</span>';
+      // License status pill in the header
+      var statusEl = G('cmember-status');
+      if (statusEl) {
+        var statusTxt = 'Active';
+        if (_coreData && _coreData.expiresAt) {
+          var dleft = Math.ceil((new Date(_coreData.expiresAt) - Date.now()) / 86400000);
+          if (dleft > 0) statusTxt = dleft === 1 ? '1 day left' : dleft + ' days left';
+          else statusTxt = 'Expired';
+        }
+        statusEl.textContent = statusTxt;
+      }
       // Expiry indicator — reads from already-loaded license state, no extra API call
       var expiryBand = G('core-expiry-band');
       if (expiryBand && _coreData && _coreData.expiresAt) {
@@ -5147,64 +5271,61 @@ function html() {
       var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/>';
       var updatable = p.installed && p.inCatalog && p.installedVersion && p.latest && cmpVer(p.latest, p.installedVersion) > 0;
       var held = p.installed && (p.pinned || p.autoUpdate === false || p.trust === 'full');
+      var isMkt = p.source === 'marketplace';
+      // Chips — version, status, update hint
+      var ver = p.installed ? (p.installedVersion || p.version) : p.version;
       var chips = '';
-      if (p.installedVersion || p.version) chips += '<span class="pchip pchip-ver">v' + esc(p.installedVersion || p.version) + '</span>';
+      if (ver) chips += '<span class="pchip pchip-ver">v' + esc(ver) + '</span>';
+      if (!p.installed && p.license) chips += '<span class="pchip pchip-ver">' + esc(p.license) + '</span>';
       if (p.installed && p.trust === 'full') chips += '<span class="pchip pchip-trusted">Trusted</span>';
       if (p.installed && !p.enabled) chips += '<span class="pchip pchip-off">Off</span>';
       if (p.installed && p.stale) chips += '<span class="pchip pchip-stale">Outdated</span>';
       if (updatable) chips += '<span class="pchip pchip-update">v' + esc(p.latest) + ' ready</span>';
+      // Author / origin line
       var meta = [];
       if (p.author) meta.push('by ' + esc(p.author));
-      if (p.license) meta.push(esc(p.license));
       if (p.installed && !p.inCatalog) meta.push('local');
-      var side = '<label class="toggle"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>';
-      if (held && updatable) side += '<button class="pbtn pbtn-update" style="margin-top:4px" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
-      var manage = '';
+      // Top-right primary control: enable toggle (installed) — store cards install from the footer
+      var topCtrl = p.installed
+        ? '<label class="toggle" title="' + (p.enabled ? 'Enabled' : 'Disabled') + '"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
+        : '';
+      // Footer — manage controls (left) + actions (right)
+      var footL = '', footR = '';
       if (p.installed) {
-        var mrow = '';
-        if (p.source === 'marketplace') {
-          mrow += '<label class="pmanage-trust" title="Lets this plugin access more bot APIs — does not grant OS or admin permissions"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '> Trusted mode</label>';
-          if (!p.pinned) mrow += '<label class="pmanage-au"><input type="checkbox" data-autoupdate="' + escAttr(p.name) + '"' + (p.autoUpdate !== false ? ' checked' : '') + '> Auto-update</label>';
-          mrow += '<button class="plink" data-report="' + escAttr(p.name) + '" data-rv="' + escAttr(p.installedVersion || p.version) + '"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Report</button>';
+        if (isMkt) {
+          footL += '<label class="pmanage-trust" title="Lets this plugin access more bot APIs — no OS, admin or filesystem access"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '>Trusted</label>';
+          if (!p.pinned) footL += '<label class="pmanage-au" title="Keep this plugin up to date from the store"><input type="checkbox" data-autoupdate="' + escAttr(p.name) + '"' + (p.autoUpdate !== false ? ' checked' : '') + '>Auto-update</label>';
         }
-        mrow += '<button class="plink danger" data-remove="' + escAttr(p.name) + '"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>';
-        manage = '<div class="pcard-manage">' + mrow + '</div>';
+        if (held && updatable) footR += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
+        if (isMkt) footR += '<button class="plink plink-ico" data-report="' + escAttr(p.name) + '" data-rv="' + escAttr(p.installedVersion || p.version) + '" title="Report a problem"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>';
+        footR += '<button class="plink plink-ico danger" data-remove="' + escAttr(p.name) + '" title="Remove"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+      } else {
+        footR += '<button class="pbtn pbtn-install" data-install="' + escAttr(p.name) + '" data-ver="' + escAttr(p.version) + '">Install</button>';
       }
-      return '<div class="pcard">' +
-        '<div class="pcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
-        '<div class="pcard-body">' +
-          '<div class="pcard-row1"><span class="pcard-name">' + esc(p.name) + '</span>' + chips + '</div>' +
-          (meta.length ? '<div class="pcard-meta">' + meta.join(' · ') + '</div>' : '') +
-          (p.description ? '<div class="pcard-desc">' + esc(p.description) + '</div>' : '') +
-          manage +
+      var foot = '<div class="pcard-foot"><div class="pcard-foot-l">' + footL + '</div><div class="pcard-foot-r">' + footR + '</div></div>';
+      return '<div class="pcard' + (p.installed ? ' is-installed' : '') + (p.installed && !p.enabled ? ' is-off' : '') + '">' +
+        '<div class="pcard-top">' +
+          '<div class="pcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
+          '<div class="pcard-id">' +
+            '<div class="pcard-name">' + esc(p.name) + '</div>' +
+            (meta.length ? '<div class="pcard-author">' + meta.join(' · ') + '</div>' : '') +
+          '</div>' + topCtrl +
         '</div>' +
-        '<div class="pcard-side">' + side + '</div>' +
+        (chips ? '<div class="pcard-chips">' + chips + '</div>' : '') +
+        (p.description ? '<div class="pcard-desc">' + esc(p.description) + '</div>' : '<div class="pcard-desc pcard-desc-empty">No description provided.</div>') +
+        foot +
       '</div>';
     }
 
-    function pluginGridCardHtml(p) {
-      var puzzle = '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/>';
-      var chips = p.version ? '<span class="pchip pchip-ver">v' + esc(p.version) + '</span>' : '';
-      if (p.license) chips += ' <span class="pchip pchip-ver">' + esc(p.license) + '</span>';
-      return '<div class="pgcard">' +
-        '<div class="pgcard-head">' +
-          '<div class="pgcard-ico"><svg viewBox="0 0 24 24">' + puzzle + '</svg></div>' +
-          '<div class="pgcard-info">' +
-            '<div class="pgcard-name">' + esc(p.name) + '</div>' +
-            (p.author ? '<div class="pgcard-author">by ' + esc(p.author) + '</div>' : '') +
-          '</div>' +
-        '</div>' +
-        (p.description ? '<div class="pgcard-desc">' + esc(p.description) + '</div>' : '<div class="pgcard-desc" style="opacity:.3;font-style:italic">No description.</div>') +
-        '<div class="pgcard-foot">' +
-          '<div class="pgcard-chips">' + chips + '</div>' +
-          '<button class="pbtn pbtn-install" data-install="' + escAttr(p.name) + '" data-ver="' + escAttr(p.version) + '">Install</button>' +
-        '</div>' +
-      '</div>';
+    function psectHtml(title, n) {
+      return '<div class="psect"><span class="psect-title">' + title + '</span>' +
+        (n ? '<span class="psect-count">' + n + '</span>' : '') +
+        '<span class="psect-line"></span></div>';
     }
 
     function marketplaceEmptyHtml() {
-      if (_catalogMeta.error) return '<div class="pempty">Could not reach the marketplace.<br><small>' + esc(_catalogMeta.error) + '</small></div>';
-      return '<div class="pempty">No community plugins in the catalog yet — check back soon.</div>';
+      if (_catalogMeta.error) return '<div class="pempty">Could not reach the store.<br><small>' + esc(_catalogMeta.error) + '</small></div>';
+      return '<div class="pempty">No community plugins in the store yet — check back soon.</div>';
     }
 
     function renderCatalog(filterQ) {
@@ -5225,20 +5346,20 @@ function html() {
       var inst = showInst ? items.filter(function(p){ return p.installed; }) : [];
       var avail = showMkt ? items.filter(function(p){ return !p.installed; }) : [];
       if (inst.length) {
-        html += '<div><div class="psect"><span class="psect-title">Installed</span><span class="psect-line"></span></div>';
-        html += '<div class="plist">' + inst.map(pluginCardHtml).join('') + '</div></div>';
+        html += '<div class="psection">' + psectHtml('Installed', inst.length) +
+          '<div class="pgrid">' + inst.map(pluginCardHtml).join('') + '</div></div>';
       }
       if (showMkt) {
-        html += '<div><div class="psect"><span class="psect-title">Marketplace</span><span class="psect-line"></span></div>';
-        html += avail.length ? '<div class="pgrid">' + avail.map(pluginGridCardHtml).join('') + '</div>' : marketplaceEmptyHtml();
-        html += '</div>';
+        html += '<div class="psection">' + psectHtml('Store', avail.length) +
+          (avail.length ? '<div class="pgrid">' + avail.map(pluginCardHtml).join('') + '</div>' : marketplaceEmptyHtml()) +
+          '</div>';
       }
       if (!html) html = '<div class="pempty">No plugins match your search.</div>';
       wrap.innerHTML = html;
       var totalInst = _catalog.filter(function(p){ return p.installed; }).length + (_catalogCore ? 1 : 0);
       var totalAvail = _catalog.filter(function(p){ return !p.installed; }).length;
       var ti = G('ptab-installed'); if (ti) ti.textContent = totalInst ? 'Installed (' + totalInst + ')' : 'Installed';
-      var tm = G('ptab-marketplace'); if (tm) tm.textContent = totalAvail ? 'Marketplace (' + totalAvail + ')' : 'Marketplace';
+      var tm = G('ptab-marketplace'); if (tm) tm.textContent = totalAvail ? 'Store (' + totalAvail + ')' : 'Store';
       bindCatalogEvents();
     }
 

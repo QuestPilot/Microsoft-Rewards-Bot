@@ -71,7 +71,7 @@
     // - Core plugin has priority 100 by default
 ,
   "test-plugin": {
-    "enabled": true,
+    "enabled": false,
     "source": "marketplace",
     "version": "1.0.0"
   }

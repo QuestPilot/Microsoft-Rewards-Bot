@@ -2,7 +2,7 @@
   "format": "msrb-marketplace",
   "version": 1,
   "sequence": 2,
-  "issuedAt": "2026-06-27T18:29:34.630Z",
+  "issuedAt": "2026-06-28T07:34:54.482Z",
   "ttlSeconds": 604800,
   "killSwitch": false,
   "plugins": [
