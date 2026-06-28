@@ -91,6 +91,12 @@ function terminalModeEnabled(config = readConfig()) {
     return config?.terminal?.enabled === true
 }
 
+// Headless Desk service: run the Desk server with NO window (servers/Docker), so the bot
+// stays reachable + controllable from Nexus without a GUI. Opt-in via config desk.headless.
+function headlessDeskService(config = readConfig()) {
+    return config?.desk?.headless === true
+}
+
 function hasGuiEnvironment(env = process.env) {
     if (env.MSRB_FORCE_APP_WINDOW === '1') return true
     if (env.MSRB_NO_APP_WINDOW === '1' || env.CI === 'true' || env.CI === '1' || env.FORCE_HEADLESS === '1')
@@ -443,6 +449,18 @@ async function main() {
     if (!isAttachLaunch()) {
         ensurePatchrightChromium({ root: ROOT })
     }
+    // Headless Desk service (opt-in) — run the Desk server with no window for servers/Docker.
+    // Takes precedence over the bot fallback, but never hijacks the agent/terminal/child paths.
+    if (
+        headlessDeskService(readConfig(ROOT)) &&
+        !isBackgroundLaunch() && !isTerminalForced() && !isUiChild() && !isAttachLaunch()
+    ) {
+        console.log('[START] Starting Rewards Desk as a headless service (no window).')
+        process.env.MSRB_APP_NO_OPEN = '1'
+        process.env.MSRB_TERMINAL_MODE = '0'
+        run(process.execPath, ['./scripts/desk/app-window.js'], 'desk')
+        return
+    }
     if (shouldLaunchInterface()) {
         // Clicking the Rewards Desk shortcut ALWAYS opens the Desk (the control
         // panel) — it never auto-runs the bot. The visible prep above (update check
@@ -505,5 +523,6 @@ module.exports = {
     launchAppWindow,
     shouldLaunchInterface,
     shouldRunUpdater,
-    terminalModeEnabled
+    terminalModeEnabled,
+    headlessDeskService
 }

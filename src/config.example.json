@@ -107,6 +107,7 @@
         "enabled": false
     },
     "desk": {
-        "lanAccess": false
+        "lanAccess": true,
+        "headless": false
     }
 }

@@ -136,6 +136,9 @@ export const ConfigSchema = z.object({
      *  the same-machine Nexus embed works on loopback without it. */
     desk: z.object({
         lanAccess: z.boolean().default(false),
+        /** Run the Desk as a headless service (no window) — for servers/Docker with no
+         *  GUI, so the bot stays reachable/controllable from Nexus. Opt-in, default off. */
+        headless: z.boolean().default(false),
         port: NumberOrString.optional()
     }).optional(),
     scheduler: SchedulerSchema.optional(),
