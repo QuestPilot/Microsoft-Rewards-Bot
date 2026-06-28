@@ -1451,16 +1451,41 @@ function html() {
     .toggle-wrap-left{flex:1;min-width:0}
     .toggle-label{font-size:13px;font-weight:600}
     .toggle-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
-    /* Settings */
-    .settings-wrap{display:none;flex-direction:column;gap:14px;overflow-y:auto;min-height:0}
+    /* Settings two-column layout */
+    .settings-wrap{display:none;flex-direction:row;min-height:0;flex:1;overflow:hidden}
     .settings-wrap.vis{display:flex}
-    .settings-section{background:linear-gradient(180deg,rgba(10,22,40,.96),rgba(5,12,24,.97));border:1px solid var(--border);border-radius:var(--r);padding:16px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
-    .settings-section:hover{transform:translateY(-1px);border-color:rgba(46,232,255,.2);box-shadow:0 10px 28px rgba(0,0,0,.16)}
-    .settings-section h3{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:11px;display:flex;align-items:center;gap:4px}
-    .settings-section-core{border-color:rgba(247,200,92,.2);background:linear-gradient(180deg,rgba(20,17,5,.97),rgba(10,9,3,.98))}
-    .settings-section-core h3{color:var(--gold)}
-    .core-section-badge{font-size:9px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;background:rgba(247,200,92,.15);color:var(--gold);border:1px solid rgba(247,200,92,.3);margin-left:auto}
-    .settings-section-note{font-size:11.5px;color:var(--muted);background:rgba(247,200,92,.06);border:1px solid rgba(247,200,92,.15);border-radius:8px;padding:8px 11px;margin-bottom:10px}
+    .sett-sidebar{width:188px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding:10px 8px;gap:1px;background:rgba(2,7,16,.25)}
+    .sett-nav-section{font-size:9px;font-weight:800;color:rgba(110,146,184,.35);letter-spacing:.12em;text-transform:uppercase;padding:10px 10px 3px;margin-top:2px;user-select:none}
+    .sett-nav-section:first-child{padding-top:3px;margin-top:0}
+    .sett-nav-item{display:flex;align-items:center;gap:9px;width:100%;padding:7px 10px;border-radius:8px;border:none;background:none;color:rgba(110,146,184,.7);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;transition:all .14s;position:relative}
+    .sett-nav-item:hover{background:rgba(255,255,255,.04);color:var(--text)}
+    .sett-nav-item.active{background:rgba(46,232,255,.1);color:var(--cyan)}
+    .sett-nav-item.active::before{content:'';position:absolute;left:0;top:25%;bottom:25%;width:2.5px;border-radius:2px;background:var(--cyan)}
+    .sett-nav-item svg{width:15px;height:15px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+    .sett-nav-item.active svg{opacity:1}
+    .sett-nav-badge{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.04em;padding:2px 5px;border-radius:4px}
+    .sett-nav-badge-gold{background:rgba(247,200,92,.14);color:var(--gold);border:1px solid rgba(247,200,92,.2)}
+    .sett-nav-badge-green{background:rgba(47,210,125,.12);color:var(--green);border:1px solid rgba(47,210,125,.22)}
+    .sett-body{flex:1;min-width:0;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column}
+    .sett-panel{display:none;flex-direction:column;gap:14px;animation:viewIn .18s ease-out}
+    .sett-panel.active{display:flex}
+    .sett-panel-header{margin-bottom:4px}
+    .sett-panel-title{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.02em;margin-bottom:3px}
+    .sett-panel-sub{font-size:12.5px;color:var(--muted);line-height:1.5}
+    .settings-section{background:rgba(8,18,35,.55);border:1px solid var(--border);border-radius:12px;padding:16px;transition:border-color .15s}
+    .settings-section:hover{border-color:rgba(46,232,255,.16)}
+    .settings-section h3{font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .settings-section-core{border-color:rgba(247,200,92,.18);background:rgba(20,14,2,.5)}
+    .settings-section-core h3{color:rgba(247,200,92,.7)}
+    .core-section-badge{font-size:8.5px;font-weight:800;letter-spacing:.05em;padding:2px 6px;border-radius:4px;background:rgba(247,200,92,.14);color:var(--gold);border:1px solid rgba(247,200,92,.28);margin-left:auto}
+    .settings-section-note{font-size:12px;color:var(--muted);background:rgba(46,232,255,.04);border:1px solid rgba(46,232,255,.1);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
+    /* Hint system */
+    .hint-bar{position:absolute;bottom:16px;left:50%;transform:translateX(-50%) translateY(10px);display:inline-flex;align-items:center;gap:8px;background:rgba(4,12,28,.97);border:1px solid rgba(46,232,255,.28);border-radius:10px;padding:8px 10px 8px 12px;font-size:12px;font-weight:500;color:var(--text);opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;z-index:50;box-shadow:0 8px 28px rgba(0,0,0,.5);backdrop-filter:blur(14px);white-space:nowrap}
+    .hint-bar.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+    .hint-bar-icon{flex-shrink:0;color:var(--cyan);display:flex}
+    .hint-bar-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .hint-bar-close{background:none;border:none;color:rgba(110,146,184,.45);cursor:pointer;padding:0 0 0 10px;font-size:17px;line-height:1;transition:color .14s;flex-shrink:0}
+    .hint-bar-close:hover{color:var(--text)}
     .core-view{display:none;flex-direction:column;gap:28px;padding:28px;overflow-y:auto;flex:1}
     .core-view.vis{display:flex}
     .core-hero{background:linear-gradient(135deg,rgba(10,22,40,.98) 0%,rgba(5,12,24,1) 100%);border:1px solid rgba(247,200,92,.2);border-radius:16px;padding:36px 32px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px}
@@ -2174,7 +2199,7 @@ function html() {
     </div>
 
     <!-- Accounts full view (editor) -->
-    <div class="view-full" id="view-accounts">
+    <div class="view-full" id="view-accounts" style="position:relative">
       <!-- Premium header with stats -->
       <div class="acc-page-header">
         <div class="acc-page-title-wrap">
@@ -2206,6 +2231,17 @@ function html() {
       </div>
       <!-- Scrollable account list -->
       <div class="acc-page-body" id="acc-editor-list"></div>
+      <!-- First-time hints -->
+      <div class="hint-bar" id="hint-acc-dbl">
+        <span class="hint-bar-icon"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="6"/><line x1="12" y1="2" x2="12" y2="10"/></svg></span>
+        <span>Double-click an account to <strong>enable</strong> or <strong>disable</strong> it</span>
+        <button class="hint-bar-close" onclick="dismissHint('acc-dbl')">&#215;</button>
+      </div>
+      <div class="hint-bar" id="hint-acc-rclick">
+        <span class="hint-bar-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+        <span>Right-click an account for <strong>more options</strong></span>
+        <button class="hint-bar-close" onclick="dismissHint('acc-rclick')">&#215;</button>
+      </div>
     </div>
 
     <!-- Console view -->
@@ -2236,219 +2272,305 @@ function html() {
 
     <!-- Settings view -->
     <div class="settings-wrap" id="view-settings">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
-        <span class="card-label">Settings</span>
+      <!-- Left navigation sidebar -->
+      <div class="sett-sidebar">
+        <span class="sett-nav-section">Bot</span>
+        <button class="sett-nav-item active" data-panel="run">
+          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>Run tasks
+        </button>
+        <button class="sett-nav-item" data-panel="behavior">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Behavior
+        </button>
+        <button class="sett-nav-item" data-panel="schedule">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Schedule
+        </button>
+        <button class="sett-nav-item" data-panel="startup">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Startup
+        </button>
+        <span class="sett-nav-section">Features</span>
+        <button class="sett-nav-item" data-panel="core">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Core Premium
+          <span class="sett-nav-badge sett-nav-badge-gold" id="sett-nav-core-badge"></span>
+        </button>
+        <button class="sett-nav-item" data-panel="notifications">
+          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notifications
+        </button>
+        <span class="sett-nav-section">System</span>
+        <button class="sett-nav-item" data-panel="privacy">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Privacy
+        </button>
+        <button class="sett-nav-item" data-panel="advanced">
+          <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Advanced
+        </button>
       </div>
-      <div class="settings-section">
-        <h3>Tasks</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">What the bot collects each run. These free tasks always run. Premium versions live in <b>Core Premium</b> lower down and only run with a valid license.</div>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily Set</div><div class="toggle-sub">Complete the daily activity set</div></div><label class="toggle"><input type="checkbox" id="tog-doDailySet"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Desktop Search</div><div class="toggle-sub">Bing PC search points</div></div><label class="toggle"><input type="checkbox" id="tog-doDesktopSearch"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Mobile Search</div><div class="toggle-sub">Bing mobile search points</div></div><label class="toggle"><input type="checkbox" id="tog-doMobileSearch"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Special Promotions</div><div class="toggle-sub">Sponsored bonus offers</div></div><label class="toggle"><input type="checkbox" id="tog-doSpecialPromotions"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">More Promotions</div><div class="toggle-sub">Additional bonus tasks</div></div><label class="toggle"><input type="checkbox" id="tog-doMorePromotions"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App Promotions</div><div class="toggle-sub">Mobile app promotional tasks</div></div><label class="toggle"><input type="checkbox" id="tog-doAppPromotions"><span class="toggle-slider"></span></label></div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>How it runs</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Browser and run behaviour applied to every account.</div>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Headless mode</div><div class="toggle-sub">Run the browser hidden in the background</div></div><label class="toggle"><input type="checkbox" id="tog-headless"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Run on zero points</div><div class="toggle-sub">Keep running even when no points are left to earn</div></div><label class="toggle"><input type="checkbox" id="tog-runOnZero"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Search on Bing local queries</div><div class="toggle-sub">Use local search-history suggestions as Bing queries</div></div><label class="toggle"><input type="checkbox" id="tog-searchOnBing"><span class="toggle-slider"></span></label></div>
-        </div>
-        <div class="acc-grid-2" style="margin-top:12px">
-          <div class="modal-field"><label>Parallel accounts (clusters)</label><input type="number" class="modal-input" id="set-clusters" min="1" max="20" placeholder="1" autocomplete="off"><div class="toggle-sub" style="margin-top:4px">How many accounts run at the same time. Higher = faster but riskier.</div></div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>Schedule</h3>
-        <div class="toggle-wrap" style="margin-bottom:9px">
-          <div class="toggle-wrap-left"><div class="toggle-label">Auto-schedule</div><div class="toggle-sub">Run the bot automatically at a set time each day</div></div>
-          <label class="toggle"><input type="checkbox" id="tog-scheduler"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="scheduler-fields hidden" id="scheduler-fields">
-          <div class="settings-field">
-            <div class="settings-label">Start time</div>
-            <input type="time" class="settings-input" id="sch-startTime" value="08:00">
+
+      <!-- Right panel content area -->
+      <div class="sett-body">
+
+        <!-- Run tasks -->
+        <div class="sett-panel active" id="sett-run">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Run tasks</div>
+            <div class="sett-panel-sub">What the bot collects on each run. Free tasks always run — premium ones require Core and are configured under Core Premium.</div>
           </div>
-          <div class="settings-field">
-            <div class="settings-label">Timezone</div>
-            <select class="settings-input" id="sch-timezone">
-              <option value="Europe/Paris">Europe/Paris</option>
-              <option value="Europe/London">Europe/London</option>
-              <option value="Europe/Berlin">Europe/Berlin</option>
-              <option value="Europe/Madrid">Europe/Madrid</option>
-              <option value="Europe/Rome">Europe/Rome</option>
-              <option value="America/New_York">America/New_York</option>
-              <option value="America/Chicago">America/Chicago</option>
-              <option value="America/Denver">America/Denver</option>
-              <option value="America/Los_Angeles">America/Los_Angeles</option>
-              <option value="America/Sao_Paulo">America/Sao_Paulo</option>
-              <option value="Asia/Tokyo">Asia/Tokyo</option>
-              <option value="Asia/Shanghai">Asia/Shanghai</option>
-              <option value="Asia/Kolkata">Asia/Kolkata</option>
-              <option value="Asia/Dubai">Asia/Dubai</option>
-              <option value="Australia/Sydney">Australia/Sydney</option>
-              <option value="UTC">UTC</option>
-            </select>
-          </div>
-          <div class="settings-label">Random delay (before start)</div>
-          <div class="settings-input-row">
-            <div class="settings-field">
-              <div class="settings-label">Min</div>
-              <input type="text" class="settings-input" id="sch-delayMin" placeholder="0min">
-            </div>
-            <div class="settings-field">
-              <div class="settings-label">Max</div>
-              <input type="text" class="settings-input" id="sch-delayMax" placeholder="30min">
+          <div class="settings-section">
+            <h3>Free tasks</h3>
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily Set</div><div class="toggle-sub">Complete the daily activity set</div></div><label class="toggle"><input type="checkbox" id="tog-doDailySet"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Desktop Search</div><div class="toggle-sub">Bing PC search points</div></div><label class="toggle"><input type="checkbox" id="tog-doDesktopSearch"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Mobile Search</div><div class="toggle-sub">Bing mobile search points</div></div><label class="toggle"><input type="checkbox" id="tog-doMobileSearch"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Special Promotions</div><div class="toggle-sub">Sponsored bonus offers</div></div><label class="toggle"><input type="checkbox" id="tog-doSpecialPromotions"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">More Promotions</div><div class="toggle-sub">Additional bonus tasks</div></div><label class="toggle"><input type="checkbox" id="tog-doMorePromotions"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App Promotions</div><div class="toggle-sub">Mobile app promotional tasks</div></div><label class="toggle"><input type="checkbox" id="tog-doAppPromotions"><span class="toggle-slider"></span></label></div>
             </div>
           </div>
-          <div class="toggle-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">Run on startup</div><div class="toggle-sub">Run immediately when the bot starts</div></div>
-            <label class="toggle"><input type="checkbox" id="tog-runOnStartup"><span class="toggle-slider"></span></label>
+        </div>
+
+        <!-- Behavior -->
+        <div class="sett-panel" id="sett-behavior">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Behavior</div>
+            <div class="sett-panel-sub">Browser and run settings applied to every account.</div>
           </div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>Start with your computer</h3>
-        <div class="startup-grid">
-          <div class="startup-card">
-            <div class="startup-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
-            <div class="startup-copy">
-              <div class="toggle-label">Open Rewards Desk</div>
-              <div class="toggle-sub">Show this interface automatically when you sign in.</div>
-              <div class="startup-method" id="startup-desk-method"></div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="tog-startup-desk"><span class="toggle-slider"></span></label>
-          </div>
-          <div class="startup-card core-only">
-            <div class="startup-icon"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v3a4 4 0 0 0 4 4h1"/><path d="M12 3a6 6 0 0 1 6 6v3a4 4 0 0 1-4 4h-1"/><path d="M9 20h6"/></svg></div>
-            <div class="startup-copy">
-              <div class="toggle-label">Core remote access <span class="startup-badge">Core</span></div>
-              <div class="toggle-sub">Keep a hidden agent online so you can launch and monitor runs remotely.</div>
-              <div class="startup-method" id="startup-agent-method"></div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="tog-startup-agent"><span class="toggle-slider"></span></label>
-          </div>
-        </div>
-      </div>
-      <div class="settings-section settings-section-core" id="settings-core-premium">
-        <h3>
-          <svg viewBox="0 0 24 24" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;fill:var(--gold);stroke:none;margin-right:5px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          Core Premium
-          <span class="core-section-badge" id="core-license-badge">No license</span>
-        </h3>
-        <div class="settings-section-note" id="core-section-note" style="display:none">Activate a Core license to unlock these features. Each one only runs — and only counts — when your license is valid and the feature is enabled here.</div>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Some features only run on one Microsoft Rewards dashboard. Badges show which.</div>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Claim points</div><div class="toggle-sub">Auto-claim ready-to-claim dashboard point cards</div></div><label class="toggle"><input type="checkbox" id="tog-core-claimPoints"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Apply coupons<span class="next-badge">Next only</span></div><div class="toggle-sub">Detect &amp; apply dashboard coupons automatically</div></div><label class="toggle"><input type="checkbox" id="tog-core-applyCoupons"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Double search points</div><div class="toggle-sub">Activate eligible double-search promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-doubleSearchPoints"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App rewards</div><div class="toggle-sub">Mobile app-only reward promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-appReward"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Read to Earn<span class="beta-badge">Beta</span></div><div class="toggle-sub">MSN app-only reading rewards</div></div><label class="toggle"><input type="checkbox" id="tog-core-readToEarn"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily check-in</div><div class="toggle-sub">App-only daily check-in bonus</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyCheckIn"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily streak</div><div class="toggle-sub">Read streak details from the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyStreak"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Streak protection</div><div class="toggle-sub">Keep streak protection enabled on the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-streakProtection"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Temporary punchcards<span class="beta-badge">Beta</span><span class="next-badge">Next only</span></div><div class="toggle-sub">New-dashboard limited-time punchcards (distinct from classic punch cards)</div></div><label class="toggle"><input type="checkbox" id="tog-core-temporaryPunchcards"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Dashboard data</div><div class="toggle-sub">Rich dashboard snapshots, ready-to-claim &amp; streak info</div></div><label class="toggle"><input type="checkbox" id="tog-core-collectDashboardInfo"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Set Rewards goal<span class="next-badge">Next only</span></div><div class="toggle-sub">Auto-pick an eligible gift card as your Rewards goal</div></div><label class="toggle"><input type="checkbox" id="tog-core-setGoal"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Page Harvester<span class="beta-badge">Diagnostic</span></div><div class="toggle-sub">Snapshots all Rewards pages (HTML + data) into the Page/ folder. Enable once, run the bot — Page/ is rebuilt and the toggle resets automatically. For selector maintenance only, does not earn points.</div></div><label class="toggle"><input type="checkbox" id="tog-core-captureDashboardPages"><span class="toggle-slider"></span></label></div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>Notifications</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Free, open-source. Click <b>Configure</b> to choose where alerts go.</div>
-        <div class="toggle-grid-1">
-          <div class="cfg-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">Discord log webhook</div><div class="toggle-sub">Stream filtered console logs to a Discord channel</div></div>
-            <button class="btn-cfg" data-cfg="discord">Configure</button>
-            <label class="toggle"><input type="checkbox" id="tog-wh-discord"><span class="toggle-slider"></span></label>
-          </div>
-          <div class="cfg-wrap">
-            <div class="toggle-wrap-left"><div class="toggle-label">ntfy push</div><div class="toggle-sub">Send notifications to an ntfy topic / server</div></div>
-            <button class="btn-cfg" data-cfg="ntfy">Configure</button>
-            <label class="toggle"><input type="checkbox" id="tog-wh-ntfy"><span class="toggle-slider"></span></label>
-          </div>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h3>Privacy &amp; data</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Anonymous usage data helps fix bugs and improve the bot. It never includes passwords, emails, cookies or licence keys.</div>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Anonymous telemetry</div><div class="toggle-sub">Send anonymous run stats and error signals to the maintainer</div></div><label class="toggle"><input type="checkbox" id="tog-analytics"><span class="toggle-slider"></span></label></div>
-        </div>
-        <div id="analytics-warning" class="settings-section-note" style="display:none;background:rgba(255,170,0,.06);border-color:rgba(255,170,0,.22);color:#f5c542">⚠ Telemetry disabled — errors are silent and bugs go unreported.</div>
-      </div>
-      <details class="settings-section settings-section-advanced adv-collapse" id="settings-advanced">
-        <summary>Advanced settings<svg class="adv-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg></summary>
-        <div class="advanced-caption">Rarely-needed options — defaults are fine for most setups. Only change these if you know what you are doing.</div>
-        <div class="adv-group">
-        <h3>Developer</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Verbose logging and a raw-terminal run mode for debugging the bot.</div>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Debug logs</div><div class="toggle-sub">Print verbose internal logs to the console</div></div><label class="toggle"><input type="checkbox" id="tog-debugLogs"><span class="toggle-slider"></span></label></div>
-        </div>
-        <div class="advanced-block term-row">
-          <div class="toggle-wrap-left">
-            <div class="toggle-label">Developer terminal mode</div>
-            <div class="toggle-sub">Close Rewards Desk and relaunch the bot in PowerShell with live developer logs.</div>
-          </div>
-          <button class="btn btn-secondary" id="btn-terminal-mode" style="flex-shrink:0">Open terminal &amp; run →</button>
-        </div>
-        </div>
-        <div class="adv-group">
-        <h3>Search tuning</h3>
-        <div class="settings-section-note" style="display:block;background:rgba(46,232,255,.05);border-color:rgba(46,232,255,.15);color:var(--muted)">Fine-tune search behaviour and timing. The defaults are sensible — only change these if you know what you are doing. Delays accept values like <b>3min</b> or <b>8sec</b>.</div>
-        <div class="toggle-grid">
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Parallel searching</div><div class="toggle-sub">Run desktop &amp; mobile searches together (faster)</div></div><label class="toggle"><input type="checkbox" id="tog-parallelSearching"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Scroll results</div><div class="toggle-sub">Scroll result pages like a human</div></div><label class="toggle"><input type="checkbox" id="tog-scrollRandomResults"><span class="toggle-slider"></span></label></div>
-          <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Click results</div><div class="toggle-sub">Occasionally open a result link</div></div><label class="toggle"><input type="checkbox" id="tog-clickRandomResults"><span class="toggle-slider"></span></label></div>
-        </div>
-        <div class="acc-grid-2" style="margin-top:12px">
-          <div class="modal-field"><label>Result visit time</label><input class="modal-input" id="set-visitTime" autocomplete="off" placeholder="8sec"></div>
-          <div class="modal-field"><label>Global timeout</label><input class="modal-input" id="set-globalTimeout" autocomplete="off" placeholder="30sec"></div>
-          <div class="modal-field"><label>Search delay min</label><input class="modal-input" id="set-searchDelayMin" autocomplete="off" placeholder="3min"></div>
-          <div class="modal-field"><label>Search delay max</label><input class="modal-input" id="set-searchDelayMax" autocomplete="off" placeholder="5min"></div>
-          <div class="modal-field"><label>Read delay min</label><input class="modal-input" id="set-readDelayMin" autocomplete="off" placeholder="3sec"></div>
-          <div class="modal-field"><label>Read delay max</label><input class="modal-input" id="set-readDelayMax" autocomplete="off" placeholder="5sec"></div>
-        </div>
-        </div>
-        <div class="adv-group">
-        <h3>Account protection &amp; maintenance</h3>
-        <div class="advanced-block">
-          <div class="storage-panel">
-            <div class="storage-shield"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3z"/><path d="m9 12 2 2 4-5"/></svg></div>
-            <div class="advanced-copy">
-              <div class="toggle-label">Account protection</div>
-              <div class="toggle-sub">Automatic AES-256-GCM encryption with the key protected by your operating system.</div>
-              <div class="storage-state" id="account-storage-status">Checking protected storage…</div>
+          <div class="settings-section">
+            <h3>Browser</h3>
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Headless mode</div><div class="toggle-sub">Run the browser hidden in the background</div></div><label class="toggle"><input type="checkbox" id="tog-headless"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Run on zero points</div><div class="toggle-sub">Keep running even when no points are left to earn</div></div><label class="toggle"><input type="checkbox" id="tog-runOnZero"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Search on Bing local queries</div><div class="toggle-sub">Use local search-history suggestions as Bing queries</div></div><label class="toggle"><input type="checkbox" id="tog-searchOnBing"><span class="toggle-slider"></span></label></div>
             </div>
           </div>
-          <div class="advanced-actions">
-            <button class="btn btn-secondary btn-sm" id="storage-export">Export protected backup</button>
-            <button class="btn btn-secondary btn-sm" id="storage-toggle">Disable encryption</button>
+          <div class="settings-section">
+            <h3>Parallelism</h3>
+            <div class="acc-grid-2">
+              <div class="modal-field"><label>Parallel accounts (clusters)</label><input type="number" class="modal-input" id="set-clusters" min="1" max="20" placeholder="1" autocomplete="off"><div class="toggle-sub" style="margin-top:4px">How many accounts run simultaneously. Higher = faster but riskier.</div></div>
+            </div>
           </div>
         </div>
-        <details class="storage-tools">
-          <summary>Security and recovery options</summary>
-          <div class="advanced-caption">These actions are rarely needed. Disabling protection requires an explicit local-user confirmation and writes credentials to plaintext JSON.</div>
-          <div class="advanced-actions">
-            <button class="btn btn-secondary btn-sm" id="storage-rotate">Rotate local key</button>
-            <button class="btn btn-secondary btn-sm" id="storage-import">Import protected backup</button>
+
+        <!-- Schedule -->
+        <div class="sett-panel" id="sett-schedule">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Schedule</div>
+            <div class="sett-panel-sub">Run the bot automatically at a set time every day.</div>
           </div>
-        </details>
-        <div class="advanced-block term-row">
-          <div class="toggle-wrap-left">
-            <div class="toggle-label">Desktop shortcuts</div>
-            <div class="toggle-sub">Remove the Desktop and application-menu shortcuts. Autostart settings are not changed.</div>
+          <div class="settings-section">
+            <div class="toggle-wrap" style="margin-bottom:9px">
+              <div class="toggle-wrap-left"><div class="toggle-label">Auto-schedule</div><div class="toggle-sub">Enable automatic daily runs</div></div>
+              <label class="toggle"><input type="checkbox" id="tog-scheduler"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="scheduler-fields hidden" id="scheduler-fields">
+              <div class="settings-field">
+                <div class="settings-label">Start time</div>
+                <input type="time" class="settings-input" id="sch-startTime" value="08:00">
+              </div>
+              <div class="settings-field">
+                <div class="settings-label">Timezone</div>
+                <select class="settings-input" id="sch-timezone">
+                  <option value="Europe/Paris">Europe/Paris</option>
+                  <option value="Europe/London">Europe/London</option>
+                  <option value="Europe/Berlin">Europe/Berlin</option>
+                  <option value="Europe/Madrid">Europe/Madrid</option>
+                  <option value="Europe/Rome">Europe/Rome</option>
+                  <option value="America/New_York">America/New_York</option>
+                  <option value="America/Chicago">America/Chicago</option>
+                  <option value="America/Denver">America/Denver</option>
+                  <option value="America/Los_Angeles">America/Los_Angeles</option>
+                  <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo</option>
+                  <option value="Asia/Shanghai">Asia/Shanghai</option>
+                  <option value="Asia/Kolkata">Asia/Kolkata</option>
+                  <option value="Asia/Dubai">Asia/Dubai</option>
+                  <option value="Australia/Sydney">Australia/Sydney</option>
+                  <option value="UTC">UTC</option>
+                </select>
+              </div>
+              <div class="settings-label">Random delay (before start)</div>
+              <div class="settings-input-row">
+                <div class="settings-field">
+                  <div class="settings-label">Min</div>
+                  <input type="text" class="settings-input" id="sch-delayMin" placeholder="0min">
+                </div>
+                <div class="settings-field">
+                  <div class="settings-label">Max</div>
+                  <input type="text" class="settings-input" id="sch-delayMax" placeholder="30min">
+                </div>
+              </div>
+              <div class="toggle-wrap">
+                <div class="toggle-wrap-left"><div class="toggle-label">Run on startup</div><div class="toggle-sub">Run immediately when the bot starts</div></div>
+                <label class="toggle"><input type="checkbox" id="tog-runOnStartup"><span class="toggle-slider"></span></label>
+              </div>
+            </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="desktop-uninstall" style="flex-shrink:0">Uninstall shortcuts</button>
         </div>
+
+        <!-- Startup -->
+        <div class="sett-panel" id="sett-startup">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Startup</div>
+            <div class="sett-panel-sub">Launch Rewards Desk or the Core agent automatically when your computer starts.</div>
+          </div>
+          <div class="startup-grid">
+            <div class="startup-card">
+              <div class="startup-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+              <div class="startup-copy">
+                <div class="toggle-label">Open Rewards Desk</div>
+                <div class="toggle-sub">Show this interface automatically when you sign in.</div>
+                <div class="startup-method" id="startup-desk-method"></div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="tog-startup-desk"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="startup-card core-only">
+              <div class="startup-icon"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v3a4 4 0 0 0 4 4h1"/><path d="M12 3a6 6 0 0 1 6 6v3a4 4 0 0 1-4 4h-1"/><path d="M9 20h6"/></svg></div>
+              <div class="startup-copy">
+                <div class="toggle-label">Core remote access <span class="startup-badge">Core</span></div>
+                <div class="toggle-sub">Keep a hidden agent online for remote monitoring and launch.</div>
+                <div class="startup-method" id="startup-agent-method"></div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="tog-startup-agent"><span class="toggle-slider"></span></label>
+            </div>
+          </div>
         </div>
-      </details>
+
+        <!-- Core Premium -->
+        <div class="sett-panel" id="sett-core">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Core Premium</div>
+            <div class="sett-panel-sub">Premium features that run on top of the free bot. Each one only activates when your Core license is valid.</div>
+          </div>
+          <div class="settings-section settings-section-core" id="settings-core-premium">
+            <h3>
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:var(--gold);stroke:none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Premium features
+              <span class="core-section-badge" id="core-license-badge">No license</span>
+            </h3>
+            <div class="settings-section-note" id="core-section-note" style="display:none">Activate a Core license to unlock these features. Each one only runs — and only counts — when your license is valid and the feature is enabled here.</div>
+            <div class="settings-section-note">Some features only run on one Microsoft Rewards dashboard. Badges show which.</div>
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Claim points</div><div class="toggle-sub">Auto-claim ready-to-claim dashboard point cards</div></div><label class="toggle"><input type="checkbox" id="tog-core-claimPoints"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Apply coupons<span class="next-badge">Next only</span></div><div class="toggle-sub">Detect &amp; apply dashboard coupons automatically</div></div><label class="toggle"><input type="checkbox" id="tog-core-applyCoupons"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Double search points</div><div class="toggle-sub">Activate eligible double-search promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-doubleSearchPoints"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App rewards</div><div class="toggle-sub">Mobile app-only reward promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-appReward"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Read to Earn<span class="beta-badge">Beta</span></div><div class="toggle-sub">MSN app-only reading rewards</div></div><label class="toggle"><input type="checkbox" id="tog-core-readToEarn"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily check-in</div><div class="toggle-sub">App-only daily check-in bonus</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyCheckIn"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily streak</div><div class="toggle-sub">Read streak details from the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyStreak"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Streak protection</div><div class="toggle-sub">Keep streak protection enabled on the dashboard</div></div><label class="toggle"><input type="checkbox" id="tog-core-streakProtection"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Temporary punchcards<span class="beta-badge">Beta</span><span class="next-badge">Next only</span></div><div class="toggle-sub">New-dashboard limited-time punchcards (distinct from classic punch cards)</div></div><label class="toggle"><input type="checkbox" id="tog-core-temporaryPunchcards"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Dashboard data</div><div class="toggle-sub">Rich dashboard snapshots, ready-to-claim &amp; streak info</div></div><label class="toggle"><input type="checkbox" id="tog-core-collectDashboardInfo"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Set Rewards goal<span class="next-badge">Next only</span></div><div class="toggle-sub">Auto-pick an eligible gift card as your Rewards goal</div></div><label class="toggle"><input type="checkbox" id="tog-core-setGoal"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Page Harvester<span class="beta-badge">Diagnostic</span></div><div class="toggle-sub">Snapshots all Rewards pages (HTML + data) into the Page/ folder. Enable once, run the bot — Page/ is rebuilt and the toggle resets. For selector maintenance only, does not earn points.</div></div><label class="toggle"><input type="checkbox" id="tog-core-captureDashboardPages"><span class="toggle-slider"></span></label></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="sett-panel" id="sett-notifications">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Notifications</div>
+            <div class="sett-panel-sub">Free, open-source channels. Click Configure on any channel to set it up.</div>
+          </div>
+          <div class="settings-section">
+            <div class="toggle-grid-1">
+              <div class="cfg-wrap">
+                <div class="toggle-wrap-left"><div class="toggle-label">Discord log webhook</div><div class="toggle-sub">Stream filtered console logs to a Discord channel</div></div>
+                <button class="btn-cfg" data-cfg="discord">Configure</button>
+                <label class="toggle"><input type="checkbox" id="tog-wh-discord"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-wrap">
+                <div class="toggle-wrap-left"><div class="toggle-label">ntfy push</div><div class="toggle-sub">Send notifications to an ntfy topic / server</div></div>
+                <button class="btn-cfg" data-cfg="ntfy">Configure</button>
+                <label class="toggle"><input type="checkbox" id="tog-wh-ntfy"><span class="toggle-slider"></span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Privacy -->
+        <div class="sett-panel" id="sett-privacy">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Privacy &amp; data</div>
+            <div class="sett-panel-sub">Anonymous usage data helps fix bugs and improve the bot. It never includes passwords, emails, cookies or licence keys.</div>
+          </div>
+          <div class="settings-section">
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Anonymous telemetry</div><div class="toggle-sub">Send anonymous run stats and error signals to the maintainer</div></div><label class="toggle"><input type="checkbox" id="tog-analytics"><span class="toggle-slider"></span></label></div>
+            </div>
+            <div id="analytics-warning" class="settings-section-note" style="display:none;margin-top:10px;margin-bottom:0;background:rgba(255,170,0,.06);border-color:rgba(255,170,0,.22);color:#f5c542">&#9888; Telemetry disabled — errors are silent and bugs go unreported.</div>
+          </div>
+        </div>
+
+        <!-- Advanced -->
+        <div class="sett-panel" id="sett-advanced">
+          <div class="sett-panel-header">
+            <div class="sett-panel-title">Advanced</div>
+            <div class="sett-panel-sub">Rarely-needed options — defaults are fine for most setups.</div>
+          </div>
+          <div class="settings-section">
+            <h3>Developer</h3>
+            <div class="settings-section-note">Verbose logging and a raw-terminal run mode for debugging the bot.</div>
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Debug logs</div><div class="toggle-sub">Print verbose internal logs to the console</div></div><label class="toggle"><input type="checkbox" id="tog-debugLogs"><span class="toggle-slider"></span></label></div>
+            </div>
+            <div class="advanced-block term-row" style="margin-top:12px">
+              <div class="toggle-wrap-left">
+                <div class="toggle-label">Developer terminal mode</div>
+                <div class="toggle-sub">Close Rewards Desk and relaunch the bot in PowerShell with live developer logs.</div>
+              </div>
+              <button class="btn btn-secondary" id="btn-terminal-mode" style="flex-shrink:0">Open terminal &amp; run &#8250;</button>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>Search tuning</h3>
+            <div class="settings-section-note">Fine-tune search behaviour and timing. Delays accept values like <b>3min</b> or <b>8sec</b>.</div>
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Parallel searching</div><div class="toggle-sub">Run desktop &amp; mobile searches together (faster)</div></div><label class="toggle"><input type="checkbox" id="tog-parallelSearching"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Scroll results</div><div class="toggle-sub">Scroll result pages like a human</div></div><label class="toggle"><input type="checkbox" id="tog-scrollRandomResults"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Click results</div><div class="toggle-sub">Occasionally open a result link</div></div><label class="toggle"><input type="checkbox" id="tog-clickRandomResults"><span class="toggle-slider"></span></label></div>
+            </div>
+            <div class="acc-grid-2" style="margin-top:12px">
+              <div class="modal-field"><label>Result visit time</label><input class="modal-input" id="set-visitTime" autocomplete="off" placeholder="8sec"></div>
+              <div class="modal-field"><label>Global timeout</label><input class="modal-input" id="set-globalTimeout" autocomplete="off" placeholder="30sec"></div>
+              <div class="modal-field"><label>Search delay min</label><input class="modal-input" id="set-searchDelayMin" autocomplete="off" placeholder="3min"></div>
+              <div class="modal-field"><label>Search delay max</label><input class="modal-input" id="set-searchDelayMax" autocomplete="off" placeholder="5min"></div>
+              <div class="modal-field"><label>Read delay min</label><input class="modal-input" id="set-readDelayMin" autocomplete="off" placeholder="3sec"></div>
+              <div class="modal-field"><label>Read delay max</label><input class="modal-input" id="set-readDelayMax" autocomplete="off" placeholder="5sec"></div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>Account protection &amp; maintenance</h3>
+            <div class="advanced-block">
+              <div class="storage-panel">
+                <div class="storage-shield"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3z"/><path d="m9 12 2 2 4-5"/></svg></div>
+                <div class="advanced-copy">
+                  <div class="toggle-label">Account protection</div>
+                  <div class="toggle-sub">Automatic AES-256-GCM encryption with the key protected by your operating system.</div>
+                  <div class="storage-state" id="account-storage-status">Checking protected storage…</div>
+                </div>
+              </div>
+              <div class="advanced-actions">
+                <button class="btn btn-secondary btn-sm" id="storage-export">Export protected backup</button>
+                <button class="btn btn-secondary btn-sm" id="storage-toggle">Disable encryption</button>
+              </div>
+            </div>
+            <details class="storage-tools">
+              <summary>Security and recovery options</summary>
+              <div class="advanced-caption">These actions are rarely needed. Disabling protection requires an explicit local-user confirmation and writes credentials to plaintext JSON.</div>
+              <div class="advanced-actions" style="margin-top:10px">
+                <button class="btn btn-secondary btn-sm" id="storage-rotate">Rotate local key</button>
+                <button class="btn btn-secondary btn-sm" id="storage-import">Import protected backup</button>
+              </div>
+            </details>
+            <div class="advanced-block term-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+              <div class="toggle-wrap-left">
+                <div class="toggle-label">Desktop shortcuts</div>
+                <div class="toggle-sub">Remove the Desktop and application-menu shortcuts. Autostart settings are not changed.</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="desktop-uninstall" style="flex-shrink:0">Uninstall shortcuts</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <!-- Core view -->
@@ -3203,8 +3325,12 @@ function html() {
       ['dash','accounts','console','settings','core','plugins','docs'].forEach(function(n) {
         var el = G('nav-' + n); if (el) el.classList.toggle('active', n === v);
       });
-      if (v === 'accounts') loadAccEditor();
-      if (v === 'settings') loadSettings();
+      if (v === 'accounts') {
+        loadAccEditor();
+        if (!_hintSeen('acc-dbl')) showHint('acc-dbl', 700);
+        else showHint('acc-rclick', 700);
+      }
+      if (v === 'settings') { _settGo(_settTab); loadSettings(); }
       if (v === 'core') renderCoreView();
       if (v === 'plugins') loadPluginsCatalog(false);
       if (v === 'docs') loadDocs();
@@ -3979,6 +4105,11 @@ function html() {
       if (badge) badge.style.background = hasCore ? 'rgba(47,210,125,.15)' : '';
       if (badge) badge.style.color = hasCore ? 'var(--green)' : '';
       if (note) note.style.display = hasCore ? 'none' : '';
+      var navBadge = G('sett-nav-core-badge');
+      if (navBadge) {
+        navBadge.textContent = hasCore ? 'Active' : '';
+        navBadge.className = 'sett-nav-badge ' + (hasCore ? 'sett-nav-badge-green' : 'sett-nav-badge-gold');
+      }
       CORE_KEYS.forEach(function(k) {
         var el = G('tog-core-' + k);
         if (!el) return;
@@ -4024,6 +4155,44 @@ function html() {
       catch(e) {}
     }
 
+    // ── Hints ─────────────────────────────────
+    var _hintsKey = 'msrb-hints-v1';
+    var _hintsData = {};
+    try { _hintsData = JSON.parse(localStorage.getItem(_hintsKey) || '{}'); } catch(e) {}
+    function _hintSeen(id) { return !!_hintsData[id]; }
+    function _markHint(id) {
+      _hintsData[id] = 1;
+      try { localStorage.setItem(_hintsKey, JSON.stringify(_hintsData)); } catch(e) {}
+    }
+    function showHint(id, delay) {
+      if (_hintSeen(id)) return;
+      setTimeout(function() {
+        if (_hintSeen(id)) return;
+        var el = G('hint-' + id);
+        if (!el) return;
+        el.classList.add('show');
+        el._hintTimer = setTimeout(function() { dismissHint(id); }, 8000);
+      }, delay || 500);
+    }
+    function dismissHint(id) {
+      var el = G('hint-' + id);
+      if (el) { clearTimeout(el._hintTimer); el.classList.remove('show'); }
+      _markHint(id);
+    }
+    // ── Settings panels ───────────────────────
+    var _settTab = 'run';
+    function _settGo(panel) {
+      _settTab = panel;
+      document.querySelectorAll('.sett-nav-item').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-panel') === panel);
+      });
+      document.querySelectorAll('.sett-panel').forEach(function(p) {
+        p.classList.toggle('active', p.id === 'sett-' + panel);
+      });
+    }
+    document.querySelectorAll('.sett-nav-item').forEach(function(b) {
+      b.addEventListener('click', function() { _settGo(b.getAttribute('data-panel')); });
+    });
     // ── Listeners ─────────────────────────────
     G('btn-run').addEventListener('click', async function() {
       var s = await fetch('/api/state').then(function(r){return r.json();}).catch(function(){return {};});
@@ -4045,7 +4214,7 @@ function html() {
       if (!row) return;
       var email = row.getAttribute('data-email');
       var idx = _raw.findIndex(function(a) { return (a.email || '') === email; });
-      if (idx !== -1) toggleAcc(idx);
+      if (idx !== -1) { toggleAcc(idx); dismissHint('acc-dbl'); }
     });
     G('btn-test-proxies').addEventListener('click', function() { runProxyTest(); });
     G('acc-modal-save').addEventListener('click', saveAccModal);
