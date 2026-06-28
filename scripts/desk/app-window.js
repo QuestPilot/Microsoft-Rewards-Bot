@@ -23,6 +23,10 @@ let deskLanUrl = null
 const DESK_EMBED_ORIGINS = new Set(
     ['https://bot.lgtw.tf'].concat(process.env.MSRB_DESK_EMBED_ORIGIN ? [process.env.MSRB_DESK_EMBED_ORIGIN] : [])
 )
+// Where the Desk announces its presence so the remote dashboard can discover it on the
+// same network (same default as the bot's DashboardClient).
+const DASHBOARD_URL = (process.env.MSRB_DASHBOARD_URL || 'https://bot.lgtw.tf').replace(/\/+$/, '')
+let deskPresenceAnnounced = false
 const APP_TITLE = 'Rewards Desk'
 const APP_ICON_PATH = path.join(ROOT, 'assets', 'logo.ico')
 const APP_BANNER_PATH = path.join(ROOT, 'assets', 'banner-core.png')
@@ -67,6 +71,35 @@ function getLanIPv4() {
         return candidates[0].address
     } catch {}
     return null
+}
+
+// Announce this Desk (loopback port + optional LAN URL) to the remote dashboard so it
+// can be discovered + embedded when you visit Nexus from the same home network. The
+// server keys it by the public IP, so it's only ever offered to the same household.
+// Discovery/embed is a Core feature → only premium Desks announce (open-source never
+// phones home here).
+function reportDeskPresence() {
+    if (state.deskLicense.tier !== 'premium' || !deskBoundPort) return
+    try {
+        const u = new URL(DASHBOARD_URL + '/api/desk/presence')
+        const transport = u.protocol === 'http:' ? require('http') : require('https')
+        const payload = JSON.stringify({ port: deskBoundPort, lanUrl: deskLanUrl })
+        const req = transport.request({
+            hostname: u.hostname,
+            port: u.port || (u.protocol === 'http:' ? 80 : 443),
+            path: u.pathname,
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) },
+            timeout: 8000
+        }, resp => { resp.on('data', () => {}); resp.on('end', () => {}) })
+        req.on('error', () => {})
+        req.on('timeout', () => req.destroy())
+        req.end(payload)
+        if (!deskPresenceAnnounced) {
+            deskPresenceAnnounced = true
+            pushLog('info', 'Desk announced to Nexus for same-network discovery.')
+        }
+    } catch {}
 }
 const APP_VERSION = readVersion()
 
@@ -739,6 +772,8 @@ async function loadDeskLicenseState() {
         state.deskLicense.loading = false
         state.boot.licenseReady = true
         finishDeskBoot()
+        // Announce as soon as premium is confirmed (don't wait for the 60s interval).
+        if (state.deskLicense.tier === 'premium') reportDeskPresence()
     }
 }
 
@@ -2827,14 +2862,14 @@ function html() {
           </div>
           <div class="settings-section">
             <h3>Network access</h3>
-            <div class="settings-section-note">Open this Desk from other devices on your home network (phone, laptop) and control the bot from there.</div>
+            <div class="settings-section-note">Control this Desk from another device on your home network (e.g. your phone). When you open Nexus on the same network, it can load this Desk directly. The Desk embedded on this same computer already works without this.</div>
             <div class="toggle-grid">
-              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Local network access (LAN)</div><div class="toggle-sub">Reachable from other devices on your Wi-Fi. Anyone on your network who opens the address can control the bot. Changing this needs a Desk restart.</div></div><label class="toggle"><input type="checkbox" id="tog-lanAccess"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Local network access (LAN)</div><div class="toggle-sub">Off by default. When on, the Desk also listens on your computer's network address so other devices on your Wi-Fi can reach it &mdash; anyone on the network who opens that address can control the bot. The first launch may ask Windows Firewall to allow it. Takes effect after a Desk restart.</div></div><label class="toggle"><input type="checkbox" id="tog-lanAccess"><span class="toggle-slider"></span></label></div>
             </div>
             <div id="lan-url-row" class="advanced-block term-row" style="margin-top:12px; display:none">
               <div class="toggle-wrap-left">
-                <div class="toggle-label">Open on your phone</div>
-                <div class="toggle-sub">Bookmark this address on a device on the same network:</div>
+                <div class="toggle-label">Your Desk address on this network</div>
+                <div class="toggle-sub">Open or bookmark this on another device on the same Wi-Fi:</div>
                 <div id="lan-url-value" style="margin-top:6px; font-family:monospace; color:#3bc9ff; user-select:all; word-break:break-all"></div>
               </div>
               <button class="btn btn-secondary" id="btn-copy-lan-url" style="flex-shrink:0">Copy</button>
@@ -6772,12 +6807,13 @@ startDeskServer()
 
 function startDeskServer() {
     const deskCfg = (readConfigRaw() || {}).desk || {}
-    // LAN access: env override (tests force loopback with MSRB_DESK_LAN=0) wins,
-    // otherwise config desk.lanAccess (default ON). When ON we bind 0.0.0.0 so the
-    // Desk is reachable from other devices on the home network; 0.0.0.0 still covers
-    // loopback, so the local app window keeps using 127.0.0.1.
+    // LAN access: env override (tests force loopback with MSRB_DESK_LAN=0) wins, otherwise
+    // config desk.lanAccess (default OFF — opt-in). The same-machine Nexus embed only needs
+    // loopback, so LAN stays off unless you specifically want to reach the Desk from another
+    // device (e.g. a phone). When ON we bind 0.0.0.0 (still covers loopback for the local
+    // window); the first such launch may prompt the Windows Firewall to allow Node.
     const lanEnv = process.env.MSRB_DESK_LAN
-    deskLanEnabled = lanEnv === '1' ? true : lanEnv === '0' ? false : deskCfg.lanAccess !== false
+    deskLanEnabled = lanEnv === '1' ? true : lanEnv === '0' ? false : deskCfg.lanAccess === true
     deskLanIp = deskLanEnabled ? getLanIPv4() : null
     const host = deskLanEnabled ? '0.0.0.0' : '127.0.0.1'
 
@@ -6822,6 +6858,9 @@ function finalizeDeskServer() {
     initializeDeskInBackground()
     void refreshAgentState()
     setInterval(() => void refreshAgentState(), 900)
+    // Announce presence to Nexus (premium only; re-announced before the 90s server TTL).
+    setTimeout(reportDeskPresence, 6000)
+    setInterval(reportDeskPresence, 60_000)
 }
 
 // Browser launcher extracted to ./desk/browser-launcher.js (behavior identical).

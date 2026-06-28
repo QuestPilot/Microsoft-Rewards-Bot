@@ -131,10 +131,11 @@ export const ConfigSchema = z.object({
     }).default({ enabled: true }),
     backgroundAgent: BackgroundAgentSchema.optional(),
     terminal: TerminalSchema.optional(),
-    /** Rewards Desk (local control UI) settings. `lanAccess` lets other devices on
-     *  the home network reach the Desk at http://<this-pc-ip>:<port>; default on. */
+    /** Rewards Desk (local control UI) settings. `lanAccess` (opt-in, default off) lets
+     *  other devices on the home network reach the Desk at http://<this-pc-ip>:<port>;
+     *  the same-machine Nexus embed works on loopback without it. */
     desk: z.object({
-        lanAccess: z.boolean().default(true),
+        lanAccess: z.boolean().default(false),
         port: NumberOrString.optional()
     }).optional(),
     scheduler: SchedulerSchema.optional(),
