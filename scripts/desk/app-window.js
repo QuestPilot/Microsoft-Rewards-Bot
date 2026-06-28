@@ -101,6 +101,89 @@ function reportDeskPresence() {
         }
     } catch {}
 }
+
+// Remote access (off-network control from Nexus). The Desk keeps a background "agent"
+// (a bot process that connects to Nexus via the Core plugin and sits idle awaiting
+// run/stop) alive while it's open; closing the Desk stops it (owner's model: Desk
+// open = remote on). Premium only. Reuses the existing agent IPC: startBot() already
+// routes a Run through an active agent (requestAgentRun), so no double process.
+async function startAgentProcess() {
+    if (state.deskLicense.tier !== 'premium' || !agentApi) return
+    try {
+        const status = await agentApi.getAgentStatus().catch(() => ({ active: false }))
+        if (status.active) return // already connected
+    } catch {}
+    try {
+        // Spawn the agent the SAME way the Desk spawns a Run — dist/index.js directly with
+        // windowsHide — NOT via start.js (whose run() re-spawns the bot WITHOUT windowsHide,
+        // which is what popped a visible CMD). detached:false on Windows = no new console;
+        // POSIX detached = a proper background session. Either way it's stopped explicitly.
+        childProcess
+            .spawn(process.execPath, [path.join('dist', 'index.js'), '--background'], {
+                cwd: ROOT,
+                detached: process.platform !== 'win32',
+                stdio: 'ignore',
+                windowsHide: true,
+                env: { ...process.env, MSRB_TERMINAL_MODE: '0' }
+            })
+            .unref()
+        pushLog('info', 'Remote access: connecting to Nexus in the background…')
+    } catch (error) {
+        pushLog('warn', `Could not start remote access: ${error && error.message ? error.message : error}`)
+    }
+}
+
+// Cross-platform process-tree kill (Windows taskkill /T, POSIX process group then pid).
+function killPidTree(pid) {
+    if (!pid) return
+    try {
+        if (process.platform === 'win32') {
+            childProcess.spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
+        } else {
+            try { process.kill(-pid, 'SIGKILL') } catch { try { process.kill(pid, 'SIGKILL') } catch {} }
+        }
+    } catch {}
+}
+
+// Graceful agent stop (IPC shutdown) with a force-kill fallback — the graceful path
+// alone proved unreliable (the agent kept running), so we make sure it actually dies.
+async function stopAgentProcess() {
+    if (!agentApi) return
+    let pid = null
+    try {
+        const status = await agentApi.getAgentStatus().catch(() => ({ active: false }))
+        if (!status.active) return
+        pid = status.pid || null
+    } catch {}
+    try { await agentApi.stopExistingAgent() } catch {}
+    try {
+        const after = await agentApi.getAgentStatus().catch(() => ({ active: false }))
+        if (after.active) killPidTree(after.pid || pid)
+    } catch {
+        if (pid) killPidTree(pid)
+    }
+}
+
+// Fast, synchronous force-kill for shutdown (the Desk is exiting — no time for the IPC
+// dance). Reads the agent rendezvous file for the pid and kills the tree.
+function quickKillAgent() {
+    if (!agentApi) return
+    try {
+        const statePath = agentApi.agentStatePath()
+        const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'))
+        if (parsed && parsed.pid) killPidTree(parsed.pid)
+        fs.rmSync(statePath, { force: true })
+    } catch {}
+}
+
+function remoteAccessEnabled() {
+    try {
+        const cfg = readConfigRaw()
+        return !!(cfg && cfg.core && cfg.core.dashboardSync === true)
+    } catch {
+        return false
+    }
+}
 const APP_VERSION = readVersion()
 
 // Reads the bot's locally-recorded stats (written by StatsRecorder to data/stats/)
@@ -147,6 +230,116 @@ function readBotStats() {
     return out
 }
 
+// Insights: read data/stats into chart series + per-account summaries + LOCAL-rule
+// recommendations (nothing leaves the machine). Charts are free; the page gates the
+// recommendations behind Core (see the client). Masked emails only — never real ones.
+function buildInsights() {
+    const statsDir = path.join(ROOT, 'data', 'stats')
+    const base = readBotStats()
+    const out = {
+        hasData: base.hasData,
+        totals: {
+            points: base.totalPoints, runs: base.totalRuns, accountRuns: base.totalAccountRuns,
+            successRate: base.successRate, claimedPoints: base.claimedPoints,
+            couponsApplied: base.couponsApplied, accountsTracked: base.accountsTracked,
+            last7Points: base.last7Points, last30Points: base.last30Points, lastRunAt: base.lastRunAt
+        },
+        daily: [],
+        accounts: [],
+        recommendations: []
+    }
+    try {
+        const dailyDir = path.join(statsDir, 'daily')
+        const rows = []
+        for (const f of fs.readdirSync(dailyDir)) {
+            if (!f.endsWith('.json')) continue
+            const date = f.slice(0, -5)
+            if (Number.isNaN(Date.parse(date))) continue
+            let d = {}
+            try { d = JSON.parse(fs.readFileSync(path.join(dailyDir, f), 'utf8')) } catch {}
+            const ar = d.accountRuns || 0
+            rows.push({
+                date,
+                points: d.totalPointsCollected || 0,
+                runs: d.runs || 0,
+                successRate: ar > 0 ? Math.round(((d.successfulAccountRuns || 0) / ar) * 100) : null
+            })
+        }
+        rows.sort((a, b) => (a.date < b.date ? -1 : 1))
+        out.daily = rows.slice(-30)
+    } catch { /* no daily stats */ }
+    try {
+        const accDir = path.join(statsDir, 'accounts')
+        for (const f of fs.readdirSync(accDir)) {
+            if (!f.endsWith('.json')) continue
+            let a = {}
+            try { a = JSON.parse(fs.readFileSync(path.join(accDir, f), 'utf8')) } catch {}
+            const totalRuns = a.totalRuns || 0
+            const hist = Array.isArray(a.history) ? a.history : []
+            const recent = hist.slice(-3)
+            const lastErr = [...hist].reverse().find(h => h && h.error)
+            let status = 'ok'
+            if (recent.length >= 2 && recent.every(h => h && h.success === false)) status = 'failing'
+            else if (totalRuns > 0 && (a.lastKnownPoints || 0) === 0 && (a.totalPointsCollected || 0) === 0) status = 'idle'
+            out.accounts.push({
+                name: a.maskedEmail || a.emailKey || 'account',
+                points: a.totalPointsCollected || 0,
+                lastKnownPoints: a.lastKnownPoints || 0,
+                runs: totalRuns,
+                successRate: totalRuns > 0 ? Math.round(((a.totalSuccessfulRuns || 0) / totalRuns) * 100) : null,
+                lastSeenAt: a.lastSeenAt || null,
+                status,
+                signedOut: !!(lastErr && /sign|enrol|onboard|authenticat|session/i.test(String(lastErr.error)))
+            })
+        }
+    } catch { /* no per-account stats */ }
+    out.accounts.sort((a, b) => (b.points - a.points) || (b.lastKnownPoints - a.lastKnownPoints))
+    out.recommendations = computeRecommendations(out)
+    return out
+}
+
+function computeRecommendations(ins) {
+    const recs = []
+    const accts = ins.accounts || []
+    const signedOut = accts.filter(a => a.signedOut)
+    const signedOutNames = new Set(signedOut.map(a => a.name))
+    if (signedOut.length) {
+        recs.push({
+            severity: 'high',
+            title: signedOut.length + ' account' + (signedOut.length > 1 ? 's look' : ' looks') + ' signed out',
+            detail: 'They earn nothing until you re-login or finish Microsoft Rewards enrollment: ' +
+                signedOut.slice(0, 6).map(a => a.name).join(', ') + (signedOut.length > 6 ? '…' : '') + '.'
+        })
+    }
+    const failing = accts.filter(a => a.status === 'failing' && !signedOutNames.has(a.name))
+    if (failing.length) {
+        recs.push({ severity: 'high', title: failing.length + ' account' + (failing.length > 1 ? 's keep' : ' keeps') + ' failing',
+            detail: 'Check the login or proxy for: ' + failing.slice(0, 6).map(a => a.name).join(', ') + '.' })
+    }
+    const zero = accts.filter(a => a.runs > 0 && a.points === 0 && a.status === 'ok' && !signedOutNames.has(a.name))
+    if (zero.length) {
+        recs.push({ severity: 'medium', title: zero.length + ' account' + (zero.length > 1 ? 's' : '') + ' collected 0 points',
+            detail: 'They run but earn nothing — make sure searches and the daily set are enabled, and the accounts are enrolled.' })
+    }
+    if (ins.totals.successRate != null && ins.totals.successRate < 70 && ins.totals.accountRuns >= 3) {
+        recs.push({ severity: 'medium', title: 'Success rate is ' + ins.totals.successRate + '%',
+            detail: 'Several account runs fail. Fixing the accounts above should raise it.' })
+    }
+    if (ins.totals.lastRunAt) {
+        const days = Math.floor((Date.now() - Date.parse(ins.totals.lastRunAt)) / 86400000)
+        if (days >= 2) recs.push({ severity: 'low', title: 'No run in ' + days + ' days',
+            detail: 'Turn on the scheduler (Settings) so points are collected automatically every day.' })
+    }
+    if (!recs.length) {
+        const top = accts.find(a => a.points > 0)
+        recs.push(top
+            ? { severity: 'low', title: 'Everything looks healthy',
+                detail: 'Top account ' + top.name + ' collected ' + top.points.toLocaleString() + ' points. Keep it running daily to maximise earnings.' }
+            : { severity: 'low', title: 'Not enough data yet',
+                detail: 'Run the bot a few more times to unlock deeper recommendations.' })
+    }
+    return recs
+}
 
 // Returns a map of maskedEmail → totalPointsCollected for the Home account list badges.
 function readAllAccountStats() {
@@ -772,8 +965,11 @@ async function loadDeskLicenseState() {
         state.deskLicense.loading = false
         state.boot.licenseReady = true
         finishDeskBoot()
-        // Announce as soon as premium is confirmed (don't wait for the 60s interval).
-        if (state.deskLicense.tier === 'premium') reportDeskPresence()
+        // Announce + connect remote as soon as premium is confirmed.
+        if (state.deskLicense.tier === 'premium') {
+            reportDeskPresence()
+            if (remoteAccessEnabled()) void startAgentProcess()
+        }
     }
 }
 
@@ -785,6 +981,30 @@ function prepareInitialRun() {
 function finishDeskBoot() {
     if (!state.boot.accountsReady || !state.boot.licenseReady) return
     prepareInitialRun()
+}
+
+// First GUI launch only: turn on "Open Rewards Desk at sign-in" by default. A one-shot
+// marker makes it stick if the user later turns it off, and we skip headless/CI launches
+// so a Docker/server start never writes a desktop autostart entry.
+function maybeAutoEnableDeskStartup() {
+    if (process.env.MSRB_APP_NO_OPEN === '1') return
+    const marker = path.join(ROOT, 'data', '.desk-startup-init')
+    try {
+        if (fs.existsSync(marker)) return
+        fs.mkdirSync(path.dirname(marker), { recursive: true })
+        fs.writeFileSync(marker, new Date().toISOString())
+    } catch {
+        return // can't persist the marker → don't risk re-enabling on every launch
+    }
+    try {
+        const st = startupManager.status()
+        if (!st || !st.desk || !st.desk.installed) {
+            startupManager.setDeskEnabled(true)
+            pushLog('info', 'Enabled "Open Rewards Desk at sign-in" (turn it off in Settings → Startup).')
+        }
+    } catch (error) {
+        pushLog('warn', `Could not enable Desk autostart: ${error && error.message ? error.message : error}`)
+    }
 }
 
 function initializeDeskInBackground() {
@@ -939,6 +1159,8 @@ function html() {
     .brand-name{font-size:clamp(12px,1vw,14px);font-weight:700;line-height:1.2}
     .brand-sub{font-size:clamp(10px,.85vw,11px);color:var(--muted);margin-top:1px}
     nav{display:flex;flex-direction:column;gap:3px;flex:1}
+    .nav-group{font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);opacity:.55;padding:11px 11px 4px;user-select:none}
+    .nav-group:first-child{padding-top:2px}
     .nav-item{
       display:flex;align-items:center;gap:10px;padding:clamp(7px,.9vh,10px) 11px;
       border-radius:10px;color:var(--muted);cursor:pointer;
@@ -1602,6 +1824,44 @@ function html() {
     .btn-danger-sm:disabled{opacity:.5;cursor:default}
     .core-view{display:none;flex-direction:column;gap:28px;padding:28px;overflow-y:auto;flex:1}
     .core-view.vis{display:flex}
+    /* ── Insights page ── */
+    .ins-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .ins-title{font-size:clamp(18px,1.8vw,24px);font-weight:800;letter-spacing:-.01em}
+    .ins-sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .ins-empty{color:var(--muted);font-size:13px;padding:34px 0;text-align:center}
+    #ins-body{display:flex;flex-direction:column;gap:16px}
+    .ins-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .ins-kpi{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:14px;padding:13px 15px}
+    .ins-kpi-val{font-size:clamp(17px,1.6vw,23px);font-weight:800}
+    .ins-kpi-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;font-weight:700}
+    .ins-card{background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:16px;padding:16px 18px}
+    .ins-card-title{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+    .ins-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .ins-chart{display:flex;align-items:flex-end;gap:3px;height:132px}
+    .ins-bar{flex:1;min-width:3px;background:linear-gradient(180deg,var(--cyan,#2ee8ff),rgba(46,232,255,.22));border-radius:3px 3px 0 0;transition:opacity .15s}
+    .ins-bar:hover{opacity:.7}
+    .ins-bar-empty{background:rgba(255,255,255,.05)}
+    .ins-acc{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px}
+    .ins-acc:last-child{border-bottom:none}
+    .ins-acc-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+    .ins-acc-meta{font-size:10.5px;color:var(--muted)}
+    .ins-acc-pts{font-weight:700;color:var(--cyan,#2ee8ff)}
+    .ins-acc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .ins-dot-ok{background:var(--green,#2fd27d)}
+    .ins-dot-failing{background:var(--red,#ff5a6a)}
+    .ins-dot-idle{background:var(--gold,#f7c85c)}
+    .ins-reco-card{position:relative}
+    .ins-reco{display:flex;flex-direction:column;gap:10px}
+    .ins-reco-item{border:1px solid var(--border);border-left-width:3px;border-radius:10px;padding:10px 12px}
+    .ins-reco-high{border-left-color:var(--red,#ff5a6a)}
+    .ins-reco-medium{border-left-color:var(--gold,#f7c85c)}
+    .ins-reco-low{border-left-color:var(--green,#2fd27d)}
+    .ins-reco-t{font-weight:700;font-size:12.5px}
+    .ins-reco-d{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+    .ins-lock{position:absolute;inset:0;background:rgba(8,14,24,.74);backdrop-filter:blur(3px);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;padding:20px}
+    .ins-lock-t{font-weight:800;color:var(--gold,#f7c85c);font-size:14px}
+    .ins-lock-d{font-size:12px;color:var(--muted);max-width:270px;line-height:1.5}
+    @media (max-width:720px){.ins-kpis{grid-template-columns:1fr 1fr}.ins-grid{grid-template-columns:1fr}}
     .core-hero{background:linear-gradient(135deg,rgba(10,22,40,.98) 0%,rgba(5,12,24,1) 100%);border:1px solid rgba(247,200,92,.2);border-radius:16px;padding:36px 32px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px}
     .core-hero-badge{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:rgba(247,200,92,.15);color:var(--gold);border:1px solid rgba(247,200,92,.3)}
     .core-hero-title{font-size:2.2rem;font-weight:800;letter-spacing:-.03em;color:var(--text);line-height:1.1}
@@ -2267,9 +2527,10 @@ function html() {
   <aside class="sidebar">
     <div class="brand">
       <img src="/app-icon.png" alt="">
-      <div><div class="brand-name">Rewards Desk</div><div class="brand-sub">local control panel</div></div>
+      <div><div class="brand-name">Rewards Desk</div><div class="brand-sub">command center</div></div>
     </div>
     <nav>
+      <div class="nav-group">Monitor</div>
       <div class="nav-item active" id="nav-dash">
         <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9 20v-5h6v5"/></svg>
         Home
@@ -2282,18 +2543,25 @@ function html() {
         <svg viewBox="0 0 24 24"><path d="M4 17h16"/><path d="m6 7 4 4-4 4"/><path d="M13 15h5"/></svg>
         Console
       </div>
-      <div class="nav-item" id="nav-settings">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Settings
-      </div>
-      <div class="nav-item" id="nav-plugins">
-        <svg viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/></svg>
-        Plugins
-      </div>
+      <div class="nav-group">Premium</div>
       <div class="nav-item nav-item-core" id="nav-core">
         <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         Core
         <span class="core-nav-badge">PRO</span>
+      </div>
+      <div class="nav-item nav-item-core" id="nav-insights">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 13 3-3 3 2 4-5"/></svg>
+        Insights
+        <span class="core-nav-badge">PRO</span>
+      </div>
+      <div class="nav-group">More</div>
+      <div class="nav-item" id="nav-plugins">
+        <svg viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/></svg>
+        Plugins
+      </div>
+      <div class="nav-item" id="nav-settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
       </div>
       <div class="nav-item" id="nav-docs">
         <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -2326,7 +2594,7 @@ function html() {
       </button>
       <button class="install-btn" id="remote-btn" style="border-color:rgba(46,232,255,.28); background:rgba(46,232,255,.08); color:#9ce9f5">
         <svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/></svg>
-        Use on phone / remote
+        Use on phone
       </button>
       <button class="discord-btn" id="discord-btn">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037 13.8 13.8 0 0 0-.61 1.253 18.3 18.3 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.253.077.077 0 0 0-.079-.037A19.7 19.7 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.08.08 0 0 0 .031.055 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.8 19.8 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
@@ -2440,6 +2708,33 @@ function html() {
     </div>
 
     <!-- Accounts full view (editor) -->
+    <div class="core-view" id="view-insights">
+      <div class="ins-head">
+        <div>
+          <div class="ins-title">Insights</div>
+          <div class="ins-sub">Smart analysis of your accounts &mdash; computed locally, on your machine.</div>
+        </div>
+        <button class="btn btn-secondary" id="ins-refresh">Refresh</button>
+      </div>
+      <div class="ins-empty" id="ins-empty" style="display:none">No stats yet &mdash; run the bot a few times and your insights will appear here.</div>
+      <div id="ins-body">
+        <div class="ins-kpis" id="ins-kpis"></div>
+        <div class="ins-card">
+          <div class="ins-card-title">Points &mdash; last 30 days</div>
+          <div id="ins-chart" class="ins-chart"></div>
+        </div>
+        <div class="ins-grid">
+          <div class="ins-card">
+            <div class="ins-card-title">Accounts</div>
+            <div id="ins-accounts" class="ins-accounts"></div>
+          </div>
+          <div class="ins-card ins-reco-card">
+            <div class="ins-card-title">Recommendations to earn more <span class="core-nav-badge">PRO</span></div>
+            <div id="ins-reco" class="ins-reco"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="view-full" id="view-accounts" style="position:relative">
       <!-- Premium header with stats -->
       <div class="acc-page-header">
@@ -2712,7 +3007,7 @@ function html() {
         <div class="sett-panel" id="sett-startup">
           <div class="sett-panel-header">
             <div class="sett-panel-title">Startup</div>
-            <div class="sett-panel-sub">Launch Rewards Desk or the Core agent automatically when your computer starts.</div>
+            <div class="sett-panel-sub">What starts with your computer, and how to reach your bot from elsewhere. <b>Open Desk</b> shows this window at sign-in · <b>Remote access</b> lets you control it from Nexus anywhere (while the Desk runs) · <b>Headless service</b> runs it with no window for servers.</div>
           </div>
           <div class="startup-grid">
             <div class="startup-card">
@@ -2727,11 +3022,19 @@ function html() {
             <div class="startup-card core-only">
               <div class="startup-icon"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v3a4 4 0 0 0 4 4h1"/><path d="M12 3a6 6 0 0 1 6 6v3a4 4 0 0 1-4 4h-1"/><path d="M9 20h6"/></svg></div>
               <div class="startup-copy">
-                <div class="toggle-label">Core remote access <span class="startup-badge">Core</span></div>
-                <div class="toggle-sub">Keep a hidden agent online for remote monitoring and launch.</div>
-                <div class="startup-method" id="startup-agent-method"></div>
+                <div class="toggle-label">Remote access <span class="startup-badge">Core</span></div>
+                <div class="toggle-sub">Control your bot from Nexus anywhere — even off your home network — while the Desk (or the headless service) is running. Closing the Desk turns it off.</div>
+                <div class="startup-method" id="remote-access-method"></div>
               </div>
-              <label class="toggle"><input type="checkbox" id="tog-startup-agent"><span class="toggle-slider"></span></label>
+              <label class="toggle"><input type="checkbox" id="tog-remote-access"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="startup-card">
+              <div class="startup-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+              <div class="startup-copy">
+                <div class="toggle-label">Headless service</div>
+                <div class="toggle-sub">For a server/Docker with no screen: run the Desk in the background (no window) so the bot stays reachable from Nexus. Takes effect on the next launch.</div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="tog-desk-headless"><span class="toggle-slider"></span></label>
             </div>
           </div>
         </div>
@@ -2899,7 +3202,7 @@ function html() {
             <div id="lan-url-row" class="advanced-block term-row" style="margin-top:12px; display:none">
               <div class="toggle-wrap-left">
                 <div class="toggle-label">Connect a phone</div>
-                <div class="toggle-sub">Your Desk's local address stays private. Use the <b>Use on phone / remote</b> button (bottom-left) to get a link that routes your phone here automatically.</div>
+                <div class="toggle-sub">Your Desk's local address stays private. Use the <b>Use on phone</b> button (bottom-left) to get a link that routes your phone here automatically.</div>
               </div>
               <button class="btn btn-secondary" id="btn-open-remote" style="flex-shrink:0">Use on phone</button>
             </div>
@@ -3359,34 +3662,21 @@ function html() {
 
   <!-- Phone & remote access -->
   <div class="modal-bg" id="remote-modal">
-    <div class="modal" style="max-width:480px">
-      <h2>Control from your phone or anywhere</h2>
-      <p>Use this Desk from another device &mdash; free on your home network, or from anywhere with Core.</p>
-      <div style="border:1px solid var(--border); border-radius:12px; padding:14px; margin-top:6px">
-        <div style="font-weight:650; font-size:13.5px; display:flex; align-items:center; gap:8px">
-          <span style="font-size:10px; font-weight:800; letter-spacing:.05em; padding:2px 7px; border-radius:5px; background:rgba(47,210,125,.16); color:#7fe6ad">FREE</span>
-          Same Wi-Fi (your home network)
-        </div>
-        <div id="remote-lan-on" style="display:none; margin-top:10px">
-          <div style="font-size:12px; color:var(--muted)">On your phone (same Wi-Fi), open this link &mdash; it takes you straight to your Desk:</div>
-          <div id="remote-go-url" style="margin-top:6px; font-family:monospace; color:#3bc9ff; word-break:break-all; user-select:all">${DASHBOARD_URL}/go</div>
-          <button class="btn btn-secondary" id="remote-copy" style="margin-top:10px">Copy link</button>
-          <div style="font-size:11px; color:var(--muted); margin-top:8px; opacity:.85">Your Desk's local address stays private &mdash; the link routes you there automatically, only on your own network.</div>
-        </div>
-        <div id="remote-lan-off" style="display:none; margin-top:10px">
-          <div style="font-size:12px; color:var(--muted)">Turn on <b>Local network access</b> to allow your phone (on the same Wi-Fi) to reach this Desk.</div>
-          <button class="btn btn-secondary" id="remote-goto-settings" style="margin-top:10px">Open Settings</button>
-        </div>
+    <div class="modal" style="max-width:460px">
+      <h2>Use on your phone</h2>
+      <p>Open or scan this link on your phone &mdash; it checks where you are and routes you automatically.</p>
+      <div style="border:1px solid var(--border); border-radius:12px; padding:16px; margin-top:6px; text-align:center">
+        <div id="remote-go-url" style="font-family:monospace; color:#3bc9ff; word-break:break-all; user-select:all; font-size:15px; font-weight:600">${DASHBOARD_URL}/go</div>
+        <button class="btn btn-primary" id="remote-copy" style="margin-top:14px; width:100%">Copy link</button>
       </div>
-      <div style="border:1px solid var(--border); border-radius:12px; padding:14px; margin-top:12px">
-        <div style="font-weight:650; font-size:13.5px; display:flex; align-items:center; gap:8px">
-          <span style="font-size:10px; font-weight:800; letter-spacing:.05em; padding:2px 7px; border-radius:5px; background:rgba(247,200,92,.18); color:var(--gold)">CORE</span>
-          From anywhere
-        </div>
-        <div style="font-size:12px; color:var(--muted); margin-top:10px">Open Nexus and sign in with your license &mdash; see and control this Desk from any network. On the same Wi-Fi, Nexus also finds this Desk automatically.</div>
-        <button class="btn btn-primary" id="remote-open-nexus" style="margin-top:10px">Open Nexus &rarr;</button>
+      <div style="font-size:12px; color:var(--muted); margin-top:14px; line-height:1.6">
+        <span style="color:#7fe6ad; font-weight:650">Same Wi-Fi</span> &rarr; opens this Desk directly.<br>
+        <span style="color:var(--gold); font-weight:650">Anywhere else</span> &rarr; opens Nexus (Core) &mdash; control from any network.
       </div>
-      <div class="modal-actions" style="grid-template-columns:1fr; margin-top:14px">
+      <div id="remote-lan-off-hint" style="display:none; font-size:11.5px; color:var(--muted); margin-top:10px; opacity:.92">
+        Local network access is off, so the link opens Nexus. <a id="remote-goto-settings" style="color:var(--cyan); cursor:pointer; text-decoration:underline">Turn it on</a> for free same-Wi-Fi access.
+      </div>
+      <div class="modal-actions" style="grid-template-columns:1fr; margin-top:16px">
         <button class="btn btn-secondary" id="remote-close">Close</button>
       </div>
     </div>
@@ -3856,6 +4146,7 @@ function html() {
       G('view-console').className = v === 'console' ? 'console-wrap vis' : 'console-wrap';
       G('view-settings').className = v === 'settings' ? 'settings-wrap vis' : 'settings-wrap';
       G('view-core').className = v === 'core' ? 'core-view vis' : 'core-view';
+      G('view-insights').className = v === 'insights' ? 'core-view vis' : 'core-view';
       G('view-plugins').className = v === 'plugins' ? 'plugins-wrap vis' : 'plugins-wrap';
       G('view-docs').className = v === 'docs' ? 'docs-wrap vis' : 'docs-wrap';
       G('view-accedit').className = v === 'accedit' ? 'view-full vis' : 'view-full';
@@ -3864,7 +4155,7 @@ function html() {
       G('footer-bar').style.display = (v === 'dash' || v === 'accounts') ? '' : 'none';
       // Nav highlight — notif sub-pages keep 'settings' nav active
       var navActive = (v === 'notif-discord' || v === 'notif-ntfy') ? 'settings' : v;
-      ['dash','accounts','console','settings','core','plugins','docs'].forEach(function(n) {
+      ['dash','accounts','console','settings','core','insights','plugins','docs'].forEach(function(n) {
         var el = G('nav-' + n); if (el) el.classList.toggle('active', n === navActive);
       });
       if (v === 'accounts') {
@@ -3876,6 +4167,7 @@ function html() {
       if (v === 'notif-discord') { loadNotifPage('discord'); showHint('notif-discord', 400); }
       if (v === 'notif-ntfy') { loadNotifPage('ntfy'); showHint('notif-ntfy', 400); }
       if (v === 'core') renderCoreView();
+      if (v === 'insights') loadInsights();
       if (v === 'plugins') loadPluginsCatalog(false);
       if (v === 'docs') loadDocs();
       if (v === 'console') {
@@ -3895,6 +4187,69 @@ function html() {
     function setRing(pct) {
       var el = G('ring-path');
       if (el) el.style.strokeDashoffset = CIRC * (1 - Math.min(100, Math.max(0, pct || 0)) / 100);
+    }
+
+    async function loadInsights() {
+      var data;
+      try { data = await fetch('/api/insights').then(function(r){return r.json();}); } catch(e) { return; }
+      var empty = G('ins-empty'), body = G('ins-body');
+      if (!data || !data.hasData) {
+        if (empty) empty.style.display = 'block';
+        if (body) body.style.display = 'none';
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+      if (body) body.style.display = 'flex';
+      var t = data.totals || {};
+      var kpis = [
+        { v: (t.points || 0).toLocaleString(), l: 'Total points' },
+        { v: '+' + (t.last7Points || 0).toLocaleString(), l: 'Last 7 days' },
+        { v: t.successRate != null ? t.successRate + '%' : '—', l: 'Success rate' },
+        { v: (t.accountsTracked || 0), l: 'Accounts' }
+      ];
+      G('ins-kpis').innerHTML = kpis.map(function(k){
+        return '<div class="ins-kpi"><div class="ins-kpi-val">' + esc(k.v) + '</div><div class="ins-kpi-lbl">' + esc(k.l) + '</div></div>';
+      }).join('');
+      var daily = data.daily || [];
+      var max = daily.reduce(function(m, d){ return Math.max(m, d.points || 0); }, 0) || 1;
+      G('ins-chart').innerHTML = daily.length ? daily.map(function(d){
+        var h = Math.max(2, Math.round(((d.points || 0) / max) * 100));
+        var cls = (d.points || 0) > 0 ? 'ins-bar' : 'ins-bar ins-bar-empty';
+        return '<div class="' + cls + '" style="height:' + h + '%" title="' + esc(d.date) + ': ' + (d.points || 0) + ' pts"></div>';
+      }).join('') : '<div class="ins-acc-meta">No daily data yet.</div>';
+      var accts = (data.accounts || []).slice(0, 12);
+      G('ins-accounts').innerHTML = accts.length ? accts.map(function(a){
+        var dot = a.status === 'failing' ? 'ins-dot-failing' : (a.status === 'idle' ? 'ins-dot-idle' : 'ins-dot-ok');
+        var meta = (a.runs || 0) + ' runs' + (a.successRate != null ? ' · ' + a.successRate + '%' : '');
+        return '<div class="ins-acc"><span class="ins-acc-dot ' + dot + '"></span>' +
+          '<div class="ins-acc-name">' + esc(a.name) + '<div class="ins-acc-meta">' + esc(meta) + '</div></div>' +
+          '<span class="ins-acc-pts">' + (a.points || 0).toLocaleString() + '</span></div>';
+      }).join('') : '<div class="ins-acc-meta">No account stats yet.</div>';
+      var recoEl = G('ins-reco');
+      var recos = data.recommendations || [];
+      var existingLock = G('ins-reco-lock');
+      if (data.hasCoreLicense) {
+        if (existingLock) existingLock.remove();
+        recoEl.innerHTML = recos.map(function(r){
+          return '<div class="ins-reco-item ins-reco-' + (r.severity || 'low') + '"><div class="ins-reco-t">' + esc(r.title) + '</div><div class="ins-reco-d">' + esc(r.detail) + '</div></div>';
+        }).join('');
+      } else {
+        recoEl.innerHTML = recos.map(function(r){
+          return '<div class="ins-reco-item ins-reco-' + (r.severity || 'low') + '"><div class="ins-reco-t" style="filter:blur(4px)">' + esc(r.title) + '</div></div>';
+        }).join('');
+        if (!existingLock) {
+          var card = recoEl.closest('.ins-reco-card');
+          if (card) {
+            var lock = document.createElement('div');
+            lock.className = 'ins-lock'; lock.id = 'ins-reco-lock';
+            lock.innerHTML = '<div class="ins-lock-t">' + recos.length + ' recommendation' + (recos.length > 1 ? 's' : '') + ' ready</div>' +
+              '<div class="ins-lock-d">Unlock Core to see personalized tips on how to earn more from your accounts.</div>' +
+              '<button class="btn btn-primary" id="ins-unlock">Activate Core</button>';
+            card.appendChild(lock);
+            var ub = G('ins-unlock'); if (ub) ub.addEventListener('click', function(){ setView('core'); });
+          }
+        }
+      }
     }
 
     function esc(v) {
@@ -4678,20 +5033,19 @@ function html() {
           row.title = t;
         }
       });
-      // Startup
+      // Remote access (Core) + headless service — sourced from /api/settings (s)
+      var remoteTog = G('tog-remote-access');
+      if (remoteTog) { remoteTog.checked = s.deskRemoteAccess === true; remoteTog.disabled = !hasCore; }
+      if (G('remote-access-method')) G('remote-access-method').textContent = !hasCore
+        ? 'Activate Core to enable remote access.'
+        : (s.deskRemoteAccess ? 'On — controllable from Nexus while the Desk runs.' : 'Off');
+      var hlTog = G('tog-desk-headless'); if (hlTog) hlTog.checked = s.deskHeadless === true;
+      // Desk autostart (from the startup manager)
       fetch('/api/startup').then(function(r){return r.json();}).then(function(st){
         var desk = G('tog-startup-desk');
-        var agent = G('tog-startup-agent');
         if (desk) desk.checked = !!(st.desk && st.desk.installed);
-        if (agent) {
-          agent.checked = !!(st.agent && st.agent.installed);
-          agent.disabled = !hasCore || !(st.agent && st.agent.supported !== false);
-        }
         if (G('startup-desk-method')) G('startup-desk-method').textContent =
           st.desk && st.desk.method ? 'Uses ' + st.desk.method.replace(/-/g, ' ') : '';
-        if (G('startup-agent-method')) G('startup-agent-method').textContent = !hasCore
-          ? 'Activate Core to enable remote access.'
-          : (st.agent && st.agent.installed ? 'Agent starts silently at sign-in.' : 'Available with your active Core license.');
       }).catch(function(){});
     }
     function _updateSchFields(on) {
@@ -4818,14 +5172,11 @@ function html() {
     G('discord-btn').addEventListener('click', function() { window.open('https://discord.gg/JWhCkhSYtg'); });
     // Phone / remote access info modal — clarifies what's free (same Wi-Fi LAN URL) vs Core (Nexus).
     G('remote-btn').addEventListener('click', function() {
+      // /go does all the routing; just hint if the free same-Wi-Fi path needs LAN turned on.
       fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
-        var on = !!(s && s.deskLanAccess); // LAN opt-in → the free same-Wi-Fi phone path works
-        G('remote-lan-on').style.display = on ? 'block' : 'none';
-        G('remote-lan-off').style.display = on ? 'none' : 'block';
-      }).catch(function(){
-        G('remote-lan-on').style.display = 'none';
-        G('remote-lan-off').style.display = 'block';
-      });
+        var off = !(s && s.deskLanAccess);
+        var h = G('remote-lan-off-hint'); if (h) h.style.display = off ? 'block' : 'none';
+      }).catch(function(){});
       G('remote-modal').classList.add('open');
     });
     G('remote-close').addEventListener('click', function(){ G('remote-modal').classList.remove('open'); });
@@ -4835,12 +5186,13 @@ function html() {
       if (v) navigator.clipboard.writeText(v).then(function(){ showToast('Link copied to clipboard'); }).catch(function(){ showToast('Could not copy', true); });
     });
     G('remote-goto-settings').addEventListener('click', function(){ G('remote-modal').classList.remove('open'); setView('settings'); });
-    G('remote-open-nexus').addEventListener('click', function(){ window.open('https://bot.lgtw.tf'); });
     G('nav-dash').addEventListener('click', function() { setView('dash'); });
     G('nav-accounts').addEventListener('click', function() { setView('accounts'); });
     G('nav-console').addEventListener('click', function() { setView('console'); });
     G('nav-settings').addEventListener('click', function() { setView('settings'); });
     G('nav-core').addEventListener('click', function() { setView('core'); });
+    G('nav-insights').addEventListener('click', function() { setView('insights'); });
+    if (G('ins-refresh')) G('ins-refresh').addEventListener('click', function() { loadInsights(); });
     if(G('console-back')) G('console-back').addEventListener('click', function() { setView('dash'); });
     if(G('settings-back')) G('settings-back').addEventListener('click', function() { setView('dash'); });
     // Scheduler toggle shows/hides fields
@@ -4923,7 +5275,27 @@ function html() {
       });
     }
     bindStartupToggle('tog-startup-desk', 'desk');
-    bindStartupToggle('tog-startup-agent', 'agent');
+    // Remote access (Core) — starts/stops the background agent now + persists the setting.
+    var _remoteTog = G('tog-remote-access');
+    if (_remoteTog) _remoteTog.addEventListener('change', async function() {
+      var enabled = this.checked;
+      var card = this.closest('.startup-card');
+      this.disabled = true; if (card) card.classList.add('is-busy');
+      try {
+        var r = await fetch('/api/remote-access', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({enable:enabled})});
+        var res = await r.json().catch(function(){return {};});
+        if (!r.ok) throw new Error(res.error || 'Could not update remote access.');
+        showToast(enabled ? 'Remote access on — connecting to Nexus…' : 'Remote access off.');
+        await loadSettings();
+      } catch(e) { this.checked = !enabled; showToast(e.message, true); }
+      finally { this.disabled = false; if (card) card.classList.remove('is-busy'); }
+    });
+    // Headless service — config flag; takes effect on the next launch.
+    var _hlTog = G('tog-desk-headless');
+    if (_hlTog) _hlTog.addEventListener('change', function() {
+      saveSetting('desk.headless', this.checked);
+      showToast(this.checked ? 'Headless service on — restart to apply.' : 'Headless service off — restart to apply.');
+    });
     var TOGGLE_MAP = {
       'tog-doDailySet':'workers.doDailySet','tog-doSpecialPromotions':'workers.doSpecialPromotions',
       'tog-doMorePromotions':'workers.doMorePromotions','tog-doDesktopSearch':'workers.doDesktopSearch',
@@ -6517,12 +6889,18 @@ const server = http.createServer((req, res) => {
             // value only changes after a restart.
             deskLanAccess: deskLanEnabled,
             deskLanUrl,
-            deskPort: deskBoundPort
+            deskPort: deskBoundPort,
+            deskRemoteAccess: (cfg.core && cfg.core.dashboardSync === true) || false,
+            deskHeadless: (cfg.desk && cfg.desk.headless === true) || false
         }))
         return
     }
     if (req.method === 'GET' && req.url === '/api/stats') {
         jsonResponse(res, 200, readBotStats())
+        return
+    }
+    if (req.method === 'GET' && req.url === '/api/insights') {
+        jsonResponse(res, 200, Object.assign(buildInsights(), { hasCoreLicense: state.deskLicense.tier === 'premium' }))
         return
     }
     if (req.method === 'GET' && req.url === '/api/startup') {
@@ -6532,30 +6910,34 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/api/startup') {
         readApiBody(req, res, body => {
             const data = parseJson(body, null)
-            if (!data || !['desk', 'agent'].includes(data.mode) || typeof data.enable !== 'boolean') {
+            if (!data || data.mode !== 'desk' || typeof data.enable !== 'boolean') {
                 jsonResponse(res, 400, { error: 'Invalid startup request' })
                 return
             }
             try {
-                if (data.mode === 'desk') {
-                    startupManager.setDeskEnabled(data.enable)
-                } else {
-                    if (data.enable && state.deskLicense.tier !== 'premium') {
-                        jsonResponse(res, 403, { error: 'An active Core license is required for remote access.' })
-                        return
-                    }
-                    startupManager.setAgentEnabled(data.enable)
-                    writeConfigPatch({
-                        backgroundAgent: {
-                            enabled: data.enable,
-                            allowDashboardAutostart: false,
-                            openConsole: false
-                        },
-                        core: { dashboardSync: data.enable }
-                    })
-                    if (!data.enable && agentApi) void agentApi.stopExistingAgent().catch(() => undefined)
-                }
+                // Only the Desk autostart is managed here now; remote access is the
+                // Desk→agent lifecycle (see /api/remote-access), not a separate service.
+                startupManager.setDeskEnabled(data.enable)
                 jsonResponse(res, 200, startupManager.status())
+            } catch (error) {
+                jsonResponse(res, 500, { error: error.message })
+            }
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/remote-access') {
+        readApiBody(req, res, body => {
+            const data = parseJson(body, null)
+            if (!data || typeof data.enable !== 'boolean') { jsonResponse(res, 400, { error: 'Invalid request' }); return }
+            if (data.enable && state.deskLicense.tier !== 'premium') {
+                jsonResponse(res, 403, { error: 'An active Core license is required for remote access.' })
+                return
+            }
+            try {
+                writeConfigPatch({ core: { dashboardSync: data.enable } })
+                if (data.enable) void startAgentProcess()
+                else void stopAgentProcess()
+                jsonResponse(res, 200, { enabled: data.enable })
             } catch (error) {
                 jsonResponse(res, 500, { error: error.message })
             }
@@ -6947,6 +7329,7 @@ function finalizeDeskServer() {
     const url = `http://127.0.0.1:${deskBoundPort}`
     if (deskLanUrl) pushLog('info', `Desk reachable on your network at ${deskLanUrl}`)
     if (process.env.MSRB_APP_NO_OPEN !== '1') openAppWindow(url)
+    maybeAutoEnableDeskStartup()
     initializeDeskInBackground()
     void refreshAgentState()
     setInterval(() => void refreshAgentState(), 900)
@@ -6967,6 +7350,10 @@ process.on('SIGTERM', shutdown)
 function shutdown() {
     if (shuttingDown) return
     shuttingDown = true
+
+    // Desk closing = remote off (owner's model): force the background agent to exit too.
+    // Synchronous force-kill (the Desk is exiting, no time for the IPC handshake).
+    quickKillAgent()
 
     if (botProcess) {
         stopRequested = true

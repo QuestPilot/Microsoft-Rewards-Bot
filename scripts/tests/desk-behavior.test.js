@@ -203,7 +203,7 @@ test('GET / renders the expected view containers and controls', async () => {
     const html = (await request('/', { token: null })).body
     const required = [
         'view-accounts', 'view-console', 'view-settings', 'view-core', 'view-plugins', 'view-docs',
-        'btn-run', 'btn-stop', 'tog-startup-desk', 'tog-startup-agent',
+        'btn-run', 'btn-stop', 'tog-startup-desk', 'tog-remote-access',
         'storage-toggle', 'lic-view-manage', 'install-btn', 'desktop-uninstall'
     ]
     for (const id of required) {
