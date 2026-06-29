@@ -520,7 +520,7 @@ export class Search extends TaskBase {
                 const cvid = randomBytes(16).toString('hex')
                 const url = `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
 
-                await searchPage.goto(url)
+                await searchPage.goto(url, { timeout: 20000 })
                 await searchPage.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
                 await this.bot.browser.utils.tryDismissAllMessages(searchPage)
 
@@ -537,7 +537,7 @@ export class Search extends TaskBase {
 
                 await this.bot.utils.wait(1000)
                 await this.bot.browser.utils.ghostClick(searchPage, searchBar, { clickCount: 3 })
-                await searchBox.fill('')
+                await searchBox.fill('', { timeout: 5000 })
 
                 // Human-like typing with randomized per-keystroke delay
                 for (const char of query) {
@@ -615,23 +615,26 @@ export class Search extends TaskBase {
         return await this.bot.browser.func.getSearchPoints()
     }
 
+    /**
+     * Human-like progressive scroll: several small wheel steps with variable
+     * speed + reading pauses, occasionally nudging back up (re-reading) — instead
+     * of one instant jump to a random offset, which is a classic automation tell.
+     * Uses real wheel events (page.mouse.wheel), never window.scrollTo, so it also
+     * sidesteps the obfuscator-unsafe page.evaluate path entirely.
+     */
     private async randomScroll(page: Page, isMobile: boolean) {
         try {
-            // String form is immune to obfuscator string-array injection.
-            const viewportHeight = await page.evaluate<number>('window.innerHeight')
-            const totalHeight = await page.evaluate<number>('document.body.scrollHeight')
-            const randomScrollPosition = Math.floor(Math.random() * (totalHeight - viewportHeight))
-
-            this.bot.logger.debug(
-                isMobile,
-                'SEARCH-RANDOM-SCROLL',
-                `Random scroll | viewportHeight=${viewportHeight} | totalHeight=${totalHeight} | scrollPos=${randomScrollPosition}`
-            )
-
-            // Avoid object literal {behavior:'auto'} inside the callback:
-            // the string 'auto' would be replaced by a string-array call and
-            // become an unresolvable outer-scope reference in the browser.
-            await page.evaluate((pos: number) => window.scrollTo(0, pos), randomScrollPosition)
+            const steps = this.bot.utils.randomNumber(3, 7)
+            for (let i = 0; i < steps; i++) {
+                await page.mouse.wheel(0, this.bot.utils.randomNumber(180, 520))
+                await this.bot.utils.wait(this.bot.utils.randomDelay(500, 1500))
+                // ~1 step in 5: a small scroll back up, like a human re-reading.
+                if (Math.random() < 0.2) {
+                    await page.mouse.wheel(0, -this.bot.utils.randomNumber(80, 240))
+                    await this.bot.utils.wait(this.bot.utils.randomDelay(400, 1100))
+                }
+            }
+            this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-SCROLL', `Human scroll done | steps=${steps}`)
         } catch (error) {
             this.bot.logger.error(
                 isMobile,
@@ -657,17 +660,26 @@ export class Search extends TaskBase {
             }
 
             await this.bot.browser.utils.ghostClick(page, BING_SEARCH.resultLinks)
-            await this.bot.utils.wait(this.bot.config.searchSettings.searchResultVisitTime)
+            // Brief settle so the navigation / new tab actually opens.
+            await this.bot.utils.wait(this.bot.utils.randomDelay(1500, 3000))
 
             if (isMobile) {
+                // Mobile: the click navigates the same tab. Read it (progressive
+                // scroll) for the visit time, then return to the results page.
+                await this.randomScroll(page, isMobile)
+                await this.bot.utils.wait(this.bot.config.searchSettings.searchResultVisitTime)
                 await page.goto(searchPageUrl)
                 this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-CLICK', 'Navigated back to search page')
             } else {
+                // Desktop: the result opens in a new tab. Read it (progressive
+                // scroll) before closing, instead of idling on it.
                 const newTab = await this.bot.browser.utils.getLatestTab(page)
                 const newTabUrl = newTab.url()
 
                 this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-CLICK', `Visited result tab | url=${newTabUrl}`)
 
+                await this.randomScroll(newTab, isMobile)
+                await this.bot.utils.wait(this.bot.config.searchSettings.searchResultVisitTime)
                 await this.bot.browser.utils.closeTabs(newTab)
                 this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-CLICK', 'Closed result tab')
             }

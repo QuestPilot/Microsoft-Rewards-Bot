@@ -111,18 +111,30 @@ export class SearchOnBing extends TaskBase {
                 const searchBar = BING_SEARCH.searchBar
 
                 const searchBox = page.locator(searchBar)
-                await searchBox.waitFor({ state: 'attached', timeout: 15000 })
+                await searchBox.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {})
 
                 await this.bot.utils.wait(500)
-                await this.bot.browser.utils.ghostClick(page, searchBar, { clickCount: 3 })
-                await searchBox.fill('')
+                // Best-effort human re-submit. The /search URL navigation above ALREADY
+                // registered the search, so a non-actionable search box (collapsed on
+                // mobile/legacy layouts) must NEVER hang us 30s on fill — fail fast and
+                // fall through to the balance check.
+                try {
+                    await this.bot.browser.utils.ghostClick(page, searchBar, { clickCount: 3 })
+                    await searchBox.fill('', { timeout: 5000 })
 
-                // Human-like typing with randomized per-keystroke delay
-                for (const char of query) {
-                    await page.keyboard.type(char, { delay: this.bot.utils.humanTypeDelay() })
+                    // Human-like typing with randomized per-keystroke delay
+                    for (const char of query) {
+                        await page.keyboard.type(char, { delay: this.bot.utils.humanTypeDelay() })
+                    }
+                    await this.bot.utils.wait(this.bot.utils.randomNumber(200, 600))
+                    await page.keyboard.press('Enter')
+                } catch (e) {
+                    this.bot.logger.debug(
+                        this.bot.isMobile,
+                        'SEARCH-ON-BING-SEARCH',
+                        `Search box not interactable, relying on URL search | query="${query}" | message=${e instanceof Error ? e.message : String(e)}`
+                    )
                 }
-                await this.bot.utils.wait(this.bot.utils.randomNumber(200, 600))
-                await page.keyboard.press('Enter')
 
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 7000))
 
@@ -185,11 +197,15 @@ export class SearchOnBing extends TaskBase {
         )
     }
 
-    /** Visit the first organic Bing result, scroll, then go back to Bing.
-     *  Runs on ~65 % of searches to vary session behaviour. */
+    /** Visit the first organic Bing result, read it, then return to Bing —
+     *  closing the result tab if it opened in a NEW one. Many organic results
+     *  (and the "explore on Bing" promos) open with target=_blank; the old code
+     *  only called page.goBack(), so the new tab was never closed and result tabs
+     *  piled up (user-reported). Runs on ~65 % of searches to vary behaviour. */
     private async visitSearchResult(page: Page): Promise<void> {
         if (Math.random() > 0.65) return
 
+        const context = page.context()
         try {
             const resultSelector = BING_SEARCH.resultLinkHref
             const href = await page
@@ -205,26 +221,50 @@ export class SearchOnBing extends TaskBase {
                 `Visiting search result | url=${href.slice(0, 80)}…`
             )
 
+            const tabsBefore = context.pages().length
             await this.bot.utils.wait(this.bot.utils.randomDelay(500, 1500))
             await this.bot.browser.utils.ghostClick(page, resultSelector)
-
-            await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {})
             await this.bot.utils.wait(this.bot.utils.randomDelay(1500, 3000))
+
+            // The result may open in a NEW tab (target=_blank) or navigate the same
+            // tab. Read whichever is the actual result page.
+            const tabs = context.pages()
+            const resultTab = (tabs.length > tabsBefore ? tabs[tabs.length - 1] : page) ?? page
+
+            await resultTab.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {})
+            await this.bot.utils.wait(this.bot.utils.randomDelay(1000, 2500))
 
             // Scroll down in 2–4 steps to simulate reading
             const steps = this.bot.utils.randomNumber(2, 4)
             for (let i = 0; i < steps; i++) {
-                await page.mouse.wheel(0, this.bot.utils.randomNumber(250, 550))
+                await resultTab.mouse.wheel(0, this.bot.utils.randomNumber(250, 550))
                 await this.bot.utils.wait(this.bot.utils.randomDelay(700, 1600))
             }
 
-            // Go back to Bing results
-            await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(async () => {
-                await page.goto(this.bingHome, { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {})
-            })
+            if (resultTab !== page) {
+                // Opened in a new tab → close it so result tabs don't accumulate.
+                await resultTab.close().catch(() => {})
+                await page.bringToFront().catch(() => {})
+            } else {
+                // Same-tab navigation → go back to the Bing results.
+                await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(async () => {
+                    await page.goto(this.bingHome, { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {})
+                })
+            }
             await this.bot.utils.wait(this.bot.utils.randomDelay(800, 1800))
         } catch {
-            // Non-critical — a failed result visit must never break the search loop
+            // Non-critical — never break the search loop. Best-effort: close any
+            // stray non-Bing tabs this visit may have left open so they don't pile up.
+            try {
+                for (const p of context.pages()) {
+                    if (p !== page && !/bing\.com/i.test(p.url())) {
+                        await p.close().catch(() => {})
+                    }
+                }
+                await page.bringToFront().catch(() => {})
+            } catch {
+                /* ignore cleanup failures */
+            }
         }
     }
 
