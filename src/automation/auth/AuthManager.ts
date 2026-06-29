@@ -117,6 +117,11 @@ export class AuthManager {
 
             while (iteration < maxIterations) {
                 if (page.isClosed()) {
+                    // TODO(review) [SEC]: treating a page closure as login success can
+                    // mint an empty session. Cannot gate cleanly on a positive signal:
+                    // the page is already closed (isBingSignedIn needs a live bing.com
+                    // page) and there is no existing helper to assert an auth cookie on
+                    // a closed context. Left as-is to avoid destabilising the login flow.
                     if (kmsiJustAccepted || emailEntered || passwordEntered) {
                         const reason = kmsiJustAccepted
                             ? 'KMSI acceptance'
@@ -204,6 +209,10 @@ export class AuthManager {
 
             // If the page was closed after KMSI acceptance, finalization will be
             // best-effort only (gotos will no-op, cookies may be partially saved).
+            // TODO(review) [SEC]: same caveat as the in-loop page-close handler —
+            // saving cookies from a closed context here is treated as success without
+            // a positive auth-cookie check. No clean existing signal to gate on, so
+            // left unchanged to avoid breaking the login flow.
             if (page.isClosed()) {
                 this.bot.logger.warn(
                     this.bot.isMobile,
@@ -257,6 +266,11 @@ export class AuthManager {
             return 'ACCOUNT_LOCKED'
         }
 
+        // TODO(review) [SEC]: this infers LOGGED_IN from the hostname alone, which can
+        // false-positive on a signed-out rewards/account page. Not gated here because
+        // isBingSignedIn only validates the bing.com header (absent on rewards.bing.com /
+        // account.microsoft.com) so using it would false-negative and break real logins,
+        // and there is no clean existing auth-cookie signal. Left as-is intentionally.
         if (url.hostname === 'rewards.bing.com' || url.hostname === 'account.microsoft.com') {
             this.bot.logger.debug(this.bot.isMobile, 'DETECT-STATE', 'On rewards/account page, assuming logged in')
             return 'LOGGED_IN'
@@ -469,17 +483,27 @@ export class AuthManager {
 
             case 'EMAIL_INPUT': {
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Entering email')
-                await this.emailStrategy.enterEmail(page, account.email)
+                const emailResult = await this.emailStrategy.enterEmail(page, account.email)
                 await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
                     this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after email entry')
                 })
-                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Email entered successfully')
+                // Don't assert success: on 'error' the field wasn't found/submitted, so
+                // just warn and let the next loop re-detect the real state.
+                if (emailResult === 'error') {
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'LOGIN',
+                        'Email entry did not complete cleanly — re-detecting login state'
+                    )
+                } else {
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Email entered successfully')
+                }
                 return true
             }
 
             case 'PASSWORD_INPUT': {
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Entering password')
-                await this.emailStrategy.enterPassword(page, account.password)
+                const passwordResult = await this.emailStrategy.enterPassword(page, account.password)
                 // Press Escape immediately after password submission to dismiss any
                 // browser-level save-password banner or Windows Hello prompt that Edge
                 // injects — this prevents the OS credential dialog from closing the page.
@@ -488,7 +512,17 @@ export class AuthManager {
                 await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
                     this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after password entry')
                 })
-                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Password entered successfully')
+                // Don't assert success: on 'error' the field wasn't found/submitted, so
+                // just warn and let the next loop re-detect the real state.
+                if (passwordResult === 'error') {
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'LOGIN',
+                        'Password entry did not complete cleanly — re-detecting login state'
+                    )
+                } else {
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Password entered successfully')
+                }
                 return true
             }
 

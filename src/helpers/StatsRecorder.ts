@@ -228,7 +228,9 @@ export async function recordSearchQuery(
             query,
             isMobile,
             pointsGained,
-            accountUser
+            // Store an opaque key, never the cleartext account identifier — matches the
+            // emailKey approach used by the account/ban logs.
+            emailKey: toEmailKey(accountUser)
         })
         await fs.appendFile(filePath, `${line}\n`, 'utf8')
     } catch {
@@ -411,7 +413,11 @@ async function updateDailyStats(input: RunCompleteInput): Promise<void> {
 
     let daily: DailyStats
     try {
-        daily = JSON.parse(await fs.readFile(filePath, 'utf8')) as DailyStats
+        const raw = JSON.parse(await fs.readFile(filePath, 'utf8')) as DailyStats
+        // Mirror the global reader's reset-on-invalid guard. DailyStats has no `version`
+        // field, so validate structurally: a corrupt-but-parseable file (e.g. `{}`/`[]`)
+        // would otherwise throw on `daily.accounts.push(...)` and lose the whole run.
+        daily = raw && typeof raw === 'object' && Array.isArray(raw.accounts) ? raw : makeEmptyDailyStats(date)
     } catch {
         daily = makeEmptyDailyStats(date)
     }

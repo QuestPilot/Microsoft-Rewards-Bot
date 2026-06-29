@@ -36,3 +36,14 @@ plugins/core/license-admin.config.local.js
 .desk-notices.json
 *.bak
 src/*.bak
+
+# Secrets / credentials — never commit (this is how a sibling repo leaked its .env)
+.env
+.env.*
+!.env.example
+*.pem
+# ...but the PUBLIC keys shipped under scripts/security/ MUST stay tracked (clients
+# verify Core + the marketplace catalog against them). Re-include them explicitly.
+!scripts/security/*.pem
+!scripts/security/**/*.pem
+_keys/

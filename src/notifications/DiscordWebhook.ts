@@ -1,5 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios'
 import PQueue from 'p-queue'
+import { redact } from './ErrorReport'
 import type { LogLevel } from './LogService'
 
 const DISCORD_LIMIT = 2000
@@ -37,6 +38,34 @@ function useAutoReportRelay(): boolean {
     return process.env.MSRB_AUTOREPORT_RELAY === '1'
 }
 
+// When relaying through the maintainer inbox (MSRB_AUTOREPORT_RELAY=1) the user's
+// own log lines / embeds transit our infrastructure. Scrub account-identifying and
+// secret material first — the SAME redaction the anonymous error reporter uses — so
+// nothing (e.g. the account email in a log line) leaks via the relay. The direct
+// path (the user's own webhook) is left untouched.
+function redactForRelay(payload: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = { ...payload }
+    if (typeof out.content === 'string') {
+        out.content = redact(out.content)
+    }
+    if (Array.isArray(out.embeds)) {
+        out.embeds = (out.embeds as DiscordEmbed[]).map(embed => {
+            const next: DiscordEmbed = { ...embed }
+            if (typeof next.title === 'string') next.title = redact(next.title)
+            if (typeof next.description === 'string') next.description = redact(next.description)
+            if (Array.isArray(next.fields)) {
+                next.fields = next.fields.map(field => ({
+                    ...field,
+                    name: typeof field.name === 'string' ? redact(field.name) : field.name,
+                    value: typeof field.value === 'string' ? redact(field.value) : field.value
+                }))
+            }
+            return next
+        })
+    }
+    return out
+}
+
 function buildDiscordRequest(discordUrl: string, payload: Record<string, unknown>): AxiosRequestConfig {
     if (useAutoReportRelay()) {
         return {
@@ -46,7 +75,7 @@ function buildDiscordRequest(discordUrl: string, payload: Record<string, unknown
             data: {
                 type: 'auto_report',
                 webhookUrl: discordUrl,
-                payload
+                payload: redactForRelay(payload)
             },
             timeout: 10000
         }

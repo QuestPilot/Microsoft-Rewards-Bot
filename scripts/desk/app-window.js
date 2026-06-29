@@ -1013,7 +1013,10 @@ function initializeDeskInBackground() {
         void startAccountStorageWorker().then(result => {
             if (result.storage?.warning) pushLog('warn', result.storage.warning)
             state.accounts = Array.isArray(result.accounts) ? result.accounts : []
-            accountCache = Array.isArray(result.rawAccounts) ? result.rawAccounts : null
+            // Decrypted accounts are no longer pushed in the startup `ready` message
+            // (security). They are fetched on demand via the `read` action the first
+            // time /api/accounts-raw is hit (see accountCache === null branch there).
+            accountCache = null
         }).catch(error => {
             pushLog('warn', `Account encryption could not be enabled: ${error.message}`)
         }).finally(() => {

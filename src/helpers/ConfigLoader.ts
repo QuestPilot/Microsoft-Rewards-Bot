@@ -93,29 +93,32 @@ export function loadAccounts(): Account[] {
     }
 }
 
+/**
+ * Resolve the active config file path the SAME way {@link loadConfig} does
+ * (`config.json`, else `config.example.json`). Callers that need to rewrite the
+ * config on disk (e.g. the Desk capture toggle) must use this rather than
+ * hardcoding `src/config.json`, which is wrong once the bot runs from `dist/`.
+ */
+export function resolveConfigPath(): string {
+    return resolveFirstExistingFile(['config.json', 'config.example.json'], 'config file')
+}
+
 export function loadConfig(): Config {
     try {
         if (configCache) {
             return configCache
         }
 
-        const configDir = resolveFirstExistingFile(['config.json', 'config.example.json'], 'config file')
-        const configData = readJsonFile<Config>(configDir, 'config file')
-        validateConfig(configData)
+        const configDir = resolveConfigPath()
+        const configData = readJsonFile<unknown>(configDir, 'config file')
 
-        // We cache the raw parsed JSON (not Zod's output) on purpose: ConfigSchema
-        // strips unknown keys, which would drop passthrough fields like `plugins`.
-        // The schema's `.default(true)` on these two opt-out workers therefore never
-        // reaches the cached object, so apply them explicitly here — a hand-edited
-        // config that omits them still enables them as intended.
-        if (configData.workers) {
-            if (configData.workers.doApplyCoupons === undefined) configData.workers.doApplyCoupons = true
-            if (configData.workers.doPunchCards === undefined) configData.workers.doPunchCards = true
-        }
+        // Cache the PARSED schema output so the schema's `.default()`s and coercions
+        // are authoritative (e.g. doApplyCoupons/doPunchCards default true). ConfigSchema
+        // is `.passthrough()`, so unknown top-level keys such as `plugins` survive — which
+        // is why caching the parsed result (instead of the raw JSON) no longer drops them.
+        configCache = validateConfig(configData)
 
-        configCache = configData
-
-        return configData
+        return configCache
     } catch (error) {
         throw new Error(errorMessage(error))
     }

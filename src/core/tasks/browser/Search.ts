@@ -193,7 +193,7 @@ export class Search extends TaskBase {
                     return totalGainedPoints
                 }
 
-                if (stagnantLoop > stagnantLoopMax) {
+                if (stagnantLoop >= stagnantLoopMax) {
                     this.bot.logger.warn(
                         isMobile,
                         'SEARCH-BING',
@@ -320,7 +320,7 @@ export class Search extends TaskBase {
                             return totalGainedPoints
                         }
 
-                        if (stagnantLoop > stagnantLoopMax) {
+                        if (stagnantLoop >= stagnantLoopMax) {
                             this.bot.logger.warn(
                                 isMobile,
                                 'SEARCH-BING-EXTRA',
@@ -482,7 +482,11 @@ export class Search extends TaskBase {
     /** Read the current points balance, tolerating transient lookup failures. */
     private async safeGetBalance(fallback: number): Promise<number> {
         try {
-            return await this.bot.browser.func.getCurrentPoints()
+            // getCurrentPoints can return NaN/undefined when the Next.js dashboard omits
+            // the balance (no throw). Treat a non-finite result like a failure and fall
+            // back, otherwise the count-based loop reads every search as a 0-point plateau.
+            const balance = Number(await this.bot.browser.func.getCurrentPoints())
+            return Number.isFinite(balance) ? balance : fallback
         } catch {
             return fallback
         }

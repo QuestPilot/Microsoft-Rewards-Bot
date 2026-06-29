@@ -12,6 +12,14 @@ export function promptInput(options: PromptOptions): Promise<string | null> {
     const { question, timeoutSeconds = 60, validate, transform } = options
 
     return new Promise(resolve => {
+        // No interactive terminal (headless / Docker / piped stdin): there is no
+        // one to type a code, so resolve immediately instead of hanging until the
+        // timeout (~minutes). Honours the project's headless-safe rule.
+        if (!process.stdin.isTTY) {
+            resolve(null)
+            return
+        }
+
         const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout

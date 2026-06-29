@@ -43,6 +43,44 @@ export const COOKIE_CONSENT = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Dismiss / overlay selectors (shared by legacy + new dashboard and bing.com)
+// ---------------------------------------------------------------------------
+
+/**
+ * Buttons that close welcome/onboarding/cookie prompts shared by BOTH the legacy
+ * and new dashboard / Bing pages. Legacy selectors are kept as fallbacks since
+ * not all users have been migrated and Bing search pages still use the old UI.
+ */
+export const DISMISS_BUTTONS: ReadonlyArray<{ selector: string; label: string }> = [
+    // --- Legacy dashboard / Bing selectors (still needed on bing.com) ---
+    { selector: '#acceptButton', label: 'AcceptButton' },
+    { selector: '.ext-secondary.ext-button', label: '"Skip for now" Button' },
+    { selector: '#iLandingViewAction', label: 'iLandingViewAction' },
+    { selector: '#iShowSkip', label: 'iShowSkip' },
+    { selector: '#iNext', label: 'iNext' },
+    { selector: '#iLooksGood', label: 'iLooksGood' },
+    { selector: '#idSIButton9', label: 'idSIButton9' },
+    { selector: '.ms-Button.ms-Button--primary', label: 'Primary Button' },
+    { selector: '.c-glyph.glyph-cancel', label: 'Mobile Welcome Button' },
+    { selector: '.maybe-later', label: 'Mobile Rewards App Banner' },
+    { selector: '#bnp_btn_accept', label: 'Bing Cookie Banner' },
+    { selector: '#reward_pivot_earn', label: 'Reward Coupon Accept' },
+
+    // --- WCP Cookie Consent Banner (shared by dashboard + bing.com) ---
+    { selector: COOKIE_CONSENT.acceptButton, label: 'WCP Cookie Accept' }
+] as const
+
+/** Legacy Bing consent overlay (still present on bing.com search pages). */
+export const BING_OVERLAY = {
+    /** Overlay wrapper – used to detect presence */
+    wrapper: '#bnp_overlay_wrapper',
+    /** Reject optional cookies */
+    rejectButton: '#bnp_btn_reject, button[aria-label*="Reject" i]',
+    /** Accept cookies */
+    acceptButton: '#bnp_btn_accept'
+} as const
+
+// ---------------------------------------------------------------------------
 // Bing Search Page (unchanged by dashboard migration)
 // ---------------------------------------------------------------------------
 
@@ -50,7 +88,9 @@ export const BING_SEARCH = {
     /** Main search input */
     searchBar: '#sb_form_q',
     /** Organic search result links */
-    resultLinks: '#b_results .b_algo h2 a, #b_results .b_algo h2, main ol li h2 a'
+    resultLinks: '#b_results .b_algo h2 a, #b_results .b_algo h2, main ol li h2 a',
+    /** First organic result link that is an external http(s) destination (for result-visit) */
+    resultLinkHref: '#b_results li.b_algo h2 a[href^="http"]'
 } as const
 
 // ---------------------------------------------------------------------------

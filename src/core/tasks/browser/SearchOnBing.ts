@@ -191,7 +191,7 @@ export class SearchOnBing extends TaskBase {
         if (Math.random() > 0.65) return
 
         try {
-            const resultSelector = '#b_results li.b_algo h2 a[href^="http"]'
+            const resultSelector = BING_SEARCH.resultLinkHref
             const href = await page
                 .locator(resultSelector)
                 .first()
@@ -255,6 +255,21 @@ export class SearchOnBing extends TaskBase {
         return ok
     }
 
+    /** Validate that a parsed query config is `Array<{ title: string; queries: string[] }>`. */
+    private isQueriesPayload(data: unknown): data is Array<{ title: string; queries: string[] }> {
+        return (
+            Array.isArray(data) &&
+            data.every(
+                item =>
+                    !!item &&
+                    typeof item === 'object' &&
+                    typeof (item as { title?: unknown }).title === 'string' &&
+                    Array.isArray((item as { queries?: unknown }).queries) &&
+                    (item as { queries: unknown[] }).queries.every(query => typeof query === 'string')
+            )
+        )
+    }
+
     private async getSearchQueries(promotion: BasePromotion): Promise<string[]> {
         interface Queries {
             title: string
@@ -268,7 +283,11 @@ export class SearchOnBing extends TaskBase {
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING-QUERY', 'Using local queries config file')
 
                 const data = fs.readFileSync(path.join(__dirname, '../../bing-search-activity-queries.json'), 'utf8')
-                queries = JSON.parse(data)
+                const parsed: unknown = JSON.parse(data)
+                if (!this.isQueriesPayload(parsed)) {
+                    throw new Error('local query config has an unexpected shape')
+                }
+                queries = parsed
 
                 this.bot.logger.debug(
                     this.bot.isMobile,
@@ -287,6 +306,11 @@ export class SearchOnBing extends TaskBase {
                     method: 'GET',
                     url: 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/src/core/bing-search-activity-queries.json'
                 })
+                // Never trust the remote payload's shape: a malformed/hostile response could
+                // otherwise crash the search flow (e.g. .find on a non-array). Validate first.
+                if (!this.isQueriesPayload(response.data)) {
+                    throw new Error('remote query config has an unexpected shape')
+                }
                 queries = response.data
 
                 this.bot.logger.debug(

@@ -74,14 +74,42 @@ export default class PageController {
                 if (response.data?.dashboard) {
                     return response.data.dashboard as DashboardData
                 }
-                throw new Error('Dashboard data missing from API response')
-            } catch {
-                this.dashboardApiUnavailable = true
-                this.bot.logger.warn(
-                    this.bot.isMobile,
-                    'GET-DASHBOARD-DATA',
-                    'Direct JSON API unavailable (account migrated to Next.js dashboard) — using HTML parser for the rest of this session'
-                )
+                // 200 OK without a `dashboard` payload usually means the request was
+                // redirected to the Next.js dashboard / sign-in. A redirect away from
+                // /api/getuserinfo is a definitive migration signal; anything else is
+                // ambiguous and must NOT latch the API off for the whole session.
+                const finalUrl =
+                    ((response.request as { res?: { responseUrl?: string } } | undefined)?.res
+                        ?.responseUrl) ?? ''
+                const redirectedAway = !!finalUrl && !finalUrl.includes('/api/getuserinfo')
+                throw Object.assign(new Error('Dashboard data missing from API response'), {
+                    migrationSignal: redirectedAway
+                })
+            } catch (e) {
+                const status = (e as { response?: { status?: number } } | undefined)?.response?.status
+                const flagged = (e as { migrationSignal?: boolean } | undefined)?.migrationSignal === true
+                // Only treat the endpoint as permanently gone on a definitive migration
+                // signal (404, a 3xx redirect, or a redirect away from the API). Transient
+                // failures (timeout / 5xx / network) fall back to the HTML parser for THIS
+                // lookup only and retry the JSON API on the next call.
+                const migrated =
+                    status === 404 ||
+                    (status !== undefined && status >= 300 && status < 400) ||
+                    flagged
+                if (migrated) {
+                    this.dashboardApiUnavailable = true
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'GET-DASHBOARD-DATA',
+                        `Direct JSON API unavailable (account migrated to Next.js dashboard${status ? `, HTTP ${status}` : ''}) — using HTML parser for the rest of this session`
+                    )
+                } else {
+                    this.bot.logger.warn(
+                        this.bot.isMobile,
+                        'GET-DASHBOARD-DATA',
+                        `Direct JSON API request failed (${e instanceof Error ? e.message : String(e)}) — falling back to HTML parser for this lookup only`
+                    )
+                }
             }
         }
 
@@ -197,10 +225,25 @@ export default class PageController {
     }
 
     private parseDashboardHtml(html: string): DashboardData {
-        const legacyMatch = html.match(/var\s+dashboard\s*=\s*({.*?});/s)
-        if (legacyMatch?.[1]) {
-            this.bot.logger.debug(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Extracted dashboard data from legacy HTML embed')
-            return JSON.parse(legacyMatch[1]) as DashboardData
+        // Locate `var dashboard = {` then slice the balanced object. The old
+        // non-greedy /{.*?};/s regex stopped at the FIRST `};` — which can sit
+        // inside a nested object or a string literal — silently truncating the
+        // JSON and throwing. findBalancedEnd is string/escape aware.
+        const legacyMarker = html.match(/var\s+dashboard\s*=\s*/)
+        if (legacyMarker?.index !== undefined) {
+            const objStart = html.indexOf('{', legacyMarker.index + legacyMarker[0].length)
+            if (objStart !== -1) {
+                const objEnd = this.findBalancedEnd(html, objStart, '{', '}')
+                if (objEnd !== -1) {
+                    try {
+                        const parsed = JSON.parse(html.slice(objStart, objEnd + 1)) as DashboardData
+                        this.bot.logger.debug(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Extracted dashboard data from legacy HTML embed')
+                        return parsed
+                    } catch {
+                        // Not valid JSON — fall through to the Next.js parsers below.
+                    }
+                }
+            }
         }
 
         const nextData = this.extractNextData(html)
@@ -726,6 +769,15 @@ export default class PageController {
      */
     async getXBoxDashboardData(): Promise<XboxDashboardData> {
         try {
+            if (!this.bot.accessToken) {
+                this.bot.logger.warn(
+                    this.bot.isMobile,
+                    'GET-XBOX-DASHBOARD-DATA',
+                    'No mobile access token available, skipping Xbox dashboard data'
+                )
+                return this.emptyXboxDashboardData()
+            }
+
             const request: AxiosRequestConfig = {
                 url: 'https://prod.rewardsplatform.microsoft.com/dapi/me?channel=xboxapp&options=6',
                 method: 'GET',
@@ -739,12 +791,47 @@ export default class PageController {
             const response = await this.bot.axios.request(request)
             return response.data as XboxDashboardData
         } catch (error) {
+            // Match the error contract of its siblings (getAppDashboardData): return
+            // an empty payload rather than rethrowing, so an Xbox-data hiccup never
+            // aborts the surrounding run.
             this.bot.logger.error(
                 this.bot.isMobile,
                 'GET-XBOX-DASHBOARD-DATA',
                 `Error fetching dashboard data: ${error instanceof Error ? error.message : String(error)}`
             )
-            throw error
+            return this.emptyXboxDashboardData()
+        }
+    }
+
+    private emptyXboxDashboardData(): XboxDashboardData {
+        return {
+            response: {
+                profile: null,
+                balance: 0,
+                counters: {},
+                promotions: [],
+                catalog: null,
+                goal_item: null,
+                activities: null,
+                cashback: null,
+                orders: null,
+                rebateProfile: null,
+                rebatePayouts: null,
+                giveProfile: null,
+                autoRedeemProfile: null,
+                autoRedeemItem: null,
+                thirdPartyProfile: null,
+                notifications: null,
+                waitlist: null,
+                autoOpenFlyout: null,
+                coupons: null,
+                recommendedAffordableCatalog: null,
+                generativeAICreditsBalance: null,
+                requestCountryCatalog: null,
+                donationCatalog: null
+            },
+            correlationId: '',
+            code: 0
         }
     }
 
@@ -890,7 +977,7 @@ export default class PageController {
                     const lastUpdated = new Date(attrs.last_updated ?? '')
                     const today = new Date()
 
-                    if (checkInDay < 6 && today.getDate() !== lastUpdated.getDate()) {
+                    if (checkInDay < 6 && today.toDateString() !== lastUpdated.toDateString()) {
                         checkIn = parseInt(attrs[`day_${checkInDay + 1}_points`] ?? '0')
                     }
                 }
@@ -977,9 +1064,12 @@ export default class PageController {
         try {
             this.bot.logger.debug(this.bot.isMobile, 'GET-CURRENT-POINTS', 'Fetching current points...')
             const data = await this.getDashboardData()
-            const points = data.userStatus.availablePoints
+            // The Next.js dashboard sometimes omits availablePoints → Number(undefined)
+            // is NaN, which would make every search look like a points "plateau" and
+            // report gained=0. Fall back to the last known balance instead.
+            const points = Number(data.userStatus.availablePoints)
             this.bot.logger.debug(this.bot.isMobile, 'GET-CURRENT-POINTS', `Current points: ${points}`)
-            return points
+            return Number.isFinite(points) ? points : this.bot.userData.currentPoints
         } catch (error) {
             this.bot.logger.error(
                 this.bot.isMobile,
@@ -1018,7 +1108,16 @@ export default class PageController {
                     try {
                         const url = new URL(page.url())
                         const origin = url.origin
-                        if (seenOrigins.has(origin) || origin === 'about:' || origin === 'chrome:') continue
+                        // For opaque pages (about:blank, chrome://…) URL.origin is the
+                        // string 'null', NOT 'about:'/'chrome:' — the old comparison never
+                        // matched, so localStorage was read from non-origin tabs.
+                        if (
+                            seenOrigins.has(origin) ||
+                            origin === 'null' ||
+                            origin === 'about:' ||
+                            origin === 'chrome:'
+                        )
+                            continue
                         seenOrigins.add(origin)
 
                         const items: Array<{ name: string; value: string }> = await page

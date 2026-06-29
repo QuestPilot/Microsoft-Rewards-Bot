@@ -162,6 +162,9 @@ export const ConfigSchema = z.object({
     }).optional(),
     safetyAdvisory: SafetyAdvisorySchema.optional()
 })
+    // Keep unknown top-level keys (e.g. `plugins`) instead of stripping them, so the
+    // parsed result is safe to cache and use directly as the authoritative config.
+    .passthrough()
 
 // Account
 export const AccountSchema = z.object({

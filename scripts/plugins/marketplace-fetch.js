@@ -74,7 +74,17 @@ function httpGetBuffer(url, options) {
                         reject(new Error(`Too many redirects while fetching ${url}`))
                         return
                     }
-                    httpGetBuffer(new URL(response.headers.location, url).toString(), { ...options, redirects: redirects + 1 }).then(
+                    const nextUrl = new URL(response.headers.location, url)
+                    // The signed catalog's host is intentionally NOT allowlisted (the Ed25519
+                    // signature is the gate), so a cross-origin redirect would let a MITM'd or
+                    // compromised endpoint steer the fetch at an arbitrary internal/external host
+                    // (SSRF). Refuse to follow a redirect that changes origin — this mirrors the
+                    // host-allowlist hardening fetchMarketplaceAsset already gets via assertUrl.
+                    if (options.sameOriginOnly && nextUrl.origin !== new URL(url).origin) {
+                        reject(new Error(`Refusing cross-origin redirect: ${new URL(url).origin} -> ${nextUrl.origin}`))
+                        return
+                    }
+                    httpGetBuffer(nextUrl.toString(), { ...options, redirects: redirects + 1 }).then(
                         resolve,
                         reject
                     )
@@ -124,7 +134,9 @@ async function fetchSignedCatalog(url, options = {}) {
         timeoutMs: options.timeoutMs ?? 20_000,
         maxBytes: options.maxBytes ?? 4 * 1024 * 1024,
         maxRedirects: options.maxRedirects ?? 5,
-        assertUrl: assertHttpsUrl
+        assertUrl: assertHttpsUrl,
+        // Host is not allowlisted here, so only follow same-origin redirects (anti-SSRF).
+        sameOriginOnly: true
     })
     let json
     try {

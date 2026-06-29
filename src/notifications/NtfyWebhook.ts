@@ -14,13 +14,17 @@ const ntfyQueue = new PQueue({
 export async function sendNtfy(config: WebhookNtfyConfig, content: string, level: LogLevel): Promise<void> {
     if (!config?.url) return
 
+    // Compute the per-message priority LOCALLY. `config` is the cached bot.config
+    // singleton, so mutating `config.priority` here would permanently bump EVERY
+    // later notification to error/warn priority after the first error/warn.
+    let priority = config.priority
     switch (level) {
         case 'error':
-            config.priority = 5 // Highest
+            priority = 5 // Highest
             break
 
         case 'warn':
-            config.priority = 4
+            priority = 4
             break
 
         default:
@@ -30,7 +34,7 @@ export async function sendNtfy(config: WebhookNtfyConfig, content: string, level
     const headers: Record<string, string> = { 'Content-Type': 'text/plain' }
     if (config.title) headers['Title'] = config.title
     if (config.tags?.length) headers['Tags'] = config.tags.join(',')
-    if (config.priority) headers['Priority'] = String(config.priority)
+    if (priority) headers['Priority'] = String(priority)
     if (config.token) headers['Authorization'] = `Bearer ${config.token}`
     headers['Icon'] = BOT_ICON_URL
 

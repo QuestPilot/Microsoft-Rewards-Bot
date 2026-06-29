@@ -78,9 +78,11 @@ test('Main() runs the harvester only when the opt-in core flag is set', () => {
 
 test('capture flag is opt-in (default false) and schema-validated', () => {
     const example = JSON.parse(read('src/config.example.json'))
-    const live = JSON.parse(read('src/config.json'))
     assert.equal(example.core.captureDashboardPages, false)
-    assert.equal(live.core.captureDashboardPages, false)
+
+    // src/config.json is user-owned, ignored runtime state and may deliberately
+    // enable a one-shot capture. Defaults must be asserted from the versioned
+    // example; persistence/reset behavior is covered by the tests above/below.
 
     const types = read('src/types/Config.ts')
     assert.match(types, /captureDashboardPages\?:\s*boolean/)

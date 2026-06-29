@@ -26,6 +26,8 @@ interface OfficialCoreManifest {
     plugin: 'core'
     version: string
     indexSha256?: string
+    /** Optional sha256 of the loader shim (plugins/core/index.js) — see isVerifiedOfficialCore. */
+    shimSha256?: string
     bytecodeTarget?: {
         node?: string
         platform?: string
@@ -36,6 +38,8 @@ interface OfficialCoreManifest {
 
 interface OfficialCoreTarget {
     indexSha256?: string
+    /** Optional sha256 of the loader shim (plugins/core/index.js) for this target. */
+    shimSha256?: string
     bytecodeTarget?: {
         node?: string
         platform?: string
@@ -263,10 +267,11 @@ export class PluginManager {
 
         // Lazy-require the network-free verifier + installer (kept off the hot path).
         let mp: {
-            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string }): {
+            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string; minSequence?: number }): {
                 ok: boolean
                 reason?: string
                 catalog?: unknown
+                sequence?: number
                 expired?: boolean
             }
             isPluginStale(publishedBotVersion?: string | null, botVersion?: string, window?: number): boolean
@@ -301,7 +306,8 @@ export class PluginManager {
 
         const verification = mp.verifyMarketplaceCatalog({
             root: process.cwd(),
-            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined,
+            minSequence: this.readPersistedMarketplaceSequence() ?? undefined
         })
         if (!verification.ok) {
             this.bot.logger.warn(
@@ -311,6 +317,9 @@ export class PluginManager {
             )
             return
         }
+        // Verified good — raise the anti-rollback floor so a later replayed older catalog
+        // (even if validly signed and unexpired) is rejected. Only ever moves forward.
+        this.persistMarketplaceSequence(verification.sequence)
         if (verification.expired) {
             this.bot.logger.warn(
                 'main',
@@ -386,10 +395,34 @@ export class PluginManager {
         if (typeof catalog !== 'string' || typeof signature !== 'string') {
             throw new Error('catalog response must be { catalog, signature }')
         }
+
+        // Verify-before-swap: the fetched bytes must pass signature + format + anti-rollback
+        // (sequence >= the highest verified so far) IN MEMORY before we touch disk. This stops
+        // a tampered/rolled-back/unsigned response from clobbering the last known-good cached
+        // catalog (a fail-closed DoS) or from delivering a rollback that re-enables a revoked
+        // plugin. Never replace a verified-good catalog with unverified bytes.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mp = require('../../scripts/security/marketplace-catalog') as {
+            verifyCatalogBytes(
+                payload: Buffer | string,
+                signature: string,
+                options: { keysDir?: string; minSequence?: number }
+            ): { ok: boolean; reason?: string; sequence?: number }
+        }
+        const check = mp.verifyCatalogBytes(Buffer.from(catalog, 'utf8'), signature, {
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined,
+            minSequence: this.readPersistedMarketplaceSequence() ?? undefined
+        })
+        if (!check.ok) {
+            throw new Error(`refusing to cache an unverified marketplace catalog (${check.reason})`)
+        }
+
         const dir = path.resolve(process.cwd(), 'plugins')
         fs.mkdirSync(dir, { recursive: true })
         this.atomicWriteFile(path.join(dir, 'marketplace.json'), catalog)
         this.atomicWriteFile(path.join(dir, 'marketplace.sig'), `${signature.trim()}\n`)
+        // Raise the floor only AFTER the verified bytes are safely persisted.
+        this.persistMarketplaceSequence(check.sequence)
     }
 
     private defaultCatalogFetcher(): CatalogFetcher | undefined {
@@ -408,6 +441,41 @@ export class PluginManager {
         const tmp = `${filePath}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`
         fs.writeFileSync(tmp, data)
         fs.renameSync(tmp, filePath)
+    }
+
+    /** Where the anti-rollback floor (highest verified catalog sequence) is persisted. */
+    private marketplaceSequencePath(): string {
+        return path.resolve(process.cwd(), 'plugins', '.marketplace-seq')
+    }
+
+    /**
+     * Highest marketplace catalog `sequence` ever VERIFIED on this machine, or null.
+     * Passed as `minSequence` to every catalog verify so a replayed older-but-still-
+     * signed catalog (which could re-enable a revoked/killed plugin within the TTL
+     * window) is rejected as a rollback.
+     */
+    private readPersistedMarketplaceSequence(): number | null {
+        try {
+            const raw = fs.readFileSync(this.marketplaceSequencePath(), 'utf8').trim()
+            const value = Number(raw)
+            return Number.isFinite(value) ? value : null
+        } catch {
+            return null
+        }
+    }
+
+    /** Raise the persisted anti-rollback floor. Monotonic — only ever moves forward. */
+    private persistMarketplaceSequence(sequence: number | undefined): void {
+        if (typeof sequence !== 'number' || !Number.isFinite(sequence)) return
+        const current = this.readPersistedMarketplaceSequence()
+        if (current !== null && sequence <= current) return
+        try {
+            const dir = path.resolve(process.cwd(), 'plugins')
+            fs.mkdirSync(dir, { recursive: true })
+            this.atomicWriteFile(this.marketplaceSequencePath(), `${sequence}\n`)
+        } catch {
+            // Best-effort: a non-writable plugins/ just means the floor doesn't persist.
+        }
     }
 
     private readBotVersion(): string | undefined {
@@ -710,14 +778,21 @@ export class PluginManager {
     /**
      * Decide how a plugin runs:
      *  - `core`      — the verified official Core plugin (in-process, full trust).
-     *  - `sandboxed` — untrusted: marketplace-sourced, or explicitly `trust: 'sandbox'`.
+     *  - `sandboxed` — untrusted: marketplace-sourced, explicitly `trust: 'sandbox'`,
+     *                  OR un-configured (no plugins.jsonc entry — see below).
      *  - `trusted`   — in-process: explicit `trust: 'full'` (Trusted Mode), or a local
-     *                  first-party plugin with no trust hint (backward compatible).
+     *                  first-party plugin EXPLICITLY listed in plugins.jsonc with no
+     *                  trust hint (backward-compatible first-party contract).
      */
     private resolvePluginTrust(isOfficialCore: boolean, entryConfig: PluginConfigEntry | undefined): 'core' | 'sandboxed' | 'trusted' {
         if (isOfficialCore) return 'core'
         if (entryConfig?.trust === 'full') return 'trusted'
         if (entryConfig?.trust === 'sandbox' || entryConfig?.source === 'marketplace') return 'sandboxed'
+        // Fail safe for UN-configured plugins (no plugins.jsonc, or a file simply dropped
+        // into plugins/): default to the sandbox so "drop a file -> in-process RCE without
+        // a signature" is no longer possible. Full in-process access requires either an
+        // explicit `trust: 'full'` or an explicit plugins.jsonc entry (first-party).
+        if (!entryConfig) return 'sandboxed'
         return 'trusted'
     }
 
@@ -850,10 +925,11 @@ export class PluginManager {
     private assertMarketplaceTrust(entryName: string, filePath: string, entryConfig: PluginConfigEntry | undefined): void {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const mp = require('../../scripts/security/marketplace-catalog') as {
-            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string }): {
+            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string; minSequence?: number }): {
                 ok: boolean
                 reason?: string
                 catalog?: unknown
+                sequence?: number
                 expired?: boolean
             }
             findEntry(catalog: unknown, name: string, version?: string): { sha256?: string; version?: string; files?: Array<{ path?: string; sha256?: string }>; manifestSha256?: string } | undefined
@@ -862,13 +938,19 @@ export class PluginManager {
 
         const result = mp.verifyMarketplaceCatalog({
             root: process.cwd(),
-            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined,
+            minSequence: this.readPersistedMarketplaceSequence() ?? undefined
         })
         if (!result.ok) {
             throw new Error(`marketplace catalog is not trusted (${result.reason}); refusing "${entryName}"`)
         }
         if (result.expired) {
             throw new Error(`marketplace catalog is stale; refusing "${entryName}"`)
+        }
+        // Verified + fresh: raise the anti-rollback floor (primary-only to avoid worker
+        // write races; reads happen everywhere so enforcement still applies in workers).
+        if (cluster.isPrimary) {
+            this.persistMarketplaceSequence(result.sequence)
         }
         const entry = mp.findEntry(result.catalog, entryName, entryConfig?.version)
         if (!entry || !entry.sha256) {
@@ -960,6 +1042,23 @@ export class PluginManager {
             throw new Error('Official Core bytecode checksum mismatch')
         }
 
+        // Pin the LOADED entrypoint too, not just the bytecode it loads. `filePath` here
+        // is the tiny in-process shim (plugins/core/index.js) that require()s the verified
+        // .jsc — a tampered shim could load a different file while the bytecode hash still
+        // "passes". Enforced when the signed manifest pins the shim hash; current manifests
+        // may omit it (absent = skip, so existing signed Cores keep loading — no regression).
+        // TODO(review): have the signer ALWAYS populate shimSha256 in official-core.json
+        // (and re-sign), then make this mandatory for entryName 'core' loaded via index.js.
+        if (path.basename(filePath) === 'index.js') {
+            const shimSha = target.shimSha256 ?? manifest.shimSha256
+            if (shimSha) {
+                const shimHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+                if (shimHash.toLowerCase() !== String(shimSha).toLowerCase()) {
+                    throw new Error('Official Core loader (index.js) checksum mismatch')
+                }
+            }
+        }
+
         return true
     }
 
@@ -998,6 +1097,15 @@ export class PluginManager {
     }
 
     private currentCoreTargetId(): string {
+        // Honor MSRB_CORE_TARGET exactly the way the loader shim (plugins/core/index.js)
+        // does, with the SAME format guard. Otherwise the shim could load
+        // targets/<env>/index.jsc while verification hashed targets/<auto>/index.jsc —
+        // verifying one bytecode file but executing another. Aligning them here keeps
+        // "verified target === loaded target".
+        const envTarget = process.env.MSRB_CORE_TARGET
+        if (envTarget && /^(win32|linux|darwin)-(x64|arm64)-node-\d+\.\d+\.\d+$/.test(envTarget)) {
+            return envTarget
+        }
         return `${process.platform}-${process.arch}-node-${process.versions.node}`
     }
 

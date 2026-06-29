@@ -9,9 +9,18 @@ export class RecoveryStrategy {
 
     constructor(private bot: MicrosoftRewardsBot) {}
 
+    /** Mask a recovery email before logging (PII). e.g. jo***@example.com */
+    private maskEmail(email: string): string {
+        const at = email.indexOf('@')
+        if (at < 0) return '***'
+        const user = email.slice(0, at)
+        const visible = Math.min(2, user.length)
+        return `${user.slice(0, visible)}***${email.slice(at)}`
+    }
+
     private async fillEmail(page: Page, email: string): Promise<boolean> {
         try {
-            this.bot.logger.info(this.bot.isMobile, 'LOGIN-RECOVERY', `Attempting to fill email: ${email}`)
+            this.bot.logger.info(this.bot.isMobile, 'LOGIN-RECOVERY', `Attempting to fill email: ${this.maskEmail(email)}`)
 
             const visibleInput = await page
                 .waitForSelector(this.textInputSelector, { state: 'visible', timeout: 500 })
@@ -55,7 +64,7 @@ export class RecoveryStrategy {
                 this.bot.logger.info(
                     this.bot.isMobile,
                     'LOGIN-RECOVERY',
-                    `Using provided recovery email: ${recoveryEmail}`
+                    `Using provided recovery email: ${this.maskEmail(recoveryEmail)}`
                 )
 
                 const filled = await this.fillEmail(page, recoveryEmail)
@@ -129,7 +138,7 @@ export class RecoveryStrategy {
                     continue
                 }
 
-                this.bot.logger.info(this.bot.isMobile, 'LOGIN-RECOVERY', `Valid email received from user: ${email}`)
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN-RECOVERY', `Valid email received from user: ${this.maskEmail(email)}`)
 
                 const filled = await this.fillEmail(page, email)
                 if (!filled) {

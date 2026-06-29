@@ -12,7 +12,7 @@ import BrowserManager from './automation/BrowserManager'
 import { DESKTOP_BROWSER_VIEWPORT } from './automation/BrowserViewport'
 import PageController from './automation/PageController'
 
-import { loadAccounts, loadConfig } from './helpers/ConfigLoader'
+import { loadAccounts, loadConfig, resolveConfigPath } from './helpers/ConfigLoader'
 import { runDataCleanup } from './helpers/DataManager'
 import Helpers from './helpers/Helpers'
 import { readAccountSummary, recordAccountBan, recordAccountRun, recordRunComplete } from './helpers/StatsRecorder'
@@ -489,13 +489,18 @@ export class MicrosoftRewardsBot {
         return new Promise(resolve => {
             const onWorkerDone = async (label: 'exit' | 'disconnect', worker: Worker, code?: number): Promise<void> => {
                 const { pid } = worker.process
-                this.activeWorkers -= 1
 
+                // Each worker emits BOTH 'disconnect' and 'exit'. Decrement only AFTER the
+                // per-pid dedup guard so activeWorkers drops exactly once per unique worker —
+                // otherwise it can fall <=0 while a worker is still running, finalizing the
+                // run (summary/flush) too early and dropping the in-flight worker's __stats.
                 if (!pid || this.exitedWorkers.includes(pid)) {
                     return
                 } else {
                     this.exitedWorkers.push(pid)
                 }
+
+                this.activeWorkers -= 1
 
                 this.logger.warn(
                     'main',
@@ -1126,7 +1131,9 @@ export class MicrosoftRewardsBot {
 
                 // Set geo
                 this.userData.geoLocale =
-                    account.geoLocale === 'auto' ? data.userProfile.attributes.country : account.geoLocale.toLowerCase()
+                    account.geoLocale === 'auto'
+                        ? (data.userProfile.attributes.country ?? 'US')
+                        : account.geoLocale.toLowerCase()
                 if (this.userData.geoLocale.length > 2) {
                     this.logger.warn(
                         'main',
@@ -1169,15 +1176,21 @@ export class MicrosoftRewardsBot {
                         // Auto-disable: write false back to config.json so the Desk toggle
                         // resets automatically. The user must re-enable it for each new capture.
                         this.config.core!.captureDashboardPages = false
-                        try {
-                            const cfgPath = path.join(process.cwd(), 'src', 'config.json')
-                            const cfgRaw = JSON.parse(fs.readFileSync(cfgPath, 'utf8'))
-                            if (cfgRaw?.core) {
-                                cfgRaw.core.captureDashboardPages = false
-                                fs.writeFileSync(cfgPath, JSON.stringify(cfgRaw, null, 4) + '\n', 'utf8')
+                        // Primary/single-worker only: cluster workers must not race each other
+                        // (or the primary) writing the shared config file. Resolve the path the
+                        // SAME way loadConfig does instead of hardcoding src/config.json (which
+                        // is wrong once the bot runs from dist/).
+                        if (cluster.isPrimary) {
+                            try {
+                                const cfgPath = resolveConfigPath()
+                                const cfgRaw = JSON.parse(fs.readFileSync(cfgPath, 'utf8'))
+                                if (cfgRaw?.core) {
+                                    cfgRaw.core.captureDashboardPages = false
+                                    fs.writeFileSync(cfgPath, JSON.stringify(cfgRaw, null, 4) + '\n', 'utf8')
+                                }
+                            } catch {
+                                /* config write is best-effort */
                             }
-                        } catch {
-                            /* config write is best-effort */
                         }
                     }
                 }
@@ -1381,12 +1394,27 @@ async function main(): Promise<void> {
         rewardsBot.dashboardStopRequested = true
     })
 
+    // Long-lived modes (scheduler loop / background agent) must survive a stray
+    // unhandledRejection/uncaughtException instead of tearing down a multi-day
+    // process. One-shot modes (single run / harvester) still fail fast.
+    const isLongLivedMode =
+        !rewardsBot.isHarvesterMode &&
+        (isSchedulerEnabled(rewardsBot.config.scheduler) || process.argv.includes('--background'))
+    // Re-entrancy guard: a SIGINT during SIGTERM cleanup (or a second fatal error)
+    // must not run the async cleanup twice concurrently.
+    let shuttingDown = false
+    let beforeExitHandled = false
+
     process.on('beforeExit', () => {
-        void rewardsBot.agentRuntime.stop()
-        void rewardsBot.pluginManager.destroyAll()
-        void flushAllWebhooks()
+        // beforeExit fires when the event loop drains. Do NOT schedule new async work
+        // here — doing so resurrects the loop and re-fires this handler. Graceful
+        // cleanup is owned by the explicit SIGINT/SIGTERM and main() exit paths.
+        if (beforeExitHandled) return
+        beforeExitHandled = true
     })
     process.on('SIGINT', async () => {
+        if (shuttingDown) return
+        shuttingDown = true
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGINT received, flushing and exiting...')
         await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
@@ -1395,6 +1423,8 @@ async function main(): Promise<void> {
         process.exit(130)
     })
     process.on('SIGTERM', async () => {
+        if (shuttingDown) return
+        shuttingDown = true
         rewardsBot.logger.warn('main', 'PROCESS', 'SIGTERM received, flushing and exiting...')
         await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
@@ -1404,6 +1434,11 @@ async function main(): Promise<void> {
     })
     process.on('uncaughtException', async error => {
         rewardsBot.logger.error('main', 'UNCAUGHT-EXCEPTION', error)
+        // Keep a long-lived process alive (log-and-continue); the scheduler/agent loop
+        // recovers on the next iteration rather than dying on one bad tick.
+        if (isLongLivedMode) return
+        if (shuttingDown) return
+        shuttingDown = true
         await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
@@ -1411,6 +1446,9 @@ async function main(): Promise<void> {
     })
     process.on('unhandledRejection', async reason => {
         rewardsBot.logger.error('main', 'UNHANDLED-REJECTION', reason as Error)
+        if (isLongLivedMode) return
+        if (shuttingDown) return
+        shuttingDown = true
         await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
@@ -1446,6 +1484,10 @@ async function main(): Promise<void> {
         await rewardsBot.closeAllBrowsers()
         await rewardsBot.agentRuntime.stop()
         await flushAllWebhooks()
+        // A fatal error must surface as a non-zero exit (match the harvester/single
+        // paths and the top-level main().catch) — previously this fell through to a
+        // misleading exit code 0.
+        process.exit(1)
     }
 }
 

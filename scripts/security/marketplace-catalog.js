@@ -54,8 +54,6 @@ function verifyMarketplaceCatalog(options = {}) {
     const root = options.root || process.cwd()
     const catalogPath = options.catalogPath || path.join(root, 'plugins', 'marketplace.json')
     const sigPath = options.sigPath || path.join(root, 'plugins', 'marketplace.sig')
-    const now = typeof options.now === 'number' ? options.now : Date.now()
-    const minSequence = typeof options.minSequence === 'number' ? options.minSequence : null
 
     if (!fs.existsSync(catalogPath) || !fs.existsSync(sigPath)) {
         return { ok: false, reason: 'absent' }
@@ -70,13 +68,35 @@ function verifyMarketplaceCatalog(options = {}) {
         return { ok: false, reason: 'unreadable' }
     }
 
+    return verifyCatalogBytes(payload, signature, {
+        keysDir: options.keysDir,
+        minSequence: options.minSequence,
+        now: options.now
+    })
+}
+
+/**
+ * Verify catalog bytes already in memory (signature + format + anti-rollback +
+ * freshness), WITHOUT reading them from disk first. Same return shapes as
+ * verifyMarketplaceCatalog. This is what lets the bot verify a freshly-fetched
+ * catalog BEFORE swapping it onto disk (verify-before-swap), so an unverified or
+ * rolled-back response can never replace the last known-good cached catalog.
+ *   @param payload   raw catalog bytes (Buffer or string)
+ *   @param signature detached base64 signature (string)
+ */
+function verifyCatalogBytes(payload, signature, options = {}) {
+    const now = typeof options.now === 'number' ? options.now : Date.now()
+    const minSequence = typeof options.minSequence === 'number' ? options.minSequence : null
+    const bytes = Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload), 'utf8')
+    const sig = String(signature || '').trim()
+
     const keys = loadTrustedKeys(options.keysDir)
     if (keys.length === 0) {
         return { ok: false, reason: 'no-trusted-keys' }
     }
     const verified = keys.some(key => {
         try {
-            verifySignedBytes(payload, signature, key)
+            verifySignedBytes(bytes, sig, key)
             return true
         } catch {
             return false
@@ -88,7 +108,7 @@ function verifyMarketplaceCatalog(options = {}) {
 
     let catalog
     try {
-        catalog = JSON.parse(payload.toString('utf8'))
+        catalog = JSON.parse(bytes.toString('utf8'))
     } catch {
         return { ok: false, reason: 'parse-error' }
     }
@@ -189,4 +209,4 @@ function isRevoked(catalog, { name, version, sha256 } = {}) {
     })
 }
 
-module.exports = { verifyMarketplaceCatalog, loadTrustedKeys, findEntry, findLatestEntry, cmpVersion, isRevoked, isPluginStale, botAheadDistance, FORMAT, DEFAULT_KEYS_DIR }
+module.exports = { verifyMarketplaceCatalog, verifyCatalogBytes, loadTrustedKeys, findEntry, findLatestEntry, cmpVersion, isRevoked, isPluginStale, botAheadDistance, FORMAT, DEFAULT_KEYS_DIR }

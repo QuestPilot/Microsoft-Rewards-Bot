@@ -72,7 +72,7 @@ export class AnalyticsService {
      */
     track(event: AnalyticsEvent, properties: Record<string, unknown> = {}): void {
         if (!this.enabled) return
-        if (this.queue.length >= MAX_QUEUE) return // drop oldest-first if queue full
+        if (this.queue.length >= MAX_QUEUE) return // queue full: drop this (newest) event
 
         const clean = this.scrubProps(properties)
         if (this.debug) {

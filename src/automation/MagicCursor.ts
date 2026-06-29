@@ -29,6 +29,12 @@ export function installMagicCursor(): void {
         // Only the top frame — avoids one cursor per iframe.
         if (window.self !== window.top) return
 
+        // Never inject on the Microsoft sign-in origins. These pages are highly
+        // automation-sensitive; an injected overlay element/init script is an
+        // unnecessary tell during the login flow, so skip them entirely.
+        const mgcHost = location.hostname
+        if (mgcHost === 'login.live.com' || mgcHost === 'account.live.com') return
+
         const STYLE_ID = '__mgc_style__'
         const CURSOR_ID = '__mgc__'
         const ROT_ID = '__mgc_rot__'

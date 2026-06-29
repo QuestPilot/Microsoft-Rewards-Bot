@@ -25,7 +25,7 @@ function maskEmail(email: string): string {
  * emails, license keys, and key=value secrets (token/password/cookie/secret). The
  * result is also length-capped to keep the relay payload small.
  */
-function redact(text: string): string {
+export function redact(text: string): string {
     return text
         // Mask any email address
         .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, m => maskEmail(m))
