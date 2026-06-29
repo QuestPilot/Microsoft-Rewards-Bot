@@ -23,6 +23,7 @@
     },
     "core": {
         "doubleSearchPoints": true,
+        "exploreOnBing": false,
         "appReward": true,
         "readToEarn": true,
         "dailyCheckIn": true,

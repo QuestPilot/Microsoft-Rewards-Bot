@@ -146,6 +146,7 @@ export const ConfigSchema = z.object({
     scheduler: SchedulerSchema.optional(),
     core: z.object({
         doubleSearchPoints: z.boolean().optional(),
+        exploreOnBing: z.boolean().optional(),
         appReward: z.boolean().optional(),
         readToEarn: z.boolean().optional(),
         dailyCheckIn: z.boolean().optional(),

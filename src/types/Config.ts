@@ -63,6 +63,7 @@ export interface ConfigScheduler {
  */
 export interface ConfigCore {
     doubleSearchPoints?: boolean
+    exploreOnBing?: boolean
     appReward?: boolean
     readToEarn?: boolean
     dailyCheckIn?: boolean
