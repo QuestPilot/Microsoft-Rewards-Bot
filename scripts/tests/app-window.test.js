@@ -61,8 +61,8 @@ test('Rewards Desk local API requires a process token and validates request boun
 
 test('Rewards Desk presents two coherent startup modes and desktop-like interaction', () => {
     assert.match(source, /id="tog-startup-desk"/)
-    assert.match(source, /id="tog-startup-agent"/)
-    assert.match(source, /Core remote access/)
+    assert.match(source, /id="tog-remote-access"/)
+    assert.match(source, /Remote access <span class="startup-badge">Core/)
     assert.doesNotMatch(source, /id="tog-bgAgent"|data-cfg="dashboardSync"/)
     assert.match(source, /document\.addEventListener\('contextmenu'/)
     assert.match(source, /user-select:none/)
