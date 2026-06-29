@@ -20,7 +20,7 @@ const DelaySchema = z.object({
     max: NumberOrString
 })
 
-const QueryEngineSchema = z.enum(['google', 'wikipedia', 'reddit', 'local'])
+const QueryEngineSchema = z.enum(['google', 'wikipedia', 'wikirandom', 'reddit', 'hackernews', 'local'])
 
 const TotpSecretSchema = z.preprocess(
     value => {

@@ -101,7 +101,7 @@ export interface ConfigPlugins {
     }
 }
 
-export type QueryEngine = 'google' | 'wikipedia' | 'reddit' | 'local'
+export type QueryEngine = 'google' | 'wikipedia' | 'wikirandom' | 'reddit' | 'hackernews' | 'local'
 
 export interface ConfigSearchSettings {
     scrollRandomResults: boolean

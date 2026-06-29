@@ -41,7 +41,7 @@
         "scrollRandomResults": true,
         "clickRandomResults": true,
         "parallelSearching": true,
-        "queryEngines": ["google", "wikipedia", "reddit", "local"],
+        "queryEngines": ["google", "wikipedia", "wikirandom", "reddit", "hackernews", "local"],
         "searchResultVisitTime": "10sec",
         "searchDelay": {
             "min": "30sec",
