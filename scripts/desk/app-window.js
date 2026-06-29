@@ -3054,6 +3054,7 @@ function html() {
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Claim points</div><div class="toggle-sub">Auto-claim ready-to-claim dashboard point cards</div></div><label class="toggle"><input type="checkbox" id="tog-core-claimPoints"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Apply coupons<span class="next-badge">Next only</span></div><div class="toggle-sub">Detect &amp; apply dashboard coupons automatically</div></div><label class="toggle"><input type="checkbox" id="tog-core-applyCoupons"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Double search points</div><div class="toggle-sub">Activate eligible double-search promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-doubleSearchPoints"><span class="toggle-slider"></span></label></div>
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Explore on Bing</div><div class="toggle-sub">Commercial topic searches (cards, insurance, travel…) for bonus points</div></div><label class="toggle"><input type="checkbox" id="tog-core-exploreOnBing"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">App rewards</div><div class="toggle-sub">Mobile app-only reward promotions</div></div><label class="toggle"><input type="checkbox" id="tog-core-appReward"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Read to Earn<span class="beta-badge">Beta</span></div><div class="toggle-sub">MSN app-only reading rewards</div></div><label class="toggle"><input type="checkbox" id="tog-core-readToEarn"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Daily check-in</div><div class="toggle-sub">App-only daily check-in bonus</div></div><label class="toggle"><input type="checkbox" id="tog-core-dailyCheckIn"><span class="toggle-slider"></span></label></div>
@@ -3973,7 +3974,7 @@ function html() {
     }
 
     // ── Core feature gating (config.json core.*) ──
-    var CORE_KEYS = ['claimPoints','applyCoupons','doubleSearchPoints','appReward','readToEarn',
+    var CORE_KEYS = ['claimPoints','applyCoupons','doubleSearchPoints','exploreOnBing','appReward','readToEarn',
       'dailyCheckIn','dailyStreak','streakProtection','temporaryPunchcards','collectDashboardInfo','setGoal',
       'captureDashboardPages'];
     // Core features whose run also depends on an open-source worker flag being on.
@@ -5659,6 +5660,7 @@ function html() {
       claimPoints:      { pts: 220, name: 'Auto-claim points',   d: 'M20 6 9 17l-5-5' },
       applyCoupons:     { pts: 130, name: 'Auto-apply coupons',  d: 'M9 11l3 3L22 4' },
       doubleSearchPoints:{pts: 180, name: 'Double search points',d: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z' },
+      exploreOnBing:    { pts: 600, name: 'Explore on Bing',     d: 'M12 2 15 8l7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z' },
       appReward:        { pts: 280, name: 'App rewards',         d: 'M5 3h14v18H5z' },
       readToEarn:       { pts: 540, name: 'Read to Earn',        d: 'M4 19V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z' },
       dailyCheckIn:     { pts: 150, name: 'Daily check-in',      d: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5' },
