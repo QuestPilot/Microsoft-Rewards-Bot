@@ -1,6 +1,6 @@
 {
     "name":  "microsoft-rewards-bot-core",
-    "version":  "2.0.1.9",
+    "version":  "2.0.1.10",
     "description":  "Official Core plugin for Microsoft Rewards Bot",
     "author":  "LightZirconite",
     "license":  "SEE LICENSE IN LICENSE",
@@ -13,8 +13,16 @@
                  "officialPlugin":  "core",
                  "releaseShape":  "single-entry-bytecode",
                  "targets":  {
+                                 "win32-x64-node-24.15.0":  {
+                                                                "indexSha256":  "225b10f58f15232e95562545ff794d58050c074cf5f9069fb2f6e4ffb2a3517a",
+                                                                "bytecodeTarget":  {
+                                                                                       "node":  "24.15.0",
+                                                                                       "platform":  "win32",
+                                                                                       "arch":  "x64"
+                                                                                   }
+                                                            },
                                  "linux-x64-node-24.15.0":  {
-                                                                "indexSha256":  "acf1702e0d6e20cc6a60ef5422849b7329e7cea4efc455f09403fa3e080128fa",
+                                                                "indexSha256":  "a459cbd398d944a3d8b9f4ef0ff33c6de8016ea53899cbeb785dcb38a41edaa8",
                                                                 "bytecodeTarget":  {
                                                                                        "node":  "24.15.0",
                                                                                        "platform":  "linux",
@@ -22,7 +30,7 @@
                                                                                    }
                                                             },
                                  "linux-arm64-node-24.15.0":  {
-                                                                  "indexSha256":  "95fae6f0a48a108314aa76cff47af417d97ff5bb9b63d733e138973e52f13511",
+                                                                  "indexSha256":  "057f9b2adea8233a1a2ac107be622a5afb9f7be2888a5bd85254bd5614c59414",
                                                                   "bytecodeTarget":  {
                                                                                          "node":  "24.15.0",
                                                                                          "platform":  "linux",
@@ -30,22 +38,14 @@
                                                                                      }
                                                               },
                                  "darwin-x64-node-24.15.0":  {
-                                                                 "indexSha256":  "acf1702e0d6e20cc6a60ef5422849b7329e7cea4efc455f09403fa3e080128fa",
+                                                                 "indexSha256":  "a459cbd398d944a3d8b9f4ef0ff33c6de8016ea53899cbeb785dcb38a41edaa8",
                                                                  "bytecodeTarget":  {
                                                                                         "node":  "24.15.0",
                                                                                         "platform":  "darwin",
                                                                                         "arch":  "x64"
                                                                                     },
                                                                  "compatibleArtifactSource":  "linux-x64-node-24.15.0"
-                                                             },
-                                 "win32-x64-node-24.15.0":  {
-                                                                "indexSha256":  "7f2617e8ce3ee0408bf6c36faff0487b0ec5ce5c9bfa5d422b2df1368bca45df",
-                                                                "bytecodeTarget":  {
-                                                                                       "node":  "24.15.0",
-                                                                                       "platform":  "win32",
-                                                                                       "arch":  "x64"
-                                                                                   }
-                                                            }
+                                                             }
                              }
              },
     "dependencies":  {
