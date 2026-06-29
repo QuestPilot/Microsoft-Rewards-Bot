@@ -134,6 +134,76 @@ async function capturePage(page, route, dir) {
     }
 }
 
+// Reuse the bot's saved per-account session (same accounts as `npm start`) so NO
+// manual login is needed. Sessions live under sessions/<email>/ as patchright
+// cookie dumps; Microsoft auth cookies are domain-scoped so a mobile jar
+// authenticates this desktop context fine. Override with MSRB_DIAG_EMAIL=<email>.
+function loadCookieSession() {
+    const sessionsRoot = path.join(process.cwd(), 'sessions')
+    const wanted = process.env.MSRB_DIAG_EMAIL
+    const readJson = file => {
+        try {
+            return JSON.parse(fs.readFileSync(file, 'utf8'))
+        } catch {
+            return null
+        }
+    }
+    let dirs = []
+    try {
+        dirs = fs
+            .readdirSync(sessionsRoot, { withFileTypes: true })
+            .filter(d => d.isDirectory() && d.name !== 'dashboard-live-diagnostics')
+            .map(d => d.name)
+    } catch {
+        return null
+    }
+    if (wanted) dirs = dirs.filter(d => d === wanted)
+
+    const candidates = []
+    for (const email of dirs) {
+        const dir = path.join(sessionsRoot, email)
+        for (const variant of ['desktop', 'mobile']) {
+            const cookieFile = path.join(dir, `session_${variant}.json`)
+            if (!fs.existsSync(cookieFile)) continue
+            const cookies = readJson(cookieFile)
+            if (!Array.isArray(cookies) || cookies.length === 0) continue
+            const storageFile = path.join(dir, `session_storage_${variant}.json`)
+            const storage = fs.existsSync(storageFile) ? readJson(storageFile) : null
+            const hasStorage = Array.isArray(storage) && storage.length > 0
+            const score =
+                (email.includes('@') ? 1_000_000 : 0) +
+                (hasStorage ? 100_000 : 0) +
+                cookies.length +
+                (variant === 'desktop' ? 50 : 0)
+            candidates.push({ email, variant, cookies, storage: hasStorage ? storage : [], score })
+        }
+    }
+    if (candidates.length === 0) return null
+    candidates.sort((a, b) => b.score - a.score)
+    return candidates[0]
+}
+
+async function restoreLocalStorage(context, storage) {
+    for (const origin of storage || []) {
+        if (!origin || !origin.origin || !Array.isArray(origin.localStorage) || origin.localStorage.length === 0) {
+            continue
+        }
+        const page = await context.newPage()
+        try {
+            await page.goto(origin.origin, { waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {})
+            await page.evaluate(items => {
+                for (const it of items) {
+                    try {
+                        localStorage.setItem(it.name, it.value)
+                    } catch {}
+                }
+            }, origin.localStorage)
+        } finally {
+            await page.close().catch(() => {})
+        }
+    }
+}
+
 async function main() {
     if (process.env.MSRB_LIVE_DASHBOARD !== '1') {
         console.error('Refusing to run. Set MSRB_LIVE_DASHBOARD=1 first.')
@@ -142,14 +212,45 @@ async function main() {
 
     const dir = outDir()
     const harPath = path.join(dir, 'network.har')
-    const userDataDir = path.join(process.cwd(), 'sessions', 'dashboard-live-diagnostics')
-    fs.mkdirSync(userDataDir, { recursive: true })
 
-    const context = await chromium.launchPersistentContext(userDataDir, {
-        headless: false,
-        viewport: { width: 1280, height: 1600 },
-        recordHar: { path: harPath, content: 'embed' }
-    })
+    // Prefer the bot's fresh saved session (no manual login). Fall back to the
+    // interactive persistent profile only when no saved session exists.
+    const session = loadCookieSession()
+    let browser = null
+    let context
+    if (session) {
+        console.error(
+            `Reusing saved ${session.variant} session for ${session.email} ` +
+                `(${session.cookies.length} cookies) — no manual login needed.`
+        )
+        browser = await chromium.launch({ headless: false, args: ['--no-sandbox'] })
+        context = await browser.newContext({
+            viewport: { width: 1280, height: 1600 },
+            recordHar: { path: harPath, content: 'embed' }
+        })
+        try {
+            await context.addCookies(session.cookies)
+        } catch (err) {
+            let ok = 0
+            for (const c of session.cookies) {
+                try {
+                    await context.addCookies([c])
+                    ok++
+                } catch {}
+            }
+            console.error(`bulk addCookies failed; added ${ok}/${session.cookies.length} individually: ${err.message}`)
+        }
+        await restoreLocalStorage(context, session.storage)
+    } else {
+        const userDataDir = path.join(process.cwd(), 'sessions', 'dashboard-live-diagnostics')
+        fs.mkdirSync(userDataDir, { recursive: true })
+        console.error('No saved session under sessions/ — opening interactive profile; log in within 120s.')
+        context = await chromium.launchPersistentContext(userDataDir, {
+            headless: false,
+            viewport: { width: 1280, height: 1600 },
+            recordHar: { path: harPath, content: 'embed' }
+        })
+    }
 
     try {
         const page = context.pages()[0] ?? (await context.newPage())
@@ -184,7 +285,8 @@ async function main() {
         console.log(JSON.stringify(summary, null, 2))
     } finally {
         // Closing the context flushes the HAR to disk.
-        await context.close()
+        await context.close().catch(() => {})
+        if (browser) await browser.close().catch(() => {})
     }
 }
 

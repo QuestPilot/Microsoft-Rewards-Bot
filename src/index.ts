@@ -1149,13 +1149,16 @@ export class MicrosoftRewardsBot {
                 const browserEarnable = await this.browser.func.getBrowserEarnablePoints()
                 const appEarnable = await this.browser.func.getAppEarnablePoints()
 
-                this.pointsCanCollect = browserEarnable.mobileSearchPoints + (appEarnable?.totalEarnablePoints ?? 0)
+                this.pointsCanCollect =
+                    browserEarnable.totalEarnablePoints + (appEarnable?.totalEarnablePoints ?? 0)
 
                 this.logger.info(
                     'main',
                     'POINTS',
-                    `Earnable today | Mobile: ${this.pointsCanCollect} | Browser: ${
-                        browserEarnable.mobileSearchPoints
+                    `Earnable today | Total: ${this.pointsCanCollect} | Desktop search: ${
+                        browserEarnable.desktopSearchPoints
+                    } | Mobile search: ${browserEarnable.mobileSearchPoints} | Promotions: ${
+                        browserEarnable.dailySetPoints + browserEarnable.morePromotionsPoints
                     } | App: ${appEarnable?.totalEarnablePoints ?? 0} | ${accountEmail} | locale: ${this.userData.geoLocale}`
                 )
 
@@ -1289,8 +1292,10 @@ export class MicrosoftRewardsBot {
                 const searchPoints = await this.browser.func.getSearchPoints()
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true)
 
-                // Microsoft's Next.js dashboard no longer exposes the search-point counters,
-                // so missingSearchPoints reports 0 and the search manager would skip every
+                // Defensive fallback: the legacy JSON API (/api/getuserinfo?type=1) normally
+                // DOES expose pcSearch/mobileSearch counters even on the Next.js dashboard, but
+                // if that fetch ever degrades to the HTML-scrape path the counters are absent and
+                // missingSearchPoints reports 0 — which would make the search manager skip every
                 // search. When the counters are absent, schedule searches with an estimated
                 // target — the search task measures real gains from the balance and stops at
                 // Microsoft's daily cap, so the estimate only needs to be positive.
