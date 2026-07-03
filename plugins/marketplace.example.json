@@ -1,0 +1,30 @@
+{
+    "format": "msrb-marketplace",
+    "version": 1,
+    "sequence": 1,
+    "issuedAt": "2026-06-23T00:00:00.000Z",
+    "ttlSeconds": 604800,
+    "killSwitch": false,
+    "plugins": [
+        {
+            "name": "example-plugin",
+            "version": "1.0.0",
+            "description": "An example marketplace plugin entry.",
+            "license": "MIT",
+            "author": "discord:123456789",
+            "apiVersion": "1.0.0",
+            "botVersionRange": ">=4.0.0",
+            "sha256": "<sha256 of the plugin index.js>",
+            "treeSha256": "<sha256 of the whole plugin archive/tree>",
+            "installUrl": "https://cdn.jsdelivr.net/gh/OWNER/REPO@1.0.0/example-plugin"
+        }
+    ],
+    "revoked": [
+        {
+            "name": "malicious-plugin",
+            "version": "2.3.1",
+            "sha256": "<sha256 of the revoked build>",
+            "reason": "credential exfiltration"
+        }
+    ]
+}

@@ -1,8 +1,7 @@
 import { sendBotErrorReport } from './DiscordWebhook'
 import { getPackageMetadata } from '../helpers/PackageMetadata'
-import type { ConfigWebhook } from '../types/Config'
 
-export type ErrorReportKind = 'account_failed' | 'account_zero_points' | 'run_fatal'
+export type ErrorReportKind = 'account_failed' | 'account_zero_points' | 'run_fatal' | 'account_banned'
 
 export interface ErrorReportInput {
     kind: ErrorReportKind
@@ -11,11 +10,6 @@ export interface ErrorReportInput {
     hasCore: boolean
     coreVersion?: string
     durationSeconds?: number
-}
-
-/** Default-on: only skip when the user explicitly sets enabled: false. */
-function isEnabled(webhook: ConfigWebhook | undefined): boolean {
-    return webhook?.errorReporting?.enabled !== false
 }
 
 function maskEmail(email: string): string {
@@ -31,7 +25,7 @@ function maskEmail(email: string): string {
  * emails, license keys, and key=value secrets (token/password/cookie/secret). The
  * result is also length-capped to keep the relay payload small.
  */
-function redact(text: string): string {
+export function redact(text: string): string {
     return text
         // Mask any email address
         .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, m => maskEmail(m))
@@ -51,13 +45,13 @@ function redact(text: string): string {
 }
 
 /**
- * Best-effort anonymous failure report to the maintainer inbox (same channel as
- * the in-app feedback system). Never throws and never blocks the run — failures
- * to deliver are surfaced by the underlying relay logger, not here.
+ * Best-effort anonymous failure report to the maintainer inbox (same Core-API
+ * relay → Discord channel as the in-app feedback system). It is gated by the
+ * single `analytics.enabled` switch at the call site, so there is no per-feature
+ * config here. Never throws and never blocks the run — delivery failures are
+ * surfaced by the underlying relay logger, not here.
  */
-export async function reportError(webhook: ConfigWebhook | undefined, input: ErrorReportInput): Promise<void> {
-    if (!isEnabled(webhook)) return
-
+export async function reportError(input: ErrorReportInput): Promise<void> {
     try {
         const pkg = getPackageMetadata()
         await sendBotErrorReport({

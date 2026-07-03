@@ -11,3 +11,18 @@ note
 accounts.dev.json
 accounts.main.json
 .playwright-chromium-installed
+
+# Keep secrets and credentials out of the image / build context
+.env
+.env.*
+*.pem
+# ...but the PUBLIC keys under scripts/security/ are required at runtime to verify
+# Core + the marketplace catalog, so re-include them after the *.pem exclusion.
+!scripts/security/*.pem
+!scripts/security/**/*.pem
+_keys/
+src/accounts.json
+src/accounts.enc.json
+*.bak
+# Opaque 11 MB Windows binary — irrelevant in a Linux container, bloats every pull.
+scripts/install.exe

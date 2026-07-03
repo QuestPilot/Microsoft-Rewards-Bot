@@ -27,7 +27,14 @@ export class FingerprintManager {
                 ? { name: 'Microsoft Edge', version: app.edge_version, major: app.edge_major_version }
                 : { name: 'Google Chrome', version: app.chrome_version, major: app.chrome_major_version }
 
-        const platformVersion = `${isMobile ? Math.floor(Math.random() * 5) + 9 : Math.floor(Math.random() * 15) + 1}.0.0`
+        // platformVersion (Sec-CH-UA-Platform-Version) must be consistent with the
+        // forced platform. On Windows (UA "Windows NT 10.0") Chromium reports a
+        // UA-CH platformVersion of 10/13/15 for Windows 10/11 — a random 1-15 value
+        // is an obvious bot tell. On Android, report a current major (10-14) so it
+        // matches the "Android <ver>" token in the UA string.
+        const platformVersion = isMobile
+            ? `${10 + Math.floor(Math.random() * 5)}.0.0`
+            : (['10.0.0', '13.0.0', '15.0.0'] as const)[Math.floor(Math.random() * 3)]
 
         const uaMetadata = {
             isMobile,

@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const { UpdateManager } = require('./updater/UpdateManager')
 const { bootstrapUserFiles, migrateUserFiles } = require('./updater/ConfigMigrator')
-const { ensurePatchrightChromium } = require('./ensure-patchright-browser')
+const { ensurePatchrightChromium } = require('./build/ensure-patchright-browser')
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -57,8 +57,12 @@ function isAttachLaunch(argv = process.argv) {
     return argv.includes('--attach')
 }
 
+function isHarvesterLaunch(argv = process.argv) {
+    return argv[2] === 'harvester'
+}
+
 function isTerminalForced(argv = process.argv, env = process.env) {
-    return argv.includes('--terminal') || env.MSRB_TERMINAL_MODE === '1'
+    return isHarvesterLaunch(argv) || argv.includes('--terminal') || env.MSRB_TERMINAL_MODE === '1'
 }
 
 function isUiChild(argv = process.argv, env = process.env) {
@@ -87,9 +91,16 @@ function terminalModeEnabled(config = readConfig()) {
     return config?.terminal?.enabled === true
 }
 
+// Headless Desk service: run the Desk server with NO window (servers/Docker), so the bot
+// stays reachable + controllable from Nexus without a GUI. Opt-in via config desk.headless.
+function headlessDeskService(config = readConfig()) {
+    return config?.desk?.headless === true
+}
+
 function hasGuiEnvironment(env = process.env) {
     if (env.MSRB_FORCE_APP_WINDOW === '1') return true
-    if (env.MSRB_NO_APP_WINDOW === '1' || env.CI === 'true' || env.CI === '1' || env.FORCE_HEADLESS === '1') return false
+    if (env.MSRB_NO_APP_WINDOW === '1' || env.CI === 'true' || env.CI === '1' || env.FORCE_HEADLESS === '1')
+        return false
     if (isDockerRuntime()) return false
     if (process.platform === 'linux') return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY)
     return true
@@ -103,6 +114,7 @@ function shouldLaunchInterface(argv = process.argv, env = process.env, root = RO
 }
 
 function shouldRunUpdater(argv = process.argv, env = process.env) {
+    if (isHarvesterLaunch(argv)) return false
     if (env.MSRB_POST_UPDATE_RESTART === '1') return false
     if (!isBackgroundLaunch(argv)) return true
     return env.MSRB_BACKGROUND_UPDATE === '1'
@@ -112,10 +124,123 @@ function hasBuiltRuntime(root = ROOT) {
     return fs.existsSync(path.join(root, 'dist', 'index.js')) && fs.existsSync(path.join(root, 'dist', 'package.json'))
 }
 
+// ── Smart build: only rebuild when the local source actually changed ──────────
+// We fingerprint every file under src/ (plus package.json + tsconfig.json) by
+// size + mtime and compare it to the marker written after the last successful
+// build. Any uncertainty (missing/invalid marker, unreadable tree) resolves to
+// "build" on purpose — false positives that rebuild are cheap, a stale runtime
+// is not. An update (post-update restart) and a missing dist always force it.
+const BUILD_MARKER_REL = path.join('data', '.build-state.json')
+
+// User data under src/ that the bot/desk rewrite at runtime (re-encrypted accounts,
+// config edits). These must NOT feed the build fingerprint, or it would change on
+// every run and defeat the smart-build skip. The desk syncs config.json into dist
+// itself, and accounts are read from src/ — so excluding them is safe.
+const RUNTIME_DATA_FILES = new Set(['config.json', 'accounts.json', 'accounts.enc.json'])
+
+function computeSourceFingerprint(root = ROOT) {
+    const crypto = require('crypto')
+    const inputs = []
+    const walk = dir => {
+        let entries
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true })
+        } catch {
+            return
+        }
+        for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : 1))) {
+            const full = path.join(dir, entry.name)
+            if (entry.isDirectory()) walk(full)
+            else if (entry.isFile()) {
+                if (RUNTIME_DATA_FILES.has(entry.name) || entry.name.endsWith('.bak')) continue
+                try {
+                    const st = fs.statSync(full)
+                    inputs.push(`${full}:${st.size}:${Math.round(st.mtimeMs)}`)
+                } catch {
+                    /* ignore unreadable file */
+                }
+            }
+        }
+    }
+    walk(path.join(root, 'src'))
+    for (const rel of ['package.json', 'tsconfig.json']) {
+        try {
+            const st = fs.statSync(path.join(root, rel))
+            inputs.push(`${rel}:${st.size}:${Math.round(st.mtimeMs)}`)
+        } catch {
+            /* file may not exist */
+        }
+    }
+    return crypto.createHash('sha1').update(inputs.join('\n')).digest('hex')
+}
+
+function sourceChangedSinceBuild(root = ROOT) {
+    try {
+        const marker = JSON.parse(fs.readFileSync(path.join(root, BUILD_MARKER_REL), 'utf8'))
+        if (!marker || !marker.fingerprint) return true
+        return marker.fingerprint !== computeSourceFingerprint(root)
+    } catch {
+        return true
+    }
+}
+
+function writeBuildMarker(root = ROOT) {
+    try {
+        fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+        fs.writeFileSync(
+            path.join(root, BUILD_MARKER_REL),
+            `${JSON.stringify({ fingerprint: computeSourceFingerprint(root), builtAt: new Date().toISOString() }, null, 2)}\n`
+        )
+    } catch {
+        /* best-effort: a missing marker just means we rebuild next time */
+    }
+}
+
 function shouldBuildRuntime(argv = process.argv, root = ROOT, env = process.env) {
     if (env.MSRB_POST_UPDATE_RESTART === '1') return true
-    if (!isBackgroundLaunch(argv)) return true
-    return !hasBuiltRuntime(root)
+    if (!hasBuiltRuntime(root)) return true
+    if (isBackgroundLaunch(argv)) return false
+    // Foreground (desk / terminal): rebuild only when local source changed.
+    return sourceChangedSinceBuild(root)
+}
+
+// ── First-run experience: terminal first, app window afterwards ───────────────
+// The very first desk launch runs in the terminal so installs/migrations are
+// fully visible and verifiable. From the second launch on we open the polished
+// app window instead. The count lives in data/ (where the desk records state).
+const LAUNCH_MARKER_REL = path.join('data', '.launch-state.json')
+
+function readLaunchState(root = ROOT) {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(path.join(root, LAUNCH_MARKER_REL), 'utf8'))
+        return parsed && typeof parsed === 'object' ? parsed : { deskLaunches: 1 }
+    } catch (error) {
+        // Missing marker → genuine first launch. Unreadable/corrupt → assume not
+        // first, so a bad file never traps the user in the terminal forever.
+        if (error && error.code === 'ENOENT') return { deskLaunches: 0 }
+        return { deskLaunches: 1 }
+    }
+}
+
+function isFirstDeskLaunch(root = ROOT) {
+    return (readLaunchState(root).deskLaunches || 0) === 0
+}
+
+function recordDeskLaunch(root = ROOT) {
+    try {
+        const state = readLaunchState(root)
+        const nowIso = new Date().toISOString()
+        const next = {
+            ...state,
+            deskLaunches: (state.deskLaunches || 0) + 1,
+            firstLaunchAt: state.firstLaunchAt || nowIso,
+            lastLaunchAt: nowIso
+        }
+        fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+        fs.writeFileSync(path.join(root, LAUNCH_MARKER_REL), `${JSON.stringify(next, null, 2)}\n`)
+    } catch {
+        /* best-effort */
+    }
 }
 
 function runNpm(args) {
@@ -124,7 +249,7 @@ function runNpm(args) {
 }
 
 function launchAppWindow() {
-    const child = childProcess.spawn(process.execPath, ['./scripts/app-window.js'], {
+    const child = childProcess.spawn(process.execPath, ['./scripts/desk/app-window.js'], {
         cwd: ROOT,
         detached: true,
         stdio: 'ignore',
@@ -153,7 +278,7 @@ function launchPostUpdateRestart(argv = process.argv, env = process.env, spawn =
 }
 
 async function deskCommand(action) {
-    const { createDesktopInstallManager } = require('./desktop-install-manager')
+    const { createDesktopInstallManager } = require('./launchers/desktop-install-manager')
     const manager = createDesktopInstallManager({ root: ROOT })
 
     if (action === 'install') {
@@ -178,7 +303,9 @@ async function deskCommand(action) {
         try {
             const result = manager.status()
             console.log('[DESK] Shortcut status:')
-            Object.entries(result).forEach(([k, v]) => console.log(`  ${v ? '✓' : '✗'} ${k}: ${v ? 'installed' : 'not installed'}`))
+            Object.entries(result).forEach(([k, v]) =>
+                console.log(`  ${v ? '✓' : '✗'} ${k}: ${v ? 'installed' : 'not installed'}`)
+            )
         } catch (err) {
             console.error(`[DESK] Status check failed: ${err.message}`)
             process.exit(1)
@@ -190,10 +317,94 @@ async function deskCommand(action) {
     }
 }
 
+// One-time migration of the generated launchers out of the legacy .core directory.
+// Re-points any installed desktop shortcuts and OS auto-start entries to the new
+// scripts/runtime launchers, then removes .core once we're actually running from
+// the new launcher (signalled by MSRB_LAUNCHER_DIR). Best-effort and idempotent;
+// never allowed to block startup.
+function migrateLaunchers(root = ROOT, env = process.env) {
+    try {
+        const { createRuntimeLaunchers } = require('./launchers/runtime-launchers')
+        const currentDir = createRuntimeLaunchers({ root }).runtimeDir
+        const legacy = path.join(root, '.core')
+        const legacyExists = fs.existsSync(legacy)
+        const markerPath = path.join(root, 'data', '.launcher-state.json')
+        let marker = {}
+        try {
+            marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'))
+        } catch {
+            marker = {}
+        }
+        const migrated = marker.launcherDir && path.resolve(marker.launcherDir) === path.resolve(currentDir)
+        if (!migrated) {
+            // Only pre-existing installs (which still carry a legacy .core launcher dir)
+            // need their shortcuts / OS auto-start re-pointed. Fresh installs already
+            // target scripts/runtime, so for them we just record the marker.
+            if (legacyExists) {
+                try {
+                    const { createDesktopInstallManager } = require('./launchers/desktop-install-manager')
+                    const mgr = createDesktopInstallManager({ root })
+                    const st = mgr.status()
+                    if (st && (st.desktop || st.menu)) mgr.install()
+                } catch {
+                    /* shortcuts absent or not writable — skip */
+                }
+                try {
+                    const { createStartupManager } = require('./launchers/startup-manager')
+                    const sm = createStartupManager({ root })
+                    const sst = sm.status()
+                    if (sst && sst.desk && sst.desk.installed) sm.setDeskEnabled(true)
+                    if (sst && sst.agent && sst.agent.installed) sm.setAgentEnabled(true)
+                } catch {
+                    /* auto-start not enabled — skip */
+                }
+            }
+            try {
+                fs.mkdirSync(path.join(root, 'data'), { recursive: true })
+                fs.writeFileSync(
+                    markerPath,
+                    `${JSON.stringify({ launcherDir: currentDir, migratedAt: new Date().toISOString() }, null, 2)}\n`
+                )
+            } catch {
+                /* best-effort */
+            }
+        }
+        // Retire the legacy .core directory once we are actually running from the new
+        // launcher (signalled by MSRB_LAUNCHER_DIR). Safe: nothing references it now.
+        if (
+            legacyExists &&
+            env.MSRB_LAUNCHER_DIR &&
+            path.resolve(env.MSRB_LAUNCHER_DIR) === path.resolve(currentDir)
+        ) {
+            try {
+                fs.rmSync(legacy, { recursive: true, force: true })
+            } catch {
+                /* may still be in use — retried on the next launch */
+            }
+        }
+    } catch {
+        /* migration is never allowed to block startup */
+    }
+}
+
 async function main() {
     if (process.argv[2] === 'desk') {
         await deskCommand(process.argv[3])
         return
+    }
+
+    const harvesterLaunch = isHarvesterLaunch()
+    if (harvesterLaunch) {
+        // Isolate the command from persistent/background integrations. The Core
+        // harvester remains allowed to rebuild its explicit Page/ artifact folder.
+        process.env.MSRB_EPHEMERAL_RUN = '1'
+        process.env.MSRB_DISABLE_PLUGINS = '1'
+        process.env.MSRB_TERMINAL_MODE = '1'
+    }
+
+    // Migrate generated launchers out of legacy .core (interactive launches only).
+    if (!isBackgroundLaunch() && !harvesterLaunch) {
+        migrateLaunchers(ROOT, process.env)
     }
 
     if (shouldRunUpdater()) {
@@ -204,6 +415,8 @@ async function main() {
             launchPostUpdateRestart()
             return
         }
+    } else if (harvesterLaunch) {
+        console.log('[HARVESTER] Update check disabled for this isolated maintenance run.')
     } else {
         console.log(
             process.env.MSRB_POST_UPDATE_RESTART === '1'
@@ -212,29 +425,68 @@ async function main() {
         )
     }
 
-    bootstrapUserFiles(ROOT)
+    if (!harvesterLaunch) {
+        bootstrapUserFiles(ROOT)
 
-    // Keep src/config.json and the accounts file in sync with the current
-    // example templates on every start (idempotent: only writes when a new key
-    // is added or a deprecated one is removed). This guarantees new features
-    // reach existing users even when the latest code arrived without going
-    // through the updater (manual copy, restore, etc.). Never block startup.
-    try {
-        migrateUserFiles(ROOT)
-    } catch (error) {
-        console.warn(`[START] Config migration skipped: ${error instanceof Error ? error.message : String(error)}`)
+        // Keep src/config.json and the accounts file in sync with the current
+        // example templates on every start (idempotent: only writes when a new key
+        // is added or a deprecated one is removed). This guarantees new features
+        // reach existing users even when the latest code arrived without going
+        // through the updater (manual copy, restore, etc.). Never block startup.
+        try {
+            migrateUserFiles(ROOT)
+        } catch (error) {
+            console.warn(`[START] Config migration skipped: ${error instanceof Error ? error.message : String(error)}`)
+        }
     }
 
     if (shouldBuildRuntime(process.argv, ROOT, process.env)) {
         runNpm(['run', 'build'])
+        writeBuildMarker(ROOT)
     } else {
-        console.log('[START] Background launch: using existing dist build.')
+        console.log('[START] No source changes since the last build — reusing the existing dist.')
     }
     if (!isAttachLaunch()) {
         ensurePatchrightChromium({ root: ROOT })
     }
+    // Headless Desk service (opt-in) — run the Desk server with no window for servers/Docker.
+    // Takes precedence over the bot fallback, but never hijacks the agent/terminal/child paths.
+    if (
+        headlessDeskService(readConfig(ROOT)) &&
+        !isBackgroundLaunch() && !isTerminalForced() && !isUiChild() && !isAttachLaunch()
+    ) {
+        console.log('[START] Starting Rewards Desk as a headless service (no window).')
+        process.env.MSRB_APP_NO_OPEN = '1'
+        process.env.MSRB_TERMINAL_MODE = '0'
+        run(process.execPath, ['./scripts/desk/app-window.js'], 'desk')
+        return
+    }
     if (shouldLaunchInterface()) {
-        console.log('[START] Opening app window. Use npm start -- --terminal for developer logs.')
+        // Clicking the Rewards Desk shortcut ALWAYS opens the Desk (the control
+        // panel) — it never auto-runs the bot. The visible prep above (update check
+        // + smart build) is the first-launch terminal step; the Desk's own loading
+        // screen then takes over. Smart build keeps later launches fast.
+        const before = readLaunchState(ROOT)
+        const firstDesk = (before.deskLaunches || 0) === 0
+        recordDeskLaunch(ROOT)
+        // Once (right after the first visible launch), switch the shortcut to a
+        // minimized window so subsequent launches show the Desk's own loading screen
+        // instead of a black console. Gated by a marker flag so it runs a single time.
+        if (!before.launcherMinimized) {
+            try {
+                require('./launchers/desktop-install-manager')
+                    .createDesktopInstallManager({ root: ROOT })
+                    .setLauncherMinimized(true)
+                const st = readLaunchState(ROOT)
+                fs.writeFileSync(
+                    path.join(ROOT, LAUNCH_MARKER_REL),
+                    `${JSON.stringify({ ...st, launcherMinimized: true }, null, 2)}\n`
+                )
+            } catch {
+                /* shortcuts not installed — fine */
+            }
+        }
+        console.log(firstDesk ? '[START] Setup complete — opening Rewards Desk.' : '[START] Opening Rewards Desk…')
         launchAppWindow()
         return
     }
@@ -250,8 +502,15 @@ if (require.main === module) {
 
 module.exports = {
     bootstrapUserFiles,
+    computeSourceFingerprint,
+    sourceChangedSinceBuild,
+    writeBuildMarker,
+    isFirstDeskLaunch,
+    recordDeskLaunch,
+    readLaunchState,
     hasBuiltRuntime,
     hasGuiEnvironment,
+    isHarvesterLaunch,
     isBackgroundLaunch,
     isAttachLaunch,
     isDockerRuntime,
@@ -264,5 +523,6 @@ module.exports = {
     launchAppWindow,
     shouldLaunchInterface,
     shouldRunUpdater,
-    terminalModeEnabled
+    terminalModeEnabled,
+    headlessDeskService
 }

@@ -32,6 +32,20 @@ export class MobileStrategy {
         private page: Page
     ) {}
 
+    /**
+     * Strip the query string (which on oauth20_desktop.srf carries the live OAuth
+     * `code`) before logging a URL. The code is exchangeable for an MBI_SSL token
+     * with only the public clientId, so it must never reach the logs/buffer.
+     */
+    private safeUrl(raw: string): string {
+        try {
+            const u = new URL(raw)
+            return `${u.origin}${u.pathname}`
+        } catch {
+            return raw.split('?')[0] ?? raw
+        }
+    }
+
     private async checkSelector(selector: string): Promise<boolean> {
         return this.page
             .waitForSelector(selector, { state: 'visible', timeout: 200 })
@@ -194,9 +208,10 @@ export class MobileStrategy {
                 while (!code && Date.now() - start < this.maxTimeout) {
                     const currentUrl = this.page.url()
 
-                    // Log only when URL changes (high signal, no spam)
+                    // Log only when URL changes (high signal, no spam). Never log the
+                    // query string — it may carry the OAuth `code`.
                     if (currentUrl !== lastUrl) {
-                        this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `OAuth poll URL changed → ${currentUrl}`)
+                        this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `OAuth poll URL changed → ${this.safeUrl(currentUrl)}`)
                         lastUrl = currentUrl
                     }
 
@@ -211,7 +226,7 @@ export class MobileStrategy {
                         this.bot.logger.debug(
                             this.bot.isMobile,
                             'LOGIN-APP',
-                            `Invalid URL while polling: ${String(currentUrl)}`
+                            `Invalid URL while polling: ${this.safeUrl(String(currentUrl))}`
                         )
                     }
 
@@ -229,7 +244,7 @@ export class MobileStrategy {
                     `Timed out waiting for OAuth code after ${Math.round((Date.now() - start) / 1000)}s`
                 )
 
-                this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `Final page URL: ${this.page.url()}`)
+                this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `Final page URL: ${this.safeUrl(this.page.url())}`)
 
                 return ''
             }

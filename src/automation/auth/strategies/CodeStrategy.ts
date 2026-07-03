@@ -4,7 +4,7 @@ import { getErrorMessage, getSubtitleMessage, promptInput } from './AuthUtils'
 
 export class CodeStrategy {
     private readonly textInputSelector = '[data-testid="codeInputWrapper"]'
-    private readonly secondairyInputSelector = 'input[id="otc-confirmation-input"], input[name="otc"]'
+    private readonly secondaryInputSelector = 'input[id="otc-confirmation-input"], input[name="otc"]'
     private readonly maxManualSeconds = 60
     private readonly maxManualAttempts = 5
 
@@ -17,6 +17,10 @@ export class CodeStrategy {
                 .catch(() => null)
 
             if (visibleInput) {
+                // Focus the field before typing — keyboard.type() sends keystrokes to
+                // whatever currently has focus, so without this the code can land
+                // nowhere (the wrapper is not auto-focused).
+                await visibleInput.click().catch(() => {})
                 for (const char of code) {
                     await page.keyboard.type(char, {
                         delay:
@@ -29,8 +33,9 @@ export class CodeStrategy {
                 return true
             }
 
-            const secondairyInput = await page.$(this.secondairyInputSelector)
-            if (secondairyInput) {
+            const secondaryInput = await page.$(this.secondaryInputSelector)
+            if (secondaryInput) {
+                await secondaryInput.click().catch(() => {})
                 for (const char of code) {
                     await page.keyboard.type(char, {
                         delay:

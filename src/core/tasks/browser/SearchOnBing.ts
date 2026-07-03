@@ -3,11 +3,29 @@ import * as fs from 'fs'
 import type { Page } from 'patchright'
 import path from 'path'
 
-import { BING_SEARCH } from '../../../automation/DashboardSelectors'
+import { BING_SEARCH, BING_PARAMS } from '../../../automation/DashboardSelectors'
 import { QueryProvider } from '../../QueryProvider'
 import { TaskBase } from '../../TaskBase'
 
 import type { BasePromotion } from '../../../types/DashboardData'
+
+// "Explore on Bing" promos (offerId ENUS_<topic>_exploreonbing_*) credit only
+// when you run a COMMERCIAL search on the topic carrying the explore tracking
+// params (form=ML2PCR…) — NOT a generic search. Map each topic to commercial
+// queries; fall back to a query built from the topic token for unknown topics.
+const EXPLORE_ON_BING_QUERIES: Readonly<Record<string, readonly string[]>> = {
+    creditcards: ['best credit cards with rewards', 'compare credit card offers'],
+    insurance: ['best insurance quotes online', 'compare insurance plans'],
+    concerttickets: ['buy concert tickets online', 'concert tickets near me'],
+    internetproviders: ['best internet providers near me', 'compare internet plans'],
+    rentalcars: ['best rental car deals', 'compare rental car prices'],
+    shopping: ['best online shopping deals today', 'top shopping deals'],
+    flights: ['cheap flight deals', 'compare flight prices'],
+    travel: ['best travel deals', 'compare vacation packages'],
+    hotels: ['best hotel deals', 'compare hotel prices'],
+    autos: ['best new car deals', 'compare car prices'],
+    homeservices: ['best home services near me', 'compare home service quotes']
+}
 
 export class SearchOnBing extends TaskBase {
     private bingHome = 'https://bing.com'
@@ -27,6 +45,17 @@ export class SearchOnBing extends TaskBase {
             'SEARCH-ON-BING',
             `Starting SearchOnBing | offerId=${offerId} | title="${promotion.title}" | currentPoints=${this.oldBalance}`
         )
+
+        // Explore-on-Bing is a Core, opt-in extra (commercial topic searches, ~10 pts each).
+        // When disabled, skip immediately instead of running searches the user didn't ask for.
+        if (this.isExploreOnBing(promotion) && this.bot.config.core?.exploreOnBing !== true) {
+            this.bot.logger.info(
+                this.bot.isMobile,
+                'SEARCH-ON-BING',
+                `Explore-on-Bing disabled (core.exploreOnBing) — skipping | offerId=${offerId}`
+            )
+            return
+        }
 
         try {
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING', `Activating search task | offerId=${offerId}`)
@@ -53,11 +82,14 @@ export class SearchOnBing extends TaskBase {
                 )
             }
 
-            // Do the bing search here
-            const queries = await this.getSearchQueries(promotion)
+            // Do the bing search here. Explore-on-Bing promos credit only on a
+            // COMMERCIAL search of the topic carrying the explore tracking params,
+            // so they use a dedicated query set + params (not getSearchQueries).
+            const isExplore = this.isExploreOnBing(promotion)
+            const queries = isExplore ? this.exploreQueries(promotion) : await this.getSearchQueries(promotion)
 
             // Run through the queries
-            await this.searchBing(page, queries)
+            await this.searchBing(page, queries, isExplore)
 
             if (this.success) {
                 this.bot.logger.info(
@@ -81,7 +113,27 @@ export class SearchOnBing extends TaskBase {
         }
     }
 
-    private async searchBing(page: Page, queries: string[]) {
+    /** Explore-on-Bing promos are credited by a tracked commercial search, not a
+     *  generic one. Detect them by offerId/name (ENUS_<topic>_exploreonbing_*). */
+    private isExploreOnBing(promotion: BasePromotion): boolean {
+        const id = `${promotion.offerId ?? ''} ${promotion.name ?? ''}`.toLowerCase()
+        return id.includes('exploreonbing')
+    }
+
+    /** Commercial queries for an explore-on-Bing promo, derived from its topic
+     *  token (ENUS_<topic>_exploreonbing). Falls back to a generic commercial
+     *  query built from the topic when it isn't in the known map. */
+    private exploreQueries(promotion: BasePromotion): string[] {
+        const offerId = (promotion.offerId ?? '').toLowerCase()
+        const parts = offerId.split('_')
+        const topic = parts.length > 1 ? (parts[1] ?? '') : ''
+        const known = topic ? EXPLORE_ON_BING_QUERIES[topic] : undefined
+        if (known && known.length) return [...known]
+        const readable = (topic || 'deals').replace(/([a-z])([A-Z])/g, '$1 $2')
+        return [`best ${readable} deals`, `compare ${readable}`]
+    }
+
+    private async searchBing(page: Page, queries: string[], isExplore = false) {
         queries = [...new Set(queries)]
 
         this.bot.logger.debug(
@@ -96,7 +148,10 @@ export class SearchOnBing extends TaskBase {
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING-SEARCH', `Processing query | query="${query}"`)
 
                 const cvid = randomBytes(16).toString('hex')
-                const url = `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
+                const exb = BING_PARAMS.exploreOnBing
+                const url = isExplore
+                    ? `${this.bingHome}/search?q=${encodeURIComponent(query)}&form=${exb.form}&OCID=${exb.OCID}&PUBL=${exb.PUBL}&CREA=${exb.CREA}&PC=${exb.form}&cvid=${cvid}`
+                    : `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
 
                 // Navigate the page this task was actually given (desktop or mobile),
                 // not a hardcoded mobile page — otherwise a desktop SearchOnBing would
@@ -108,21 +163,38 @@ export class SearchOnBing extends TaskBase {
 
                 await this.bot.browser.utils.tryDismissAllMessages(page)
 
-                const searchBar = BING_SEARCH.searchBar
+                // For explore-on-Bing, the tracked /search navigation above IS what
+                // credits — re-typing in the box submits an UNtracked /search and can lose
+                // the credit. So the human re-submit only runs for normal SearchOnBing items.
+                if (!isExplore) {
+                    const searchBar = BING_SEARCH.searchBar
 
-                const searchBox = page.locator(searchBar)
-                await searchBox.waitFor({ state: 'attached', timeout: 15000 })
+                    const searchBox = page.locator(searchBar)
+                    await searchBox.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {})
 
-                await this.bot.utils.wait(500)
-                await this.bot.browser.utils.ghostClick(page, searchBar, { clickCount: 3 })
-                await searchBox.fill('')
+                    await this.bot.utils.wait(500)
+                    // Best-effort human re-submit. The /search URL navigation above ALREADY
+                    // registered the search, so a non-actionable search box (collapsed on
+                    // mobile/legacy layouts) must NEVER hang us 30s on fill — fail fast and
+                    // fall through to the balance check.
+                    try {
+                        await this.bot.browser.utils.ghostClick(page, searchBar, { clickCount: 3 })
+                        await searchBox.fill('', { timeout: 5000 })
 
-                // Human-like typing with randomized per-keystroke delay
-                for (const char of query) {
-                    await page.keyboard.type(char, { delay: this.bot.utils.humanTypeDelay() })
+                        // Human-like typing with randomized per-keystroke delay
+                        for (const char of query) {
+                            await page.keyboard.type(char, { delay: this.bot.utils.humanTypeDelay() })
+                        }
+                        await this.bot.utils.wait(this.bot.utils.randomNumber(200, 600))
+                        await page.keyboard.press('Enter')
+                    } catch (e) {
+                        this.bot.logger.debug(
+                            this.bot.isMobile,
+                            'SEARCH-ON-BING-SEARCH',
+                            `Search box not interactable, relying on URL search | query="${query}" | message=${e instanceof Error ? e.message : String(e)}`
+                        )
+                    }
                 }
-                await this.bot.utils.wait(this.bot.utils.randomNumber(200, 600))
-                await page.keyboard.press('Enter')
 
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 7000))
 
@@ -185,13 +257,17 @@ export class SearchOnBing extends TaskBase {
         )
     }
 
-    /** Visit the first organic Bing result, scroll, then go back to Bing.
-     *  Runs on ~65 % of searches to vary session behaviour. */
+    /** Visit the first organic Bing result, read it, then return to Bing —
+     *  closing the result tab if it opened in a NEW one. Many organic results
+     *  (and the "explore on Bing" promos) open with target=_blank; the old code
+     *  only called page.goBack(), so the new tab was never closed and result tabs
+     *  piled up (user-reported). Runs on ~65 % of searches to vary behaviour. */
     private async visitSearchResult(page: Page): Promise<void> {
         if (Math.random() > 0.65) return
 
+        const context = page.context()
         try {
-            const resultSelector = '#b_results li.b_algo h2 a[href^="http"]'
+            const resultSelector = BING_SEARCH.resultLinkHref
             const href = await page
                 .locator(resultSelector)
                 .first()
@@ -205,26 +281,50 @@ export class SearchOnBing extends TaskBase {
                 `Visiting search result | url=${href.slice(0, 80)}…`
             )
 
+            const tabsBefore = context.pages().length
             await this.bot.utils.wait(this.bot.utils.randomDelay(500, 1500))
             await this.bot.browser.utils.ghostClick(page, resultSelector)
-
-            await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {})
             await this.bot.utils.wait(this.bot.utils.randomDelay(1500, 3000))
+
+            // The result may open in a NEW tab (target=_blank) or navigate the same
+            // tab. Read whichever is the actual result page.
+            const tabs = context.pages()
+            const resultTab = (tabs.length > tabsBefore ? tabs[tabs.length - 1] : page) ?? page
+
+            await resultTab.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {})
+            await this.bot.utils.wait(this.bot.utils.randomDelay(1000, 2500))
 
             // Scroll down in 2–4 steps to simulate reading
             const steps = this.bot.utils.randomNumber(2, 4)
             for (let i = 0; i < steps; i++) {
-                await page.mouse.wheel(0, this.bot.utils.randomNumber(250, 550))
+                await resultTab.mouse.wheel(0, this.bot.utils.randomNumber(250, 550))
                 await this.bot.utils.wait(this.bot.utils.randomDelay(700, 1600))
             }
 
-            // Go back to Bing results
-            await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(async () => {
-                await page.goto(this.bingHome, { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {})
-            })
+            if (resultTab !== page) {
+                // Opened in a new tab → close it so result tabs don't accumulate.
+                await resultTab.close().catch(() => {})
+                await page.bringToFront().catch(() => {})
+            } else {
+                // Same-tab navigation → go back to the Bing results.
+                await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(async () => {
+                    await page.goto(this.bingHome, { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {})
+                })
+            }
             await this.bot.utils.wait(this.bot.utils.randomDelay(800, 1800))
         } catch {
-            // Non-critical — a failed result visit must never break the search loop
+            // Non-critical — never break the search loop. Best-effort: close any
+            // stray non-Bing tabs this visit may have left open so they don't pile up.
+            try {
+                for (const p of context.pages()) {
+                    if (p !== page && !/bing\.com/i.test(p.url())) {
+                        await p.close().catch(() => {})
+                    }
+                }
+                await page.bringToFront().catch(() => {})
+            } catch {
+                /* ignore cleanup failures */
+            }
         }
     }
 
@@ -255,6 +355,21 @@ export class SearchOnBing extends TaskBase {
         return ok
     }
 
+    /** Validate that a parsed query config is `Array<{ title: string; queries: string[] }>`. */
+    private isQueriesPayload(data: unknown): data is Array<{ title: string; queries: string[] }> {
+        return (
+            Array.isArray(data) &&
+            data.every(
+                item =>
+                    !!item &&
+                    typeof item === 'object' &&
+                    typeof (item as { title?: unknown }).title === 'string' &&
+                    Array.isArray((item as { queries?: unknown }).queries) &&
+                    (item as { queries: unknown[] }).queries.every(query => typeof query === 'string')
+            )
+        )
+    }
+
     private async getSearchQueries(promotion: BasePromotion): Promise<string[]> {
         interface Queries {
             title: string
@@ -268,7 +383,11 @@ export class SearchOnBing extends TaskBase {
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING-QUERY', 'Using local queries config file')
 
                 const data = fs.readFileSync(path.join(__dirname, '../../bing-search-activity-queries.json'), 'utf8')
-                queries = JSON.parse(data)
+                const parsed: unknown = JSON.parse(data)
+                if (!this.isQueriesPayload(parsed)) {
+                    throw new Error('local query config has an unexpected shape')
+                }
+                queries = parsed
 
                 this.bot.logger.debug(
                     this.bot.isMobile,
@@ -287,6 +406,11 @@ export class SearchOnBing extends TaskBase {
                     method: 'GET',
                     url: 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/src/core/bing-search-activity-queries.json'
                 })
+                // Never trust the remote payload's shape: a malformed/hostile response could
+                // otherwise crash the search flow (e.g. .find on a non-array). Validate first.
+                if (!this.isQueriesPayload(response.data)) {
+                    throw new Error('remote query config has an unexpected shape')
+                }
                 queries = response.data
 
                 this.bot.logger.debug(

@@ -14,6 +14,23 @@ export class Search extends TaskBase {
     private searchCount = 0
 
     public async doSearch(data: DashboardData, page: Page, isMobile: boolean): Promise<number> {
+        // Wrapper: run the search session, then emit one aggregate `search_completed`
+        // event per platform. `finally` guarantees it fires on every return path of
+        // the inner method (and even if it throws), without touching the hot-path logic.
+        let gained = 0
+        try {
+            gained = await this.doSearchInner(data, page, isMobile)
+            return gained
+        } finally {
+            this.bot.analytics.track('search_completed', this.bot.analytics.withContext({
+                platform: isMobile ? 'mobile' : 'desktop',
+                points_gained: gained,
+                has_core: this.bot.pluginManager.hasOfficialCoreEntitlement()
+            }))
+        }
+    }
+
+    private async doSearchInner(data: DashboardData, page: Page, isMobile: boolean): Promise<number> {
         const startBalance = Number(this.bot.userData.currentPoints ?? 0)
 
         this.bot.logger.info(isMobile, 'SEARCH-BING', `Starting Bing searches | currentPoints=${startBalance}`)
@@ -176,7 +193,7 @@ export class Search extends TaskBase {
                     return totalGainedPoints
                 }
 
-                if (stagnantLoop > stagnantLoopMax) {
+                if (stagnantLoop >= stagnantLoopMax) {
                     this.bot.logger.warn(
                         isMobile,
                         'SEARCH-BING',
@@ -303,7 +320,7 @@ export class Search extends TaskBase {
                             return totalGainedPoints
                         }
 
-                        if (stagnantLoop > stagnantLoopMax) {
+                        if (stagnantLoop >= stagnantLoopMax) {
                             this.bot.logger.warn(
                                 isMobile,
                                 'SEARCH-BING-EXTRA',
@@ -465,7 +482,11 @@ export class Search extends TaskBase {
     /** Read the current points balance, tolerating transient lookup failures. */
     private async safeGetBalance(fallback: number): Promise<number> {
         try {
-            return await this.bot.browser.func.getCurrentPoints()
+            // getCurrentPoints can return NaN/undefined when the Next.js dashboard omits
+            // the balance (no throw). Treat a non-finite result like a failure and fall
+            // back, otherwise the count-based loop reads every search as a 0-point plateau.
+            const balance = Number(await this.bot.browser.func.getCurrentPoints())
+            return Number.isFinite(balance) ? balance : fallback
         } catch {
             return fallback
         }
@@ -473,31 +494,13 @@ export class Search extends TaskBase {
 
     private async bingSearch(searchPage: Page, query: string, isMobile: boolean) {
         const maxAttempts = 5
-        const refreshThreshold = 10 // Page gets sluggish after x searches?
 
         this.searchCount++
-
-        if (this.searchCount % refreshThreshold === 0) {
-            this.bot.logger.info(
-                isMobile,
-                'SEARCH-BING',
-                `Returning to home page to clear accumulated page context | count=${this.searchCount} | threshold=${refreshThreshold}`
-            )
-
-            this.bot.logger.debug(isMobile, 'SEARCH-BING', `Returning home to refresh state | url=${this.bingHome}`)
-
-            const cvid = randomBytes(16).toString('hex')
-            const url = `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
-
-            await searchPage.goto(url)
-            await searchPage.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
-            await this.bot.browser.utils.tryDismissAllMessages(searchPage)
-        }
 
         this.bot.logger.debug(
             isMobile,
             'SEARCH-BING',
-            `Starting bingSearch | query="${query}" | maxAttempts=${maxAttempts} | searchCount=${this.searchCount} | refreshEvery=${refreshThreshold} | scrollRandomResults=${this.bot.config.searchSettings.scrollRandomResults} | clickRandomResults=${this.bot.config.searchSettings.clickRandomResults}`
+            `Starting bingSearch | query="${query}" | maxAttempts=${maxAttempts} | searchCount=${this.searchCount} | scrollRandomResults=${this.bot.config.searchSettings.scrollRandomResults} | clickRandomResults=${this.bot.config.searchSettings.clickRandomResults}`
         )
 
         for (let i = 0; i < maxAttempts; i++) {
@@ -505,16 +508,36 @@ export class Search extends TaskBase {
                 const searchBar = BING_SEARCH.searchBar
                 const searchBox = searchPage.locator(searchBar)
 
+                // Load the results page for this query directly instead of relying on the
+                // search box already being usable on whatever page the previous step left
+                // behind. On mobile (and some locales) the homepage #sb_form_q is present
+                // in the DOM but collapsed/hidden, so waitFor({ state: 'visible' }) timed
+                // out (15s × maxAttempts) and the whole run earned 0 points. Navigating to
+                // /search guarantees a real results page (mirrors the proven SearchOnBing
+                // flow) and registers the search via the URL even if the human-typing
+                // re-submit below is interrupted. A fresh navigation on each attempt also
+                // recovers a stale/blank page on retry.
+                const cvid = randomBytes(16).toString('hex')
+                const url = `${this.bingHome}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
+
+                await searchPage.goto(url, { timeout: 20000 })
+                await searchPage.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+                await this.bot.browser.utils.tryDismissAllMessages(searchPage)
+
                 // Use string form so the obfuscator cannot inject outer-scope
                 // string-array references inside the evaluate callback body.
                 await searchPage.evaluate('window.scrollTo(0, 0)')
 
                 await searchPage.keyboard.press('Home')
-                await searchBox.waitFor({ state: 'visible', timeout: 15000 })
+
+                // 'attached' (not 'visible'): the box is reliably in the DOM on the results
+                // page but Playwright can flag it not-visible on mobile/SERP layouts; the
+                // ghostClick + fill below make it interactable. Matches SearchOnBing.
+                await searchBox.waitFor({ state: 'attached', timeout: 15000 })
 
                 await this.bot.utils.wait(1000)
                 await this.bot.browser.utils.ghostClick(searchPage, searchBar, { clickCount: 3 })
-                await searchBox.fill('')
+                await searchBox.fill('', { timeout: 5000 })
 
                 // Human-like typing with randomized per-keystroke delay
                 for (const char of query) {
@@ -558,11 +581,11 @@ export class Search extends TaskBase {
 
                 return counters
             } catch (error) {
-                if (i >= 5) {
+                if (i >= maxAttempts - 1) {
                     this.bot.logger.error(
                         isMobile,
                         'SEARCH-BING',
-                        `Failed after 5 retries | query="${query}" | message=${error instanceof Error ? error.message : String(error)}`
+                        `Failed after ${maxAttempts} retries | query="${query}" | message=${error instanceof Error ? error.message : String(error)}`
                     )
                     break
                 }
@@ -592,23 +615,26 @@ export class Search extends TaskBase {
         return await this.bot.browser.func.getSearchPoints()
     }
 
+    /**
+     * Human-like progressive scroll: several small wheel steps with variable
+     * speed + reading pauses, occasionally nudging back up (re-reading) — instead
+     * of one instant jump to a random offset, which is a classic automation tell.
+     * Uses real wheel events (page.mouse.wheel), never window.scrollTo, so it also
+     * sidesteps the obfuscator-unsafe page.evaluate path entirely.
+     */
     private async randomScroll(page: Page, isMobile: boolean) {
         try {
-            // String form is immune to obfuscator string-array injection.
-            const viewportHeight = await page.evaluate<number>('window.innerHeight')
-            const totalHeight = await page.evaluate<number>('document.body.scrollHeight')
-            const randomScrollPosition = Math.floor(Math.random() * (totalHeight - viewportHeight))
-
-            this.bot.logger.debug(
-                isMobile,
-                'SEARCH-RANDOM-SCROLL',
-                `Random scroll | viewportHeight=${viewportHeight} | totalHeight=${totalHeight} | scrollPos=${randomScrollPosition}`
-            )
-
-            // Avoid object literal {behavior:'auto'} inside the callback:
-            // the string 'auto' would be replaced by a string-array call and
-            // become an unresolvable outer-scope reference in the browser.
-            await page.evaluate((pos: number) => window.scrollTo(0, pos), randomScrollPosition)
+            const steps = this.bot.utils.randomNumber(3, 7)
+            for (let i = 0; i < steps; i++) {
+                await page.mouse.wheel(0, this.bot.utils.randomNumber(180, 520))
+                await this.bot.utils.wait(this.bot.utils.randomDelay(500, 1500))
+                // ~1 step in 5: a small scroll back up, like a human re-reading.
+                if (Math.random() < 0.2) {
+                    await page.mouse.wheel(0, -this.bot.utils.randomNumber(80, 240))
+                    await this.bot.utils.wait(this.bot.utils.randomDelay(400, 1100))
+                }
+            }
+            this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-SCROLL', `Human scroll done | steps=${steps}`)
         } catch (error) {
             this.bot.logger.error(
                 isMobile,
@@ -634,17 +660,26 @@ export class Search extends TaskBase {
             }
 
             await this.bot.browser.utils.ghostClick(page, BING_SEARCH.resultLinks)
-            await this.bot.utils.wait(this.bot.config.searchSettings.searchResultVisitTime)
+            // Brief settle so the navigation / new tab actually opens.
+            await this.bot.utils.wait(this.bot.utils.randomDelay(1500, 3000))
 
             if (isMobile) {
+                // Mobile: the click navigates the same tab. Read it (progressive
+                // scroll) for the visit time, then return to the results page.
+                await this.randomScroll(page, isMobile)
+                await this.bot.utils.wait(this.bot.config.searchSettings.searchResultVisitTime)
                 await page.goto(searchPageUrl)
                 this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-CLICK', 'Navigated back to search page')
             } else {
+                // Desktop: the result opens in a new tab. Read it (progressive
+                // scroll) before closing, instead of idling on it.
                 const newTab = await this.bot.browser.utils.getLatestTab(page)
                 const newTabUrl = newTab.url()
 
                 this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-CLICK', `Visited result tab | url=${newTabUrl}`)
 
+                await this.randomScroll(newTab, isMobile)
+                await this.bot.utils.wait(this.bot.config.searchSettings.searchResultVisitTime)
                 await this.bot.browser.utils.closeTabs(newTab)
                 this.bot.logger.debug(isMobile, 'SEARCH-RANDOM-CLICK', 'Closed result tab')
             }

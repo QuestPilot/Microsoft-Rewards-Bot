@@ -3,7 +3,7 @@ import { ClickOptions, createCursor } from 'ghost-cursor-playwright-port'
 import { type BrowserContext, type Page } from 'patchright'
 
 import type { MicrosoftRewardsBot } from '../index'
-import { COOKIE_CONSENT } from './DashboardSelectors'
+import { BING_OVERLAY, COOKIE_CONSENT, DISMISS_BUTTONS } from './DashboardSelectors'
 
 export default class AutomationUtils {
     private bot: MicrosoftRewardsBot
@@ -14,29 +14,9 @@ export default class AutomationUtils {
 
     async tryDismissAllMessages(page: Page): Promise<void> {
         try {
-            // -----------------------------------------------------------------
-            // Buttons shared by BOTH legacy and new dashboard / Bing pages.
-            // We keep legacy selectors as fallbacks since not all users have
-            // been migrated yet, and Bing search pages still use the old UI.
-            // -----------------------------------------------------------------
-            const buttons = [
-                // --- Legacy dashboard / Bing selectors (still needed on bing.com) ---
-                { selector: '#acceptButton', label: 'AcceptButton' },
-                { selector: '.ext-secondary.ext-button', label: '"Skip for now" Button' },
-                { selector: '#iLandingViewAction', label: 'iLandingViewAction' },
-                { selector: '#iShowSkip', label: 'iShowSkip' },
-                { selector: '#iNext', label: 'iNext' },
-                { selector: '#iLooksGood', label: 'iLooksGood' },
-                { selector: '#idSIButton9', label: 'idSIButton9' },
-                { selector: '.ms-Button.ms-Button--primary', label: 'Primary Button' },
-                { selector: '.c-glyph.glyph-cancel', label: 'Mobile Welcome Button' },
-                { selector: '.maybe-later', label: 'Mobile Rewards App Banner' },
-                { selector: '#bnp_btn_accept', label: 'Bing Cookie Banner' },
-                { selector: '#reward_pivot_earn', label: 'Reward Coupon Accept' },
-
-                // --- WCP Cookie Consent Banner (shared by dashboard + bing.com) ---
-                { selector: COOKIE_CONSENT.acceptButton, label: 'WCP Cookie Accept' }
-            ]
+            // Selectors live in the DashboardSelectors registry (DISMISS_BUTTONS),
+            // never inline here. They cover BOTH legacy and new dashboard / Bing pages.
+            const buttons = DISMISS_BUTTONS
 
             const checkVisible = await Promise.allSettled(
                 buttons.map(async b => ({
@@ -71,13 +51,13 @@ export default class AutomationUtils {
             }
 
             // --- Legacy Bing overlay (still present on bing.com search pages) ---
-            const overlay = await page.$('#bnp_overlay_wrapper')
+            const overlay = await page.$(BING_OVERLAY.wrapper)
             if (overlay) {
-                const rejected = await this.ghostClick(page, '#bnp_btn_reject, button[aria-label*="Reject" i]')
+                const rejected = await this.ghostClick(page, BING_OVERLAY.rejectButton)
                 if (rejected) {
                     this.bot.logger.debug(this.bot.isMobile, 'DISMISS-ALL-MESSAGES', 'Dismissed: Bing Overlay Reject')
                 } else {
-                    const accepted = await this.ghostClick(page, '#bnp_btn_accept')
+                    const accepted = await this.ghostClick(page, BING_OVERLAY.acceptButton)
                     if (accepted) {
                         this.bot.logger.debug(
                             this.bot.isMobile,
@@ -200,7 +180,8 @@ export default class AutomationUtils {
 
             const newTab = pages[pages.length - 1]
             if (!newTab) {
-                throw this.bot.logger.error(this.bot.isMobile, 'GET-NEW-TAB', 'No tabs could be found!')
+                this.bot.logger.error(this.bot.isMobile, 'GET-NEW-TAB', 'No tabs could be found!')
+                throw new Error('No tabs could be found')
             }
 
             return newTab
@@ -236,7 +217,9 @@ export default class AutomationUtils {
                 'RELOAD-BAD-PAGE',
                 `Reload check failed: ${error instanceof Error ? error.message : String(error)}`
             )
-            return true
+            // The check itself failed — we did NOT detect or reload a bad page, so
+            // report false rather than falsely signalling a reload happened.
+            return false
         }
     }
 

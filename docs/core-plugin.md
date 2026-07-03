@@ -93,6 +93,18 @@ Auto-start is installed in one click from the dashboard, with no administrator r
 
 ---
 
+## Terminal Page Harvester
+
+Maintainers can analyze the live Rewards pages once, independently of a normal points run:
+
+```powershell
+npm start -- harvester
+```
+
+The command uses the first enabled account and the official Core plugin, then rebuilds `Page/` with HTML, RSC payloads, screenshots, per-route DOM inventories, a cross-route `site-inventory.json`, and `summary.json`. Selector checks are measured before and after disclosures are expanded; navigation status and deterministic DOM fingerprints are included for drift analysis. It then prints the complete analysis in the terminal. It does not start the scheduler or remote dashboard, send analytics or webhooks, or update configuration, statistics, and sessions.
+
+---
+
 ## Your Data Stays Yours
 
 Core only sends sanitized data to the dashboard: masked account emails, run state, filtered logs, and point summaries. Passwords, cookies, tokens, and webhook URLs never leave your machine.

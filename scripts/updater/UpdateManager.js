@@ -58,7 +58,6 @@ const DEFAULT_MANAGED_PATHS = [
     'assets',
     'docs',
     'plugins/core',
-    'plugins/catalog.json',
     'plugins/official-core.json',
     'plugins/official-core.sig',
     'scripts',
@@ -82,7 +81,8 @@ const DEFAULT_MANAGED_PATHS = [
 ]
 
 const DEFAULT_OBSOLETE_PATHS = [
-    'src/core/DashboardServer.ts'
+    'src/core/DashboardServer.ts',
+    'plugins/catalog.json'
 ]
 
 const UPDATE_STRATEGIES = new Set(['auto', 'git', 'archive'])

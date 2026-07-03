@@ -6,7 +6,7 @@ import { getErrorMessage, promptInput } from './AuthUtils'
 export class TotpStrategy {
     private readonly textInputSelector =
         'form[name="OneTimeCodeViewForm"] input[type="text"], input#floatingLabelInput5'
-    private readonly secondairyInputSelector = 'input[id="otc-confirmation-input"], input[name="otc"]'
+    private readonly secondaryInputSelector = 'input[id="otc-confirmation-input"], input[name="otc"]'
     private readonly submitButtonSelector = 'button[type="submit"]'
     private readonly maxManualSeconds = 60
     private readonly maxManualAttempts = 5
@@ -29,9 +29,9 @@ export class TotpStrategy {
                 return true
             }
 
-            const secondairyInput = await page.$(this.secondairyInputSelector)
-            if (secondairyInput) {
-                await secondairyInput.fill(code)
+            const secondaryInput = await page.$(this.secondaryInputSelector)
+            if (secondaryInput) {
+                await secondaryInput.fill(code)
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN-TOTP', 'Filled TOTP input')
                 return true
             }

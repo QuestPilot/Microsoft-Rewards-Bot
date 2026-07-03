@@ -9,7 +9,7 @@
         "langCode": "en",
         "dashboardMode": "auto",
         "proxy": {
-            "proxyAxios": false,
+            "proxyAxios": true,
             "url": "",
             "port": 0,
             "username": "",
@@ -29,7 +29,7 @@
         "geoLocale": "auto",
         "langCode": "en",
         "proxy": {
-            "proxyAxios": false,
+            "proxyAxios": true,
             "url": "",
             "port": 0,
             "username": "",
