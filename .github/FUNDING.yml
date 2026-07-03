@@ -1,0 +1,8 @@
+# Funding / support links shown via the "Sponsor" button on GitHub.
+# The project is supported by Core (the optional premium plugin), sold through our Discord.
+# To enable GitHub Sponsors or Ko-fi, create the account and uncomment the matching line.
+
+# github: [QuestPilot]
+# ko_fi: questpilot
+custom:
+  - "https://discord.gg/JWhCkhSYtg"

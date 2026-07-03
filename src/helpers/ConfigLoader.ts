@@ -15,6 +15,10 @@ const { createAccountStorage } = require('../../scripts/account-storage') as {
 
 let configCache: Config
 
+function isEphemeralRun(): boolean {
+    return process.env.MSRB_EPHEMERAL_RUN === '1'
+}
+
 function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error)
 }
@@ -23,7 +27,9 @@ function readJsonFile<T>(filePath: string, label: string): T {
     try {
         return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T
     } catch (error) {
-        throw new Error(`[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`)
+        throw new Error(
+            `[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`
+        )
     }
 }
 
@@ -31,7 +37,9 @@ async function readJsonFileAsync<T>(filePath: string, label: string): Promise<T>
     try {
         return JSON.parse(await fs.promises.readFile(filePath, 'utf-8')) as T
     } catch (error) {
-        throw new Error(`[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`)
+        throw new Error(
+            `[CONFIG] Could not read ${label} at ${path.relative(process.cwd(), filePath)}: ${errorMessage(error)}`
+        )
     }
 }
 
@@ -85,29 +93,32 @@ export function loadAccounts(): Account[] {
     }
 }
 
+/**
+ * Resolve the active config file path the SAME way {@link loadConfig} does
+ * (`config.json`, else `config.example.json`). Callers that need to rewrite the
+ * config on disk (e.g. the Desk capture toggle) must use this rather than
+ * hardcoding `src/config.json`, which is wrong once the bot runs from `dist/`.
+ */
+export function resolveConfigPath(): string {
+    return resolveFirstExistingFile(['config.json', 'config.example.json'], 'config file')
+}
+
 export function loadConfig(): Config {
     try {
         if (configCache) {
             return configCache
         }
 
-        const configDir = resolveFirstExistingFile(['config.json', 'config.example.json'], 'config file')
-        const configData = readJsonFile<Config>(configDir, 'config file')
-        validateConfig(configData)
+        const configDir = resolveConfigPath()
+        const configData = readJsonFile<unknown>(configDir, 'config file')
 
-        // We cache the raw parsed JSON (not Zod's output) on purpose: ConfigSchema
-        // strips unknown keys, which would drop passthrough fields like `plugins`.
-        // The schema's `.default(true)` on these two opt-out workers therefore never
-        // reaches the cached object, so apply them explicitly here — a hand-edited
-        // config that omits them still enables them as intended.
-        if (configData.workers) {
-            if (configData.workers.doApplyCoupons === undefined) configData.workers.doApplyCoupons = true
-            if (configData.workers.doPunchCards === undefined) configData.workers.doPunchCards = true
-        }
+        // Cache the PARSED schema output so the schema's `.default()`s and coercions
+        // are authoritative (e.g. doApplyCoupons/doPunchCards default true). ConfigSchema
+        // is `.passthrough()`, so unknown top-level keys such as `plugins` survive — which
+        // is why caching the parsed result (instead of the raw JSON) no longer drops them.
+        configCache = validateConfig(configData)
 
-        configCache = configData
-
-        return configData
+        return configCache
     } catch (error) {
         throw new Error(errorMessage(error))
     }
@@ -167,6 +178,7 @@ export async function saveSessionData(
     email: string,
     isMobile: boolean
 ): Promise<string> {
+    if (isEphemeralRun()) return getSessionDir(sessionPath, email)
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const cookiesFileName = isMobile ? 'session_mobile.json' : 'session_desktop.json'
@@ -189,6 +201,7 @@ export async function saveFingerprintData(
     isMobile: boolean,
     fingerpint: BrowserFingerprintWithHeaders
 ): Promise<string> {
+    if (isEphemeralRun()) return getSessionDir(sessionPath, email)
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const fingerprintFileName = isMobile ? 'session_fingerprint_mobile.json' : 'session_fingerprint_desktop.json'
@@ -211,6 +224,7 @@ export async function saveStorageState(
     email: string,
     isMobile: boolean
 ): Promise<void> {
+    if (isEphemeralRun()) return
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const storageFileName = isMobile ? 'session_storage_mobile.json' : 'session_storage_desktop.json'
@@ -240,6 +254,7 @@ export async function saveDashboardVariant(
     isMobile: boolean,
     variant: DashboardVariant
 ): Promise<void> {
+    if (isEphemeralRun()) return
     try {
         const sessionDir = getSessionDir(sessionPath, email)
         const file = path.join(sessionDir, 'dashboard-variant.json')

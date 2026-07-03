@@ -18,7 +18,12 @@ class HttpClient {
             timeout: 20000
         })
 
-        if (this.account.url && this.account.proxyAxios) {
+        // Account-safety: when a proxy is configured, route the HTTP client through it
+        // BY DEFAULT (opt-out via `proxyAxios: false`). Otherwise the browser uses the
+        // proxy but authenticated, account-bound API calls (getuserinfo, dapi/me, the
+        // OAuth token exchange) would leak the real IP — a per-account IP split Microsoft
+        // can trivially correlate. A configured proxy should cover everything.
+        if (HttpClient.shouldUseProxy(this.account)) {
             const agent = this.getAgentForProxy(this.account)
             this.instance.defaults.httpAgent = agent
             this.instance.defaults.httpsAgent = agent
@@ -36,6 +41,15 @@ class HttpClient {
                 return status === 429 || (status >= 500 && status <= 599)
             }
         })
+    }
+
+    /**
+     * Whether the HTTP client should egress through the account proxy. True whenever a
+     * proxy URL is set and the user hasn't explicitly opted out (`proxyAxios: false`).
+     * Keeping this a pure static makes the no-IP-leak guarantee unit-testable.
+     */
+    static shouldUseProxy(account: Pick<AccountProxy, 'url' | 'proxyAxios'>): boolean {
+        return Boolean(account.url) && account.proxyAxios !== false
     }
 
     private getAgentForProxy(

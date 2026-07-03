@@ -94,6 +94,20 @@ COPY --chmod=755 scripts/docker/run_daily.sh ./scripts/docker/run_daily.sh
 COPY --chmod=644 src/crontab.template /etc/cron.d/microsoft-rewards-bot.template
 COPY --chmod=755 scripts/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
+# TODO(review): run as a non-root user. This stage deliberately stays root because
+# the entrypoint requires it as PID 1: it reconfigures tzdata, symlinks /etc/localtime,
+# writes /etc/cron.d/*, runs `crontab`, and execs `cron -f` (Vixie cron needs root).
+# Dropping to a non-root user (e.g. `RUN useradd -r -u 10001 botuser` + chown of the
+# app dir and writable sessions/) is not safe without first replacing Vixie cron with a
+# user-space scheduler such as supercronic (or relying on the built-in Node scheduler,
+# which the entrypoint already prefers when scheduler.enabled=true and CAN run non-root).
+# Until then, harden at deploy time instead of in the image, e.g. in compose.yaml:
+#   read_only: true
+#   tmpfs: [/tmp, /var/run]
+#   cap_drop: [ALL]
+#   security_opt: ["no-new-privileges:true"]
+# (mount sessions/, data/ and logs/ as writable volumes).
+
 # Entrypoint handles TZ, initial run toggle, cron templating & launch
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["sh", "-c", "echo 'Container started; cron is running.'"]

@@ -86,6 +86,26 @@ export interface PluginConfigEntry {
     enabled?: boolean
     priority?: number
     config?: Record<string, unknown>
+    /**
+     * Isolation/trust level for this plugin:
+     *  - `'sandbox'` — run untrusted in a V8 isolate with no Node APIs (the default for
+     *    marketplace-sourced plugins).
+     *  - `'full'` — Trusted Mode: run in-process with full access. Requires explicit local
+     *    user consent and is NEVER set automatically by the marketplace.
+     * First-party/local plugins with no `trust` set keep the in-process path.
+     */
+    trust?: 'full' | 'sandbox'
+    /** Provenance. `'marketplace'` plugins are sandboxed unless `trust` is `'full'`. */
+    source?: 'local' | 'marketplace'
+    /** Pinned version for a marketplace plugin (matched against the signed catalog). */
+    version?: string
+    /**
+     * Auto-update policy for an UNPINNED marketplace plugin. Default (omitted/true):
+     * the bot installs the latest approved version on each start. `false` holds it at
+     * the installed version. A pinned `version` always wins (never auto-updates), and
+     * Trusted-Mode (`trust: 'full'`) plugins are held back regardless (manual update only).
+     */
+    autoUpdate?: boolean
 }
 
 export interface PluginDiagnostic {

@@ -8,7 +8,9 @@ import readline from 'readline'
 import type { DashboardLog } from '../types/Dashboard'
 import { writeJsonAtomic } from '../helpers/AtomicFile'
 
-const STATE_DIR = '.core'
+// Agent IPC rendezvous (port + token) lives under data/ — the single runtime
+// state folder — so the legacy hidden .core directory can be retired entirely.
+const STATE_DIR = path.join('data', 'agent')
 const STATE_FILE = 'agent.json'
 
 export interface AgentRuntimeState {

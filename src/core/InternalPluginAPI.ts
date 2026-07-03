@@ -10,15 +10,14 @@ import type { MicrosoftRewardsBot } from '../index'
 import type { StreakProtectionSyncResult } from './tasks/browser/StreakProtectionGate'
 import type { Promotion } from '../types/AppDashboardData'
 import type { PurplePromotionalItem } from '../types/DashboardData'
-import type {
-    IPlugin,
-    PluginLifecycleContext,
-    PublicPluginContext
-} from '../plugin-api'
+import type { IPlugin, PluginLifecycleContext, PublicPluginContext } from '../plugin-api'
 
 export type { AccountResult, IPlugin, PluginConfigEntry, PluginLogger } from '../plugin-api'
 
-export interface OfficialCorePlugin extends Omit<IPlugin, 'register' | 'onBotInitialized' | 'onAccountStart' | 'onAccountEnd'> {
+export interface OfficialCorePlugin extends Omit<
+    IPlugin,
+    'register' | 'onBotInitialized' | 'onAccountStart' | 'onAccountEnd'
+> {
     register(context: OfficialCoreContext): void | Promise<void>
     onBotInitialized?(context: OfficialCoreLifecycleContext): void | Promise<void>
     onAccountStart?(context: OfficialCoreAccountLifecycleContext): void | Promise<void>
@@ -68,9 +67,92 @@ export interface DashboardCaptureResult {
     /** Route names that were captured (e.g. "dashboard", "earn"). */
     routes: string[]
     /** Output directory the snapshots were written to, relative to the run cwd. */
-    outputDir: string
+    outputDir: string | null
     /** Aggregated analyzer problems across every captured route (selector drift hints). */
     problems: string[]
+    /** Detailed in-memory analysis used by the terminal-only harvester report. */
+    analyses?: DashboardHarvesterPageAnalysis[]
+    /** Routes that could not be analyzed at all. */
+    failures?: DashboardHarvesterFailure[]
+    /** End-to-end analysis duration. */
+    durationMs?: number
+}
+
+export interface DashboardHarvesterSelectorCheck {
+    group: string
+    key: string
+    selector: string
+    /** Maximum match count observed across the initial and expanded DOM states. */
+    matches: number
+    /** Match count before the harvester opens disclosures and side panels. */
+    matchesInitial?: number
+    /** Match count after the harvester opens disclosures and side panels. */
+    matchesExpanded?: number
+    valid: boolean
+    required: boolean
+    error?: string
+}
+
+/**
+ * RSC flight-data contract check. The selectorChecks above validate the DOM; these
+ * validate the Next.js `__next_f` flight payload the data parsers depend on (balance,
+ * pointClaim, streakCounter, …) — the exact failure mode of the original Next.js
+ * migration, which DOM checks alone could not catch.
+ */
+export interface DashboardHarvesterFlightCheck {
+    /** Logical key name, e.g. "balance+level" or "streakCounter". */
+    key: string
+    /** Human-readable description of what consumes this key. */
+    label: string
+    /** Source regex (string form) that was tested against the flight payload. */
+    pattern: string
+    /** Whether the pattern matched the captured flight text. */
+    present: boolean
+    /** When true, an absent key is pushed to `problems` (drift); when false it is informational. */
+    required: boolean
+}
+
+export interface DashboardHarvesterPageAnalysis {
+    name: string
+    /** Requested route URL. */
+    url: string
+    /** Final URL after redirects. */
+    finalUrl?: string
+    /** Main-document HTTP status when Patchright exposed a response. */
+    httpStatus?: number
+    /** Non-fatal navigation error when a timed-out page still produced usable DOM/RSC data. */
+    navigationError?: string
+    title: string
+    domBytes?: number
+    elementCount?: number
+    classTokenCount?: number
+    stableIdCount?: number
+    /** Per-route structured DOM inventory written next to the HTML/RSC artifacts. */
+    inventoryFile?: string
+    /** Deterministic SHA-256 of stable DOM signals for drift comparisons. */
+    domFingerprint?: string
+    flightBytes: number
+    offerIds: number
+    actionIds: number
+    modelTypes: string[]
+    hasPointClaim: boolean
+    hasDailySet: boolean
+    switches: number
+    disclosures: number
+    dialogs: number
+    selectorChecks: DashboardHarvesterSelectorCheck[]
+    /** RSC flight-key contract results (data-layer drift detection). */
+    flightChecks?: DashboardHarvesterFlightCheck[]
+    /** Non-required selectors that matched 0 elements — surfaced (non-blocking) so silent
+     *  selector death (a token rename, a removed card) is visible without crying wolf. */
+    zeroMatchSelectors?: string[]
+    problems: string[]
+}
+
+export interface DashboardHarvesterFailure {
+    name: string
+    url: string
+    error: string
 }
 
 export interface ClaimEntry {

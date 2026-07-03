@@ -18,7 +18,9 @@ export interface Account {
 }
 
 export interface AccountProxy {
-    proxyAxios: boolean
+    /** Route the HTTP client through the proxy too. Defaults to true when a proxy
+     *  `url` is set; set false only to deliberately send API calls off-proxy. */
+    proxyAxios?: boolean
     url: string
     port: number
     password: string

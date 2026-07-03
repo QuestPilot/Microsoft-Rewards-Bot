@@ -5,7 +5,7 @@
 <h1 align="center">Microsoft Rewards Bot</h1>
 
 <p align="center">
-  <strong>Source-available Microsoft Rewards automation with a powerful plugin ecosystem.</strong>
+  <strong>The all-in-one Microsoft Rewards bot — both dashboards, a real control panel, fully automated.</strong>
 </p>
 
 <p align="center">
@@ -13,6 +13,12 @@
     <img src="https://img.shields.io/github/v/release/QuestPilot/Microsoft-Rewards-Bot?style=for-the-badge&label=Version&color=0078d4" alt="Latest release">
   </a>
   <img src="https://img.shields.io/badge/Node.js-24.15.0-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js">
+  <a href="https://discord.gg/JWhCkhSYtg">
+    <img src="https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord">
+  </a>
+  <a href="https://github.com/QuestPilot/Microsoft-Rewards-Bot/stargazers">
+    <img src="https://img.shields.io/github/stars/QuestPilot/Microsoft-Rewards-Bot?style=for-the-badge&color=f5b400" alt="Stars">
+  </a>
   <img src="https://img.shields.io/badge/License-Source_Available-f35325?style=for-the-badge" alt="License">
 </p>
 
@@ -22,8 +28,24 @@ Microsoft Rewards Bot automates daily sets, searches, and promotions on Microsof
 
 It supports **both** Microsoft Rewards dashboards in a single project — the new Next.js dashboard and the older one — detecting which one each account is served at login and using the right code path automatically, so every account earns regardless of which dashboard Microsoft has rolled out to it.
 
-> [!NOTE]
-> This repository is source-available for personal non-commercial use and official contributions only. Commercial redistribution, public forks, and bypassing the Core plugin boundary are not permitted.
+> [!TIP]
+> **One bot. Both dashboards. Every point.** This isn't just another search script — it's a complete automation platform. It runs on **both** Microsoft Rewards dashboards (the new one *and* the classic one) with per-account auto-detection, ships a built-in control panel that needs no terminal, a sandboxed plugin system, and silent auto-updates. Add the optional **Core** plugin and you unlock full point coverage — claimable cards, dashboard coupons, streak protection, and app rewards — plus a remote web dashboard to run every machine from anywhere. Set it up once and leave nothing on the table.
+
+---
+
+## Features
+
+- ✅ **Works on the new Microsoft dashboard** *and* the classic one — auto-detected per account, zero config.
+- 🖥️ **A real control panel** (Rewards Desk) — manage accounts, runs, settings, and plugins in your browser. No terminal, no JSON, no rebuild after every change.
+- 🔍 **Desktop + mobile searches** with human-like behavior and multi-source, locale-aware query generation.
+- 🧩 **Activities solved automatically** — daily set, quizzes, polls, promotions, URL rewards, and classic punch cards.
+- 🔐 **Full login coverage** — password, 2FA / TOTP, passwordless, passkey handling, and recovery flows.
+- 🛡️ **Anti-detection built in** — stealth browser, realistic fingerprints, human-like mouse and typing.
+- 🔒 **Your credentials stay yours** — accounts encrypted at rest with your OS vault (DPAPI / Keychain / Secret Service).
+- 🧰 **Extensible** — a sandboxed plugin system to add your own features safely.
+- 🔔 **Notifications & automation** — Discord and ntfy alerts, a built-in scheduler, silent auto-updates, and Docker support.
+- 🌍 **Cross-platform** — Windows, macOS, Linux, and headless/Docker.
+- ⭐ **Optional Core** — claimable point cards, dashboard coupons, streak protection, app rewards, **auto-redeem to gift cards**, and a remote dashboard to run every machine from anywhere.
 
 ---
 
@@ -116,6 +138,8 @@ See [Docker deployment](docs/docker.md) for the full Compose example and Core co
 | Enable, disable, or inspect plugins | [Plugin System](docs/plugins.md) |
 | Build your own plugin | [Create a Plugin](docs/create-plugin.md) · [Plugin API](docs/plugin-api.md) |
 | Fix launch, install, or update issues | [Troubleshooting](docs/troubleshooting.md) |
+| Run safely & reduce ban risk | [Account Safety](docs/account-safety.md) |
+| Understand privacy, telemetry, and security | [Privacy & Telemetry](docs/privacy.md) · [Security Policy](SECURITY.md) |
 | Licensing and allowed use | [License](LICENSE) · [Commercial Use](COMMERCIAL.md) · [Trademark](TRADEMARK.md) |
 
 Full documentation index: [docs/README.md](docs/README.md)

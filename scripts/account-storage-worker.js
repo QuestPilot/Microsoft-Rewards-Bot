@@ -59,12 +59,15 @@ function execute(action, payload = {}) {
 try {
     const storageState = storage.initializeEncryption()
     const accounts = storage.readAccounts()
+    // SECURITY: do NOT emit plaintext `rawAccounts` in the unsolicited startup
+    // message. The consumer requests them explicitly over the line protocol when
+    // needed (the `read` action returns { accounts }), so decrypted credentials
+    // are only ever sent on demand rather than pushed to stdout at boot.
     send({
         type: 'ready',
         success: true,
         storage: storageState,
-        accounts: maskedAccounts(accounts),
-        rawAccounts: accounts
+        accounts: maskedAccounts(accounts)
     })
 } catch (error) {
     send({

@@ -1,0 +1,79 @@
+name: 🐞 Bug report
+description: Something isn't working. Help us reproduce and fix it.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! For setup help or "best config?" questions, please use [Discord](https://discord.gg/JWhCkhSYtg) instead — this form is for bugs.
+        **Never paste passwords, cookies, license keys, or full account emails.**
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you start
+      options:
+        - label: I'm on the latest version (`npm run update:check`) and the bug still happens.
+          required: true
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Bot version
+      placeholder: e.g. 4.5.16
+    validations:
+      required: true
+  - type: dropdown
+    id: dashboard
+    attributes:
+      label: Which dashboard is the affected account on?
+      options:
+        - "Not sure"
+        - "New (Next.js) dashboard"
+        - "Classic dashboard"
+        - "Both / multiple accounts"
+    validations:
+      required: true
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      options:
+        - "Free (open source)"
+        - "Core (premium)"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - "Windows"
+        - "macOS"
+        - "Linux"
+        - "Docker / headless"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (redacted)
+      description: Paste relevant console/log output. Remove emails, passwords, tokens, and license keys.
+      render: shell

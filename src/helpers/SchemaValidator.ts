@@ -20,7 +20,7 @@ const DelaySchema = z.object({
     max: NumberOrString
 })
 
-const QueryEngineSchema = z.enum(['google', 'wikipedia', 'reddit', 'local'])
+const QueryEngineSchema = z.enum(['google', 'wikipedia', 'wikirandom', 'reddit', 'hackernews', 'local'])
 
 const TotpSecretSchema = z.preprocess(
     value => {
@@ -63,7 +63,7 @@ const SafetyAdvisorySchema = z.object({
     blockedBehavior: z.enum(['prompt', 'continue', 'stop']).default('prompt')
 })
 
-// Webhook
+// Webhook — user notification channels only (Discord log lines, ntfy push)
 const WebhookSchema = z.object({
     discord: z
         .object({
@@ -82,15 +82,7 @@ const WebhookSchema = z.object({
             priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional()
         })
         .optional(),
-    webhookLogFilter: LogFilterSchema,
-    runSummary: z
-        .object({
-            enabled: z.boolean().default(false),
-            discordUrl: z.string().default(''),
-            includeCoreComparison: z.boolean().optional(),
-            includeCorePitch: z.boolean().optional()
-        })
-        .optional()
+    webhookLogFilter: LogFilterSchema
 })
 
 // Config
@@ -99,8 +91,6 @@ export const ConfigSchema = z.object({
     sessionPath: z.string(),
     headless: z.boolean(),
     runOnZeroPoints: z.boolean(),
-    clusters: z.number().int().nonnegative(),
-    errorDiagnostics: z.boolean(),
     workers: z.object({
         doDailySet: z.boolean(),
         doSpecialPromotions: z.boolean(),
@@ -125,7 +115,11 @@ export const ConfigSchema = z.object({
         queryEngines: z.array(QueryEngineSchema),
         searchResultVisitTime: NumberOrString,
         searchDelay: DelaySchema,
-        readDelay: DelaySchema
+        readDelay: DelaySchema,
+        // Account-safety pacing (all optional, safe defaults applied in code).
+        accountDelay: DelaySchema.optional(),
+        shuffleAccounts: z.boolean().default(true),
+        delayMultiplier: z.number().min(1).default(1)
     }),
     debugLogs: z.boolean(),
     proxy: z.object({
@@ -133,11 +127,26 @@ export const ConfigSchema = z.object({
     }),
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
+    /** All anonymous telemetry. Default on; disabling also disables error reporting. */
+    analytics: z.object({
+        enabled: z.boolean().default(true)
+    }).default({ enabled: true }),
     backgroundAgent: BackgroundAgentSchema.optional(),
     terminal: TerminalSchema.optional(),
+    /** Rewards Desk (local control UI) settings. `lanAccess` (opt-in, default off) lets
+     *  other devices on the home network reach the Desk at http://<this-pc-ip>:<port>;
+     *  the same-machine Nexus embed works on loopback without it. */
+    desk: z.object({
+        lanAccess: z.boolean().default(false),
+        /** Run the Desk as a headless service (no window) — for servers/Docker with no
+         *  GUI, so the bot stays reachable/controllable from Nexus. Opt-in, default off. */
+        headless: z.boolean().default(false),
+        port: NumberOrString.optional()
+    }).optional(),
     scheduler: SchedulerSchema.optional(),
     core: z.object({
         doubleSearchPoints: z.boolean().optional(),
+        exploreOnBing: z.boolean().optional(),
         appReward: z.boolean().optional(),
         readToEarn: z.boolean().optional(),
         dailyCheckIn: z.boolean().optional(),
@@ -147,12 +156,16 @@ export const ConfigSchema = z.object({
         applyCoupons: z.boolean().optional(),
         temporaryPunchcards: z.boolean().optional(),
         collectDashboardInfo: z.boolean().optional(),
+        clusters: z.number().int().nonnegative().optional(),
         streakProtection: z.boolean().optional(),
         dashboardSync: z.boolean().optional(),
         captureDashboardPages: z.boolean().optional()
     }).optional(),
     safetyAdvisory: SafetyAdvisorySchema.optional()
 })
+    // Keep unknown top-level keys (e.g. `plugins`) instead of stripping them, so the
+    // parsed result is safe to cache and use directly as the authoritative config.
+    .passthrough()
 
 // Account
 export const AccountSchema = z.object({
@@ -164,7 +177,8 @@ export const AccountSchema = z.object({
     geoLocale: z.string(),
     langCode: z.string(),
     proxy: z.object({
-        proxyAxios: z.boolean(),
+        // Default true: a configured proxy covers the HTTP client too (set false to opt out).
+        proxyAxios: z.boolean().default(true),
         url: z.string(),
         port: z.number(),
         password: z.string(),

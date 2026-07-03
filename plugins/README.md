@@ -19,11 +19,12 @@ When `plugins/plugins.jsonc` exists, only the plugins listed there are eligible 
 It is shipped as a compiled official artifact and loaded through the same plugin manager as third-party plugins.
 Its checksum is pinned in `plugins/official-core.json`; if it does not match, premium entitlement is not granted.
 
-## Built-in Free Plugins
+## Free and Community Plugins
 
-`plugins/run-summary/` is an optional free plugin. It records account results locally in
-`diagnostics/run-summary/` and is useful when users want a simple after-run report without enabling
-premium Core features or sending extra data to a remote service.
+The bot ships with only the official Core plugin. Every other plugin is installed from the
+cloud marketplace — see [Publishing a plugin](../docs/plugin-marketplace.md). Declare it in
+`plugins.jsonc` with `"source": "marketplace"` and the bot downloads, verifies, and sandboxes it
+on the next start.
 
 ## Third-Party Plugins
 

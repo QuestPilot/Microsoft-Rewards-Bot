@@ -52,8 +52,14 @@ export interface BingSearchPageAnalysis {
     problems: string[]
 }
 
+const ACTIVITY_ROUTES = new Set(['dashboard', 'earn'])
+
 function unique(values: string[]): string[] {
     return [...new Set(values.filter(Boolean))]
+}
+
+export function normalizeModelType(value: string): string {
+    return value.replace(/\s+/g, '').toLowerCase()
 }
 
 export function extractNextFlightTextFromHtml(html: string): string {
@@ -155,10 +161,14 @@ function buildBingProblems(analysis: Pick<BingSearchPageAnalysis, 'searchBoxPres
 function buildRewardsProblems(
     analysis: Pick<
         RewardsPageAnalysis,
-        'modelTypes' | 'activities' | 'panelSignals' | 'disclosures' | 'actionIds'
+        'route' | 'modelTypes' | 'activities' | 'panelSignals' | 'disclosures'
     >
 ): string[] {
     const problems: string[] = []
+
+    // Activity models only exist on the dashboard and earn routes. Static,
+    // redemption and referral routes are still valid Rewards captures.
+    if (!analysis.route || !ACTIVITY_ROUTES.has(analysis.route)) return problems
 
     if (!analysis.modelTypes.length) problems.push('No Rewards RSC activity models found')
     if (
@@ -180,10 +190,6 @@ function buildRewardsProblems(
     ) {
         problems.push('streak models found, but no disclosure trigger was found')
     }
-    if (!analysis.actionIds.length) {
-        problems.push('reportActivity server action id not found in saved HTML/chunks')
-    }
-
     return problems
 }
 
@@ -304,6 +310,8 @@ export function extractRewardsActivities(text: string): RewardsActivityModel[] {
 
     for (const match of modelMatches) {
         if (match.index === undefined || !match[1]) continue
+        const type = normalizeModelType(match[1])
+        if (!type) continue
         const context = contextAround(text, match.index, 2200)
         const offerId = readStringField(context, 'offerId') ?? readStringField(context, 'activationOfferId')
         const hash = readStringField(context, 'hash') ?? readStringField(context, 'activationHash')
@@ -313,7 +321,7 @@ export function extractRewardsActivities(text: string): RewardsActivityModel[] {
         if (offerId && activities.some(activity => activity.offerId === offerId)) continue
 
         activities.push({
-            type: match[1],
+            type,
             offerId: offerId && offerId !== '$undefined' ? offerId : undefined,
             hash: hash && hash !== '$undefined' ? hash : undefined,
             destination,
@@ -355,14 +363,21 @@ export function analyzeRewardsPage(html: string, scriptText = ''): RewardsPageAn
     const modelTypes = unique(activities.map(activity => activity.type))
     const actionIds = extractReportActivityActionIds(combined)
     const diagnostics: string[] = []
+    const route = routeMatch?.[1]
 
     if (!flightText) diagnostics.push('RSC flight data not found')
-    if (!actionIds.length) diagnostics.push('reportActivity server action id not found')
-    if (!activities.length) diagnostics.push('No rewards activity models found')
+    if (route && ACTIVITY_ROUTES.has(route) && !activities.length) {
+        diagnostics.push('No rewards activity models found')
+    }
+    if (route && ACTIVITY_ROUTES.has(route) && !actionIds.length) {
+        diagnostics.push(
+            'reportActivity action id was not loaded by this read-only capture; its chunk may load only during an activity'
+        )
+    }
 
     const analysis: RewardsPageAnalysis = {
         kind: flightText ? 'rewards-next' : 'unknown',
-        route: routeMatch?.[1],
+        route,
         actionIds,
         modelTypes,
         activities,

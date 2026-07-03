@@ -2,9 +2,10 @@
     "baseURL": "https://rewards.bing.com/dashboard",
     "sessionPath": "sessions",
     "headless": false,
-    "runOnZeroPoints": false,
-    "clusters": 1,
-    "errorDiagnostics": false,
+    "runOnZeroPoints": true,
+    "searchOnBingLocalQueries": true,
+    "globalTimeout": "30sec",
+    "debugLogs": false,
     "workers": {
         "doDailySet": true,
         "doSpecialPromotions": true,
@@ -16,17 +17,32 @@
         "doReadToEarn": true,
         "doDailyStreak": true,
         "doDashboardInfo": true,
+        "doPunchCards": true,
         "doClaimPoints": true,
-        "doApplyCoupons": true,
-        "doPunchCards": true
+        "doApplyCoupons": true
     },
-    "searchOnBingLocalQueries": true,
-    "globalTimeout": "30sec",
+    "core": {
+        "doubleSearchPoints": true,
+        "exploreOnBing": false,
+        "appReward": true,
+        "readToEarn": true,
+        "dailyCheckIn": true,
+        "dailyStreak": true,
+        "setGoal": false,
+        "claimPoints": true,
+        "applyCoupons": true,
+        "temporaryPunchcards": false,
+        "collectDashboardInfo": true,
+        "clusters": 1,
+        "streakProtection": false,
+        "dashboardSync": false,
+        "captureDashboardPages": false
+    },
     "searchSettings": {
         "scrollRandomResults": true,
         "clickRandomResults": true,
         "parallelSearching": true,
-        "queryEngines": ["google", "wikipedia", "reddit", "local"],
+        "queryEngines": ["google", "wikipedia", "wikirandom", "reddit", "hackernews", "local"],
         "searchResultVisitTime": "10sec",
         "searchDelay": {
             "min": "30sec",
@@ -35,15 +51,23 @@
         "readDelay": {
             "min": "30sec",
             "max": "1min"
-        }
+        },
+        "accountDelay": {
+            "min": "40sec",
+            "max": "4min"
+        },
+        "shuffleAccounts": true,
+        "delayMultiplier": 1
     },
-    "debugLogs": false,
-    "consoleLogFilter": {
+    "scheduler": {
         "enabled": false,
-        "mode": "whitelist",
-        "levels": ["error", "warn"],
-        "keywords": ["starting account"],
-        "regexPatterns": []
+        "runOnStartup": true,
+        "timezone": "Europe/Paris",
+        "startTime": "08:00",
+        "randomDelay": {
+            "min": "0min",
+            "max": "30min"
+        }
     },
     "proxy": {
         "queryEngine": true
@@ -68,39 +92,17 @@
             "levels": ["error"],
             "keywords": ["starting account", "select number", "collected"],
             "regexPatterns": []
-        },
-        "runSummary": {
-            "enabled": false,
-            "discordUrl": "",
-            "includeCoreComparison": true
-        },
-        "autoReport": {
-            "enabled": false,
-            "discordUrl": "",
-            "channelId": "",
-            "reportRunStart": true,
-            "reportAccountEnd": true,
-            "reportRunSummary": true,
-            "maskEmails": true
-        },
-        "errorReporting": {
-            "enabled": true
         }
     },
-    "core": {
-        "doubleSearchPoints": true,
-        "appReward": true,
-        "readToEarn": true,
-        "dailyCheckIn": true,
-        "dailyStreak": true,
-        "setGoal": true,
-        "claimPoints": true,
-        "applyCoupons": true,
-        "temporaryPunchcards": false,
-        "collectDashboardInfo": true,
-        "streakProtection": false,
-        "dashboardSync": false,
-        "captureDashboardPages": false
+    "consoleLogFilter": {
+        "enabled": false,
+        "mode": "whitelist",
+        "levels": ["error", "warn"],
+        "keywords": ["starting account"],
+        "regexPatterns": []
+    },
+    "analytics": {
+        "enabled": true
     },
     "backgroundAgent": {
         "enabled": false,
@@ -110,14 +112,8 @@
     "terminal": {
         "enabled": false
     },
-    "scheduler": {
-        "enabled": false,
-        "runOnStartup": true,
-        "timezone": "Europe/Paris",
-        "startTime": "08:00",
-        "randomDelay": {
-            "min": "0min",
-            "max": "30min"
-        }
+    "desk": {
+        "lanAccess": true,
+        "headless": false
     }
 }

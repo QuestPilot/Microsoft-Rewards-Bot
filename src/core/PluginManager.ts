@@ -26,6 +26,8 @@ interface OfficialCoreManifest {
     plugin: 'core'
     version: string
     indexSha256?: string
+    /** Optional sha256 of the loader shim (plugins/core/index.js) — see isVerifiedOfficialCore. */
+    shimSha256?: string
     bytecodeTarget?: {
         node?: string
         platform?: string
@@ -36,18 +38,13 @@ interface OfficialCoreManifest {
 
 interface OfficialCoreTarget {
     indexSha256?: string
+    /** Optional sha256 of the loader shim (plugins/core/index.js) for this target. */
+    shimSha256?: string
     bytecodeTarget?: {
         node?: string
         platform?: string
         arch?: string
     }
-}
-
-interface PluginCatalog {
-    plugins?: Array<{
-        name?: string
-        sha256?: string
-    }>
 }
 
 interface PluginPackageManifest {
@@ -65,19 +62,61 @@ interface PluginPackageManifest {
     }
 }
 
+/** Handle returned by the out-of-process plugin sandbox (scripts/plugins/plugin-sandbox.js). */
+interface SandboxedPluginHandle {
+    name: string | null
+    version: string | null
+    hooks: { onBotInitialized: boolean; onAccountStart: boolean; onAccountEnd: boolean; destroy: boolean }
+    sinkCount: number
+    emitNotification(notification: unknown): Promise<void>
+    runLifecycle(name: string, payload?: unknown): Promise<void>
+    dispose(): void
+}
+
+type CreatePluginSandbox = (options: {
+    source: string
+    config?: Record<string, unknown>
+    apiVersion?: string
+    log?: PluginLogger
+    memoryLimitMb?: number
+    timeoutMs?: number
+}) => Promise<SandboxedPluginHandle>
+
+/** Downloads a marketplace plugin's raw source by its catalog `installUrl`. */
+type MarketplaceFetcher = (url: string) => Promise<Buffer | Uint8Array | string>
+
+/** Pulls the signed catalog { catalog, signature } from core-api. */
+type CatalogFetcher = (url: string) => Promise<{ catalog: string; signature: string }>
+
+/** Optional injection seam — tests pass local fetchers; runtime uses HTTPS. */
+export interface PluginManagerOptions {
+    marketplaceFetcher?: MarketplaceFetcher
+    /** Where to pull the signed catalog from (defaults to env MSRB_MARKETPLACE_CATALOG_URL). */
+    marketplaceCatalogUrl?: string
+    catalogFetcher?: CatalogFetcher
+}
+
 export class PluginManager {
     private bot: MicrosoftRewardsBot
     private plugins: IPlugin[] = []
     private pluginConfigs = new WeakMap<IPlugin, Record<string, unknown>>()
     private officialCorePlugins = new WeakSet<IPlugin>()
+    private sandboxedPlugins = new WeakSet<IPlugin>()
+    private readonly sandboxAccountKey = crypto.randomBytes(32)
+    private readonly marketplaceFetcher?: MarketplaceFetcher
+    private readonly marketplaceCatalogUrl?: string
+    private readonly catalogFetcher?: CatalogFetcher
     private registeredTasks: Partial<PremiumTaskMap> = {}
     private registeredSelectors: Record<string, Record<string, unknown>> = {}
     private diagnosticsProviders: PluginDiagnosticsProvider[] = []
     private notificationSinks: PluginNotificationSink[] = []
     private officialCoreEntitlement = false
 
-    constructor(bot: MicrosoftRewardsBot) {
+    constructor(bot: MicrosoftRewardsBot, options: PluginManagerOptions = {}) {
         this.bot = bot
+        this.marketplaceFetcher = options.marketplaceFetcher
+        this.marketplaceCatalogUrl = options.marketplaceCatalogUrl
+        this.catalogFetcher = options.catalogFetcher
     }
 
     /**
@@ -94,7 +133,35 @@ export class PluginManager {
 
         const { config: pluginConfig, hasFile: hasConfigFile } = this.loadPluginConfig()
 
-        const ignoredFiles = new Set(['README.md', 'plugins.jsonc', 'official-core.json', 'official-core.sig', 'catalog.json'])
+        // Local offline panic switch: disable every plugin except verified Core.
+        // Works without core-api — the incident-response control for a bad plugin.
+        const thirdPartyDisabled = process.env.MSRB_DISABLE_PLUGINS === '1'
+        if (thirdPartyDisabled && cluster.isPrimary) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                'MSRB_DISABLE_PLUGINS=1 set — loading only verified Core; all other plugins are disabled'
+            )
+        }
+
+        // Materialize any marketplace-sourced plugins declared in plugins.jsonc
+        // BEFORE the directory scan, so a freshly downloaded plugin is picked up in
+        // this same run. Primary-only (workers load what the primary installs); the
+        // MSRB_DISABLE_PLUGINS panic switch skips it entirely.
+        if (!thirdPartyDisabled && cluster.isPrimary) {
+            await this.installMarketplacePlugins(pluginConfig)
+        }
+
+        const ignoredFiles = new Set([
+            'README.md',
+            'plugins.jsonc',
+            'official-core.json',
+            'official-core.sig',
+            'catalog.json',
+            'marketplace.json',
+            'marketplace.sig',
+            'marketplace.example.json'
+        ])
         const entries = fs
             .readdirSync(pluginsDir, { withFileTypes: true })
             .filter(entry => !entry.name.startsWith('.') && !ignoredFiles.has(entry.name))
@@ -114,8 +181,13 @@ export class PluginManager {
         for (const entry of entries) {
             const entryName = this.getPluginEntryName(entry)
             const entryConfig = pluginConfig[entryName]
+            const forceCoreForHarvester = this.bot.isHarvesterMode && entryName === 'core'
 
-            if (hasConfigFile) {
+            if (thirdPartyDisabled && entryName !== 'core') {
+                continue
+            }
+
+            if (hasConfigFile && !forceCoreForHarvester) {
                 if (!entryConfig) {
                     this.bot.logger.debug(
                         'main',
@@ -136,9 +208,9 @@ export class PluginManager {
 
             try {
                 if (entry.isDirectory()) {
-                    await this.loadDirectoryPlugin(entryName, path.join(pluginsDir, entry.name), entryConfig?.config ?? {})
+                    await this.loadDirectoryPlugin(entryName, path.join(pluginsDir, entry.name), entryConfig)
                 } else if (entry.name.endsWith('.js') || entry.name.endsWith('.jsc')) {
-                    await this.loadPluginFile(entryName, path.join(pluginsDir, entry.name), entryConfig?.config ?? {})
+                    await this.loadPluginFile(entryName, path.join(pluginsDir, entry.name), entryConfig)
                 }
             } catch (error) {
                 this.bot.logger.error(
@@ -157,6 +229,295 @@ export class PluginManager {
             )
         } else {
             this.bot.logger.debug('main', 'PLUGIN-MANAGER', 'No plugins loaded - running core only')
+        }
+    }
+
+    /**
+     * Download + verify + install any `source: 'marketplace'` plugin declared in
+     * plugins.jsonc whose source isn't already present (or is outdated) on disk.
+     * Self-healing: runs every startup and re-materializes a plugin that an
+     * auto-update or the user may have removed (plugins.jsonc itself is preserved
+     * across updates, so the intent to keep the plugin survives). Fail-closed — the
+     * signed catalog must verify before anything is fetched, and each plugin's bytes
+     * must match the catalog's pinned sha256 (enforced by ensureMarketplacePlugin).
+     */
+    private async installMarketplacePlugins(pluginConfig: Record<string, PluginConfigEntry>): Promise<void> {
+        const marketplaceEntries = Object.entries(pluginConfig).filter(
+            ([, entry]) => entry && entry.source === 'marketplace' && entry.enabled !== false
+        )
+        if (marketplaceEntries.length === 0) return
+
+        // Refresh the signed catalog from core-api first (best-effort): cache it to
+        // plugins/marketplace.json(+.sig) so a new publish reaches the bot without a
+        // bot update. Offline / failure -> fall back to the cached copy (fail-closed
+        // happens later in verify). Only runs when a catalog URL is configured, so
+        // tests stay offline.
+        const catalogUrl = this.marketplaceCatalogUrl ?? process.env.MSRB_MARKETPLACE_CATALOG_URL
+        if (catalogUrl) {
+            try {
+                await this.syncMarketplaceCatalog(catalogUrl)
+            } catch (error) {
+                this.bot.logger.warn(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Could not refresh the marketplace catalog from ${catalogUrl}; using the cached copy: ${error instanceof Error ? error.message : String(error)}`
+                )
+            }
+        }
+
+        // Lazy-require the network-free verifier + installer (kept off the hot path).
+        let mp: {
+            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string; minSequence?: number }): {
+                ok: boolean
+                reason?: string
+                catalog?: unknown
+                sequence?: number
+                expired?: boolean
+            }
+            isPluginStale(publishedBotVersion?: string | null, botVersion?: string, window?: number): boolean
+        }
+        let installer: {
+            ensureMarketplacePlugin(options: {
+                root: string
+                name: string
+                requestedVersion?: string
+                autoUpdate?: boolean
+                trust?: 'full' | 'sandbox'
+                catalog: unknown
+                fetcher: MarketplaceFetcher
+                botVersion?: string
+                apiVersion?: string
+                now?: string
+            }): Promise<{ installed: boolean; reason: string; version?: string; updateAvailable?: string; publishedBotVersion?: string | null }>
+        }
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            mp = require('../../scripts/security/marketplace-catalog')
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            installer = require('../../scripts/plugins/plugin-installer')
+        } catch (error) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Marketplace installer unavailable; ${marketplaceEntries.length} marketplace plugin(s) will not be installed: ${error instanceof Error ? error.message : String(error)}`
+            )
+            return
+        }
+
+        const verification = mp.verifyMarketplaceCatalog({
+            root: process.cwd(),
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined,
+            minSequence: this.readPersistedMarketplaceSequence() ?? undefined
+        })
+        if (!verification.ok) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Marketplace catalog unavailable (${verification.reason}); ${marketplaceEntries.length} marketplace plugin(s) will not be installed`
+            )
+            return
+        }
+        // Verified good — raise the anti-rollback floor so a later replayed older catalog
+        // (even if validly signed and unexpired) is rejected. Only ever moves forward.
+        this.persistMarketplaceSequence(verification.sequence)
+        if (verification.expired) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                'Marketplace catalog is stale; skipping marketplace plugin installation until it refreshes'
+            )
+            return
+        }
+
+        const fetcher = this.marketplaceFetcher ?? this.defaultMarketplaceFetcher()
+        if (!fetcher) {
+            this.bot.logger.warn('main', 'PLUGIN-MANAGER', 'Marketplace fetcher unavailable; cannot download marketplace plugins')
+            return
+        }
+
+        const botVersion = this.readBotVersion()
+        for (const [name, entry] of marketplaceEntries) {
+            try {
+                const result = await installer.ensureMarketplacePlugin({
+                    root: process.cwd(),
+                    name,
+                    requestedVersion: entry.version,
+                    autoUpdate: entry.autoUpdate,
+                    trust: entry.trust,
+                    catalog: verification.catalog,
+                    fetcher,
+                    botVersion,
+                    apiVersion: PLUGIN_API_VERSION,
+                    now: new Date().toISOString()
+                })
+                this.logMarketplaceInstall(name, result)
+                // Auto bot-version staleness: the plugin was stamped (server-side) with
+                // the bot version at publish time. We don't block — just warn loudly when
+                // this bot has moved well ahead of that stamp (also covers headless/CLI).
+                if (result.installed && result.publishedBotVersion && cluster.isPrimary) {
+                    const staleWindow = Number(process.env.MSRB_PLUGIN_STALE_WINDOW) || undefined
+                    if (mp.isPluginStale(result.publishedBotVersion, botVersion, staleWindow)) {
+                        this.bot.logger.warn(
+                            'main',
+                            'PLUGIN-MANAGER',
+                            `Community plugin "${name}" was published for bot v${result.publishedBotVersion}; this bot (v${botVersion}) is well ahead, so it MAY be outdated. It still runs — consider updating it or asking the author to republish.`
+                        )
+                    }
+                }
+            } catch (error) {
+                this.bot.logger.error(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Marketplace install failed for "${name}": ${error instanceof Error ? error.message : String(error)}`
+                )
+            }
+        }
+    }
+
+    /** Real runtime fetcher: a hardened HTTPS GET (scripts/plugins/marketplace-fetch.js). */
+    private defaultMarketplaceFetcher(): MarketplaceFetcher | undefined {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { fetchMarketplaceAsset } = require('../../scripts/plugins/marketplace-fetch') as {
+                fetchMarketplaceAsset: (url: string) => Promise<Buffer>
+            }
+            return (url: string) => fetchMarketplaceAsset(url)
+        } catch {
+            return undefined
+        }
+    }
+
+    /** Pull the signed catalog from core-api and cache it to plugins/marketplace.json(+.sig). */
+    private async syncMarketplaceCatalog(url: string): Promise<void> {
+        const fetchCatalog = this.catalogFetcher ?? this.defaultCatalogFetcher()
+        if (!fetchCatalog) throw new Error('no catalog fetcher available')
+        const { catalog, signature } = await fetchCatalog(url)
+        if (typeof catalog !== 'string' || typeof signature !== 'string') {
+            throw new Error('catalog response must be { catalog, signature }')
+        }
+
+        // Verify-before-swap: the fetched bytes must pass signature + format + anti-rollback
+        // (sequence >= the highest verified so far) IN MEMORY before we touch disk. This stops
+        // a tampered/rolled-back/unsigned response from clobbering the last known-good cached
+        // catalog (a fail-closed DoS) or from delivering a rollback that re-enables a revoked
+        // plugin. Never replace a verified-good catalog with unverified bytes.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mp = require('../../scripts/security/marketplace-catalog') as {
+            verifyCatalogBytes(
+                payload: Buffer | string,
+                signature: string,
+                options: { keysDir?: string; minSequence?: number }
+            ): { ok: boolean; reason?: string; sequence?: number }
+        }
+        const check = mp.verifyCatalogBytes(Buffer.from(catalog, 'utf8'), signature, {
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined,
+            minSequence: this.readPersistedMarketplaceSequence() ?? undefined
+        })
+        if (!check.ok) {
+            throw new Error(`refusing to cache an unverified marketplace catalog (${check.reason})`)
+        }
+
+        const dir = path.resolve(process.cwd(), 'plugins')
+        fs.mkdirSync(dir, { recursive: true })
+        this.atomicWriteFile(path.join(dir, 'marketplace.json'), catalog)
+        this.atomicWriteFile(path.join(dir, 'marketplace.sig'), `${signature.trim()}\n`)
+        // Raise the floor only AFTER the verified bytes are safely persisted.
+        this.persistMarketplaceSequence(check.sequence)
+    }
+
+    private defaultCatalogFetcher(): CatalogFetcher | undefined {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { fetchSignedCatalog } = require('../../scripts/plugins/marketplace-fetch') as {
+                fetchSignedCatalog: (url: string) => Promise<{ catalog: string; signature: string }>
+            }
+            return (url: string) => fetchSignedCatalog(url)
+        } catch {
+            return undefined
+        }
+    }
+
+    private atomicWriteFile(filePath: string, data: string): void {
+        const tmp = `${filePath}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`
+        fs.writeFileSync(tmp, data)
+        fs.renameSync(tmp, filePath)
+    }
+
+    /** Where the anti-rollback floor (highest verified catalog sequence) is persisted. */
+    private marketplaceSequencePath(): string {
+        return path.resolve(process.cwd(), 'plugins', '.marketplace-seq')
+    }
+
+    /**
+     * Highest marketplace catalog `sequence` ever VERIFIED on this machine, or null.
+     * Passed as `minSequence` to every catalog verify so a replayed older-but-still-
+     * signed catalog (which could re-enable a revoked/killed plugin within the TTL
+     * window) is rejected as a rollback.
+     */
+    private readPersistedMarketplaceSequence(): number | null {
+        try {
+            const raw = fs.readFileSync(this.marketplaceSequencePath(), 'utf8').trim()
+            const value = Number(raw)
+            return Number.isFinite(value) ? value : null
+        } catch {
+            return null
+        }
+    }
+
+    /** Raise the persisted anti-rollback floor. Monotonic — only ever moves forward. */
+    private persistMarketplaceSequence(sequence: number | undefined): void {
+        if (typeof sequence !== 'number' || !Number.isFinite(sequence)) return
+        const current = this.readPersistedMarketplaceSequence()
+        if (current !== null && sequence <= current) return
+        try {
+            const dir = path.resolve(process.cwd(), 'plugins')
+            fs.mkdirSync(dir, { recursive: true })
+            this.atomicWriteFile(this.marketplaceSequencePath(), `${sequence}\n`)
+        } catch {
+            // Best-effort: a non-writable plugins/ just means the floor doesn't persist.
+        }
+    }
+
+    private readBotVersion(): string | undefined {
+        try {
+            const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')) as { version?: string }
+            return typeof pkg.version === 'string' ? pkg.version : undefined
+        } catch {
+            return undefined
+        }
+    }
+
+    /** Append every install attempt to .plugins-marketplace.log + surface notable outcomes. */
+    private logMarketplaceInstall(
+        name: string,
+        result: { installed: boolean; reason: string; version?: string; updateAvailable?: string }
+    ): void {
+        const line = `${new Date().toISOString()} ${name} installed=${result.installed} reason=${result.reason}${result.version ? ` version=${result.version}` : ''}${result.updateAvailable ? ` updateAvailable=${result.updateAvailable}` : ''}\n`
+        try {
+            fs.appendFileSync(path.resolve(process.cwd(), '.plugins-marketplace.log'), line)
+        } catch {
+            // logging is best-effort
+        }
+        if (result.installed && result.reason === 'installed') {
+            this.bot.logger.info('main', 'PLUGIN-MANAGER', `Installed marketplace plugin: ${name}@${result.version}`)
+        } else if (result.installed && result.reason === 'updated') {
+            this.bot.logger.info('main', 'PLUGIN-MANAGER', `Auto-updated marketplace plugin: ${name}@${result.version}`)
+        } else if (result.reason === 'revoked' || result.reason === 'kill-switch') {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Marketplace plugin "${name}" was ${result.reason === 'kill-switch' ? 'disabled by the marketplace kill switch' : 'revoked'} — its downloaded files were removed`
+            )
+        } else if (!result.installed) {
+            this.bot.logger.warn('main', 'PLUGIN-MANAGER', `Marketplace plugin "${name}" not installed (${result.reason})`)
+        }
+        // A held/pinned plugin sitting on an older version than the latest approved one.
+        if (result.installed && result.updateAvailable && result.updateAvailable !== result.version) {
+            this.bot.logger.info(
+                'main',
+                'PLUGIN-MANAGER',
+                `Update available for "${name}": v${result.updateAvailable} (held — apply it from the Desk Plugins page)`
+            )
         }
     }
 
@@ -303,30 +664,57 @@ export class PluginManager {
     private async loadDirectoryPlugin(
         entryName: string,
         dirPath: string,
-        pluginConfig: Record<string, unknown>
+        entryConfig: PluginConfigEntry | undefined
     ): Promise<void> {
         const jscPath = path.join(dirPath, 'index.jsc')
         const jsPath = path.join(dirPath, 'index.js')
 
         if (entryName === 'core' && fs.existsSync(jsPath)) {
-            await this.loadPluginFile(entryName, jsPath, pluginConfig)
+            await this.loadPluginFile(entryName, jsPath, entryConfig)
         } else if (fs.existsSync(jscPath)) {
-            await this.loadPluginFile(entryName, jscPath, pluginConfig)
+            await this.loadPluginFile(entryName, jscPath, entryConfig)
         } else if (fs.existsSync(jsPath)) {
-            await this.loadPluginFile(entryName, jsPath, pluginConfig)
+            await this.loadPluginFile(entryName, jsPath, entryConfig)
         }
     }
 
     private async loadPluginFile(
         entryName: string,
         filePath: string,
-        pluginConfig: Record<string, unknown>
+        entryConfig: PluginConfigEntry | undefined
     ): Promise<void> {
+        const pluginConfig = entryConfig?.config ?? {}
+
         // Verify the official Core plugin BEFORE loading its bytecode
         const isOfficialCore = this.isVerifiedOfficialCore(entryName, filePath)
 
-        // Enforce the catalog.json sha256 for third-party plugins (fail closed on mismatch)
-        if (!isOfficialCore) this.assertCatalogHash(entryName, filePath)
+        // A marketplace plugin is ALWAYS vouched for by the signed catalog (signature +
+        // pinned sha256 + not revoked + not stale) — whether it runs sandboxed OR was
+        // locally elevated to Trusted Mode. Trusted Mode skips the sandbox, so verifying
+        // here (before any of its code runs) is what keeps an elevated marketplace plugin
+        // honest. Fail closed.
+        if (!isOfficialCore && entryConfig?.source === 'marketplace') {
+            this.assertMarketplaceTrust(entryName, filePath, entryConfig)
+        }
+
+        const trust = this.resolvePluginTrust(isOfficialCore, entryConfig)
+
+        // Loud, unmissable warning when a COMMUNITY (marketplace) plugin has been granted
+        // full in-process access. It is an explicit local opt-in, so surface it on every
+        // run — including headless/CLI, where there is no Desk prompt to remind you.
+        if (trust === 'trusted' && entryConfig?.source === 'marketplace' && cluster.isPrimary) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `⚠ Community plugin "${entryName}" is running in TRUSTED MODE (full access, NOT sandboxed). Only keep this on for plugins you fully trust.`
+            )
+        }
+
+        // Untrusted third-party plugins run in a V8 isolate with no Node APIs.
+        // Core and trusted/first-party plugins keep the in-process require() path.
+        if (trust === 'sandboxed') {
+            return this.loadSandboxedPlugin(entryName, filePath, entryConfig)
+        }
 
         if (filePath.endsWith('.jsc') || this.isOfficialCoreLoader(entryName, filePath)) {
             this.assertBytecodeTarget(entryName, filePath)
@@ -387,6 +775,231 @@ export class PluginManager {
         }
     }
 
+    /**
+     * Decide how a plugin runs:
+     *  - `core`      — the verified official Core plugin (in-process, full trust).
+     *  - `sandboxed` — untrusted: marketplace-sourced, explicitly `trust: 'sandbox'`,
+     *                  OR un-configured (no plugins.jsonc entry — see below).
+     *  - `trusted`   — in-process: explicit `trust: 'full'` (Trusted Mode), or a local
+     *                  first-party plugin EXPLICITLY listed in plugins.jsonc with no
+     *                  trust hint (backward-compatible first-party contract).
+     */
+    private resolvePluginTrust(isOfficialCore: boolean, entryConfig: PluginConfigEntry | undefined): 'core' | 'sandboxed' | 'trusted' {
+        if (isOfficialCore) return 'core'
+        if (entryConfig?.trust === 'full') return 'trusted'
+        if (entryConfig?.trust === 'sandbox' || entryConfig?.source === 'marketplace') return 'sandboxed'
+        // Fail safe for UN-configured plugins (no plugins.jsonc, or a file simply dropped
+        // into plugins/): default to the sandbox so "drop a file -> in-process RCE without
+        // a signature" is no longer possible. Full in-process access requires either an
+        // explicit `trust: 'full'` or an explicit plugins.jsonc entry (first-party).
+        if (!entryConfig) return 'sandboxed'
+        return 'trusted'
+    }
+
+    /**
+     * Load an untrusted plugin inside a V8 isolate (no Node APIs, no secrets). The
+     * plugin's source is read and handed to scripts/plugins/plugin-sandbox.js; the returned
+     * handle is adapted to the IPlugin interface so the rest of the manager is
+     * agnostic to how the plugin runs. If isolation is unavailable on this platform
+     * we FAIL CLOSED (never run untrusted code in-process).
+     */
+    private async loadSandboxedPlugin(
+        entryName: string,
+        filePath: string,
+        entryConfig: PluginConfigEntry | undefined
+    ): Promise<void> {
+        if (filePath.endsWith('.jsc')) {
+            throw new Error(`Sandboxed plugin "${entryName}" must ship JavaScript source (.js), not bytecode (.jsc)`)
+        }
+
+        // Marketplace-sourced plugins are vouched for by the SIGNED catalog up in
+        // loadPluginFile (before this runs), so both the sandboxed and Trusted-Mode
+        // paths are covered by the same fail-closed check.
+
+        let createPluginSandbox: CreatePluginSandbox
+        try {
+            // Lazy-require: isolated-vm is a native module. If it can't load here,
+            // refuse the plugin rather than run untrusted code unsandboxed.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            ;({ createPluginSandbox } = require('../../scripts/plugins/plugin-sandbox') as { createPluginSandbox: CreatePluginSandbox })
+        } catch (error) {
+            this.bot.logger.warn(
+                'main',
+                'PLUGIN-MANAGER',
+                `Plugin isolation is unavailable (${error instanceof Error ? error.message : String(error)}); refusing to load untrusted plugin "${entryName}" unsandboxed`
+            )
+            return
+        }
+
+        const pluginConfig = entryConfig?.config ?? {}
+        const source = fs.readFileSync(filePath, 'utf-8')
+        const sandbox = await createPluginSandbox({
+            source,
+            config: pluginConfig,
+            apiVersion: PLUGIN_API_VERSION,
+            log: this.createLogger(),
+            memoryLimitMb: 64,
+            timeoutMs: 5000
+        })
+
+        if (typeof sandbox.name !== 'string' || typeof sandbox.version !== 'string') {
+            sandbox.dispose()
+            throw new Error(`Sandboxed plugin "${entryName}" must export string { name, version }`)
+        }
+        if (sandbox.name !== entryName) {
+            sandbox.dispose()
+            throw new Error(`Plugin name "${sandbox.name}" must match configured entry "${entryName}"`)
+        }
+
+        // Circuit breaker: if a sandboxed plugin repeatedly throws or times out, disable
+        // it for the rest of the run so a flaky/hostile plugin cannot stall the bot.
+        // (Catastrophic V8 OOM crashes are a separate, harder problem — see the child-
+        // process hosting follow-up; this handles the recoverable failure modes.)
+        const breaker = { failures: 0, tripped: false }
+        const MAX_FAILURES = 3
+        const guard = (action: string, run: () => Promise<void>): Promise<void> => {
+            if (breaker.tripped) return Promise.resolve()
+            return run().catch((error: unknown) => {
+                breaker.failures += 1
+                const message = error instanceof Error ? error.message : String(error)
+                this.bot.logger.warn(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Sandboxed plugin "${entryName}" ${action} failed (${breaker.failures}/${MAX_FAILURES}): ${message}`
+                )
+                if (breaker.failures >= MAX_FAILURES && !breaker.tripped) {
+                    breaker.tripped = true
+                    this.bot.logger.error(
+                        'main',
+                        'PLUGIN-MANAGER',
+                        `Sandboxed plugin "${entryName}" disabled after ${MAX_FAILURES} failures`
+                    )
+                    try { sandbox.dispose() } catch {}
+                }
+            })
+        }
+
+        const adapter: IPlugin = {
+            name: sandbox.name,
+            version: sandbox.version,
+            register: () => {}, // registration already ran inside the isolate
+            destroy: () => sandbox.dispose()
+        }
+        if (sandbox.hooks.onBotInitialized) {
+            adapter.onBotInitialized = () => guard('onBotInitialized', () => sandbox.runLifecycle('onBotInitialized'))
+        }
+        if (sandbox.hooks.onAccountStart) {
+            adapter.onAccountStart = context =>
+                guard('onAccountStart', () => sandbox.runLifecycle('onAccountStart', { email: this.tokenizeAccount(context.email) }))
+        }
+        if (sandbox.hooks.onAccountEnd) {
+            adapter.onAccountEnd = context =>
+                guard('onAccountEnd', () =>
+                    sandbox.runLifecycle('onAccountEnd', {
+                        email: this.tokenizeAccount(context.email),
+                        result: { ...context.result, email: this.tokenizeAccount(context.result.email) }
+                    })
+                )
+        }
+
+        // Forward host notifications into the isolate so the plugin's own sinks fire.
+        if (sandbox.sinkCount > 0) {
+            this.notificationSinks.push(notification => guard('notify', () => sandbox.emitNotification(notification)))
+        }
+
+        this.plugins.push(adapter)
+        this.pluginConfigs.set(adapter, pluginConfig)
+        this.sandboxedPlugins.add(adapter)
+
+        if (cluster.isPrimary) {
+            this.bot.logger.info('main', 'PLUGIN-MANAGER', `Registered sandboxed plugin: ${adapter.name}@${adapter.version}`)
+        }
+    }
+
+    /**
+     * Enforce marketplace trust for a `source: 'marketplace'` plugin: the signed
+     * catalog must verify (signature + freshness), list this plugin with a pinned
+     * sha256 that matches the on-disk file, and not have revoked it. Throws (fail
+     * closed) on any failure — the caller's catch skips the plugin.
+     */
+    private assertMarketplaceTrust(entryName: string, filePath: string, entryConfig: PluginConfigEntry | undefined): void {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mp = require('../../scripts/security/marketplace-catalog') as {
+            verifyMarketplaceCatalog(options: { root?: string; keysDir?: string; minSequence?: number }): {
+                ok: boolean
+                reason?: string
+                catalog?: unknown
+                sequence?: number
+                expired?: boolean
+            }
+            findEntry(catalog: unknown, name: string, version?: string): { sha256?: string; version?: string; files?: Array<{ path?: string; sha256?: string }>; manifestSha256?: string } | undefined
+            isRevoked(catalog: unknown, opts: { name?: string; version?: string; sha256?: string }): boolean
+        }
+
+        const result = mp.verifyMarketplaceCatalog({
+            root: process.cwd(),
+            keysDir: process.env.MSRB_MARKETPLACE_KEYS_DIR || undefined,
+            minSequence: this.readPersistedMarketplaceSequence() ?? undefined
+        })
+        if (!result.ok) {
+            throw new Error(`marketplace catalog is not trusted (${result.reason}); refusing "${entryName}"`)
+        }
+        if (result.expired) {
+            throw new Error(`marketplace catalog is stale; refusing "${entryName}"`)
+        }
+        // Verified + fresh: raise the anti-rollback floor (primary-only to avoid worker
+        // write races; reads happen everywhere so enforcement still applies in workers).
+        if (cluster.isPrimary) {
+            this.persistMarketplaceSequence(result.sequence)
+        }
+        const entry = mp.findEntry(result.catalog, entryName, entryConfig?.version)
+        if (!entry || !entry.sha256) {
+            throw new Error(`"${entryName}" is not pinned in the signed marketplace catalog`)
+        }
+        if (Array.isArray(entry.files) && entry.files.length > 0) {
+            // Multi-file plugin: every file in the SIGNED manifest must match on disk
+            // (its sha256), and there must be an index.js entry point. Fail closed.
+            const pluginDir = path.dirname(filePath)
+            if (!entry.files.some(file => file && file.path === 'index.js')) {
+                throw new Error(`"${entryName}" manifest has no index.js entry point`)
+            }
+            for (const file of entry.files) {
+                if (!file || typeof file.path !== 'string' || typeof file.sha256 !== 'string') {
+                    throw new Error(`"${entryName}" has a malformed manifest entry`)
+                }
+                if (file.path.includes('..') || path.isAbsolute(file.path) || /^[\\/]/.test(file.path)) {
+                    throw new Error(`"${entryName}" manifest path is unsafe: ${file.path}`)
+                }
+                const onDisk = path.join(pluginDir, file.path)
+                if (onDisk !== pluginDir && !onDisk.startsWith(pluginDir + path.sep)) {
+                    throw new Error(`"${entryName}" manifest path escapes the plugin directory: ${file.path}`)
+                }
+                const fileHash = crypto.createHash('sha256').update(fs.readFileSync(onDisk)).digest('hex')
+                if (fileHash.toLowerCase() !== file.sha256.toLowerCase()) {
+                    throw new Error(`"${entryName}" file "${file.path}" sha256 does not match the signed marketplace catalog`)
+                }
+            }
+        } else {
+            const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+            if (fileHash.toLowerCase() !== String(entry.sha256).toLowerCase()) {
+                throw new Error(`"${entryName}" sha256 does not match the signed marketplace catalog`)
+            }
+        }
+        if (mp.isRevoked(result.catalog, { name: entryName, version: entry.version, sha256: entry.sha256 })) {
+            throw new Error(`"${entryName}" is revoked by the marketplace catalog`)
+        }
+    }
+
+    /**
+     * Stable opaque token for an account email so untrusted (sandboxed) plugins can
+     * correlate per-account state within a run WITHOUT receiving PII. The HMAC key is
+     * random per process, so tokens are not linkable across runs/installs. Trusted
+     * in-process plugins keep receiving the real email (unchanged public contract).
+     */
+    private tokenizeAccount(email: string): string {
+        return 'acct_' + crypto.createHmac('sha256', this.sandboxAccountKey).update(String(email ?? '')).digest('hex').slice(0, 16)
+    }
+
     private isVerifiedOfficialCore(entryName: string, filePath: string): boolean {
         if (entryName !== 'core' || !['index.jsc', 'index.js'].includes(path.basename(filePath))) {
             return false
@@ -429,29 +1042,24 @@ export class PluginManager {
             throw new Error('Official Core bytecode checksum mismatch')
         }
 
+        // Pin the LOADED entrypoint too, not just the bytecode it loads. `filePath` here
+        // is the tiny in-process shim (plugins/core/index.js) that require()s the verified
+        // .jsc — a tampered shim could load a different file while the bytecode hash still
+        // "passes". Enforced when the signed manifest pins the shim hash; current manifests
+        // may omit it (absent = skip, so existing signed Cores keep loading — no regression).
+        // TODO(review): have the signer ALWAYS populate shimSha256 in official-core.json
+        // (and re-sign), then make this mandatory for entryName 'core' loaded via index.js.
+        if (path.basename(filePath) === 'index.js') {
+            const shimSha = target.shimSha256 ?? manifest.shimSha256
+            if (shimSha) {
+                const shimHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+                if (shimHash.toLowerCase() !== String(shimSha).toLowerCase()) {
+                    throw new Error('Official Core loader (index.js) checksum mismatch')
+                }
+            }
+        }
+
         return true
-    }
-
-    /**
-     * Enforce the catalog.json sha256 pin for non-official (third-party) plugins.
-     * Fails closed: if the catalog entry has a sha256 that does not match the file,
-     * this throws and the plugin is skipped by the caller's catch. If the plugin is
-     * absent from the catalog or has no sha256, this is permissive (local/dev plugins).
-     */
-    private assertCatalogHash(entryName: string, filePath: string): void {
-        const catalogPath = path.resolve(process.cwd(), 'plugins', 'catalog.json')
-        const catalog = this.readJsonFile<PluginCatalog>(catalogPath)
-        const entry = catalog?.plugins?.find(plugin => plugin?.name === entryName)
-        const expected = entry?.sha256
-        if (!expected) {
-            // Not catalogued or no pinned hash — treat as a local/dev plugin (permissive).
-            return
-        }
-
-        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
-        if (fileHash.toLowerCase() !== expected.toLowerCase()) {
-            throw new Error(`Plugin "${entryName}" checksum mismatch against plugins/catalog.json`)
-        }
     }
 
     private assertBytecodeTarget(entryName: string, filePath: string): void {
@@ -489,6 +1097,15 @@ export class PluginManager {
     }
 
     private currentCoreTargetId(): string {
+        // Honor MSRB_CORE_TARGET exactly the way the loader shim (plugins/core/index.js)
+        // does, with the SAME format guard. Otherwise the shim could load
+        // targets/<env>/index.jsc while verification hashed targets/<auto>/index.jsc —
+        // verifying one bytecode file but executing another. Aligning them here keeps
+        // "verified target === loaded target".
+        const envTarget = process.env.MSRB_CORE_TARGET
+        if (envTarget && /^(win32|linux|darwin)-(x64|arm64)-node-\d+\.\d+\.\d+$/.test(envTarget)) {
+            return envTarget
+        }
         return `${process.platform}-${process.arch}-node-${process.versions.node}`
     }
 

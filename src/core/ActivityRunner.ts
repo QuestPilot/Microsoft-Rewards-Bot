@@ -77,7 +77,10 @@ export default class ActivityRunner {
         if (this.premiumTasks.doDoubleSearchPoints) {
             return this.premiumTasks.doDoubleSearchPoints(promotion)
         }
-        this.coreHint('Double Search Points', 'Core can activate eligible double-search promotions when Microsoft offers them.')
+        this.coreHint(
+            'Double Search Points',
+            'Core can activate eligible double-search promotions when Microsoft offers them.'
+        )
     }
 
     doAppReward = async (promotion: Promotion): Promise<void> => {
@@ -105,7 +108,10 @@ export default class ActivityRunner {
         if (this.premiumTasks.doDailyStreak) {
             return this.premiumTasks.doDailyStreak(page)
         }
-        this.coreHint('Daily Streak', 'Core can read streak details and sync streak protection from the Rewards dashboard.')
+        this.coreHint(
+            'Daily Streak',
+            'Core can read streak details and sync streak protection from the Rewards dashboard.'
+        )
         return null
     }
 
@@ -120,7 +126,10 @@ export default class ActivityRunner {
         if (this.premiumTasks.collectDashboardInfo) {
             return this.premiumTasks.collectDashboardInfo(page)
         }
-        this.coreHint('Dashboard Info', 'Core adds richer dashboard snapshots, ready-to-claim cards, streak details, and remote dashboard data.')
+        this.coreHint(
+            'Dashboard Info',
+            'Core adds richer dashboard snapshots, ready-to-claim cards, streak details, and remote dashboard data.'
+        )
         return {
             userName: null,
             level: null,
@@ -153,7 +162,10 @@ export default class ActivityRunner {
         if (this.premiumTasks.doTemporaryPunchcards) {
             return this.premiumTasks.doTemporaryPunchcards(page)
         }
-        this.coreHint('Temporary Punchcards', 'Core can attempt supported temporary dashboard punchcards when they appear.')
+        this.coreHint(
+            'Temporary Punchcards',
+            'Core can attempt supported temporary dashboard punchcards when they appear.'
+        )
         return { visited: 0, completedSteps: 0, skippedSteps: 0 }
     }
 
@@ -174,7 +186,7 @@ export default class ActivityRunner {
             'Dashboard Capture',
             'Core can harvest full-fidelity dashboard page snapshots (HTML + RSC flight data) for selector maintenance.'
         )
-        return { captured: 0, routes: [], outputDir: 'Page', problems: [] }
+        return { captured: 0, routes: [], outputDir: null, problems: [], analyses: [], failures: [] }
     }
 
     private coreHint(feature: string, detail: string): void {

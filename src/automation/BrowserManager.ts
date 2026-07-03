@@ -207,17 +207,25 @@ class BrowserManager {
                 for (const origin of sessionData.storageState) {
                     if (origin.localStorage?.length) {
                         const page = await context.newPage()
-                        await page
-                            .goto(origin.origin, { waitUntil: 'domcontentloaded', timeout: 10000 })
-                            .catch(() => {})
-                        await page.evaluate((items: Array<{ name: string; value: string }>) => {
-                            for (const item of items) {
-                                try {
-                                    localStorage.setItem(item.name, item.value)
-                                } catch {}
-                            }
-                        }, origin.localStorage)
-                        await page.close()
+                        try {
+                            await page
+                                .goto(origin.origin, { waitUntil: 'domcontentloaded', timeout: 10000 })
+                                .catch(() => {})
+                            // A blocked/about:blank navigation makes setItem throw a
+                            // SecurityError; swallow it so a single bad origin can never
+                            // abort the whole browser launch.
+                            await page
+                                .evaluate((items: Array<{ name: string; value: string }>) => {
+                                    for (const item of items) {
+                                        try {
+                                            localStorage.setItem(item.name, item.value)
+                                        } catch {}
+                                    }
+                                }, origin.localStorage)
+                                .catch(() => {})
+                        } finally {
+                            await page.close().catch(() => {})
+                        }
                     }
                 }
             }
@@ -347,7 +355,11 @@ class BrowserManager {
     async generateFingerprint(isMobile: boolean, browser: 'chrome' | 'edge' = 'chrome') {
         const fingerPrintData = new FingerprintGenerator().getFingerprint({
             devices: isMobile ? ['mobile'] : ['desktop'],
-            operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'linux'],
+            // Restrict the generated OS so the generated platform matches the
+            // forced User-Agent (Windows desktop / Android mobile). Allowing
+            // linux/ios here produced fingerprints whose navigator.platform
+            // contradicted the UA — a trivial CreepJS/BrowserScan bot tell.
+            operatingSystems: isMobile ? ['android'] : ['windows'],
             browsers: [{ name: browser }]
         })
 

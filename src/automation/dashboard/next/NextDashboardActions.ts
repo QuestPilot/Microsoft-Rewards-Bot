@@ -1,6 +1,7 @@
 import type { Page } from 'patchright'
 
 import type { MicrosoftRewardsBot } from '../../../index'
+import { URLS } from '../../DashboardSelectors'
 import type { DashboardActions, ReportActivityParams } from '../DashboardActions'
 
 /**
@@ -26,8 +27,8 @@ export class NextDashboardActions implements DashboardActions {
      * Daily Set hashes.
      */
     private async ensureOnEarn(page: Page): Promise<void> {
-        if (!page.url().includes('rewards.bing.com/earn')) {
-            await page.goto('https://rewards.bing.com/earn', { waitUntil: 'domcontentloaded' }).catch(() => {})
+        if (!page.url().includes(URLS.earn)) {
+            await page.goto(URLS.earn, { waitUntil: 'domcontentloaded' }).catch(() => {})
             await this.bot.utils.wait(2000)
         }
     }
@@ -100,7 +101,7 @@ export class NextDashboardActions implements DashboardActions {
                 try {
                     await page.goto(params.destinationUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 })
                     await this.bot.utils.wait(this.bot.utils.randomDelay(3000, 6000))
-                    await page.goto('https://rewards.bing.com/earn', { waitUntil: 'domcontentloaded', timeout: 15_000 })
+                    await page.goto(URLS.earn, { waitUntil: 'domcontentloaded', timeout: 15_000 })
                     await this.bot.utils.wait(2000)
                     // Navigation succeeded. For punchcard/OCID activities Microsoft credits
                     // the visit asynchronously — the balance check right after this call will

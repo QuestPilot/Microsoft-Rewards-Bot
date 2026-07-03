@@ -19,7 +19,7 @@ export class QueryProvider {
     ): Promise<string[]> {
         const {
             shuffle = false,
-            sourceOrder = ['google', 'wikipedia', 'reddit', 'local'],
+            sourceOrder = ['google', 'wikipedia', 'wikirandom', 'reddit', 'hackernews', 'local'],
             related = true,
             langCode = 'en',
             geoLocale = 'US'
@@ -34,10 +34,7 @@ export class QueryProvider {
 
             const topicLists: string[][] = []
 
-            const sourceHandlers: Record<
-                'google' | 'wikipedia' | 'reddit' | 'local',
-                (() => Promise<string[]>) | (() => string[])
-            > = {
+            const sourceHandlers: Record<QueryEngine, (() => Promise<string[]>) | (() => string[])> = {
                 google: async () => {
                     const topics = await this.getGoogleTrends(geoLocale.toUpperCase()).catch(() => [])
                     this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `google: ${topics.length}`)
@@ -48,9 +45,19 @@ export class QueryProvider {
                     this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `wikipedia: ${topics.length}`)
                     return topics
                 },
+                wikirandom: async () => {
+                    const topics = await this.getWikipediaRandom(langCode).catch(() => [])
+                    this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `wikirandom: ${topics.length}`)
+                    return topics
+                },
                 reddit: async () => {
                     const topics = await this.getRedditTopics().catch(() => [])
                     this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `reddit: ${topics.length}`)
+                    return topics
+                },
+                hackernews: async () => {
+                    const topics = await this.getHackerNewsTopics().catch(() => [])
+                    this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `hackernews: ${topics.length}`)
                     return topics
                 },
                 local: () => {
@@ -441,6 +448,82 @@ export class QueryProvider {
                 this.bot.isMobile,
                 'SEARCH-REDDIT',
                 `request failed | subreddit=${subreddit} | error=${
+                    error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)
+                }`
+            )
+            return []
+        }
+    }
+
+    async getWikipediaRandom(langCode = 'en'): Promise<string[]> {
+        try {
+            const request: AxiosRequestConfig = {
+                url: `https://${encodeURIComponent(
+                    langCode
+                )}.wikipedia.org/w/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json&origin=*`,
+                method: 'GET',
+                headers: {
+                    ...(this.bot.fingerprint?.headers ?? {})
+                }
+            }
+
+            const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine)
+            const pages = response.data?.query?.random ?? []
+            const out: string[] = Array.isArray(pages)
+                ? pages.map((p: { title?: string }) => p.title?.trim() ?? '').filter(Boolean)
+                : []
+
+            if (!out.length) {
+                this.bot.logger.debug(
+                    this.bot.isMobile,
+                    'SEARCH-WIKIPEDIA-RANDOM',
+                    `empty wikipedia random | lang=${langCode}`
+                )
+            }
+
+            return out
+        } catch (error) {
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'SEARCH-WIKIPEDIA-RANDOM',
+                `request failed | lang=${langCode} | error=${
+                    error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)
+                }`
+            )
+            return []
+        }
+    }
+
+    async getHackerNewsTopics(): Promise<string[]> {
+        try {
+            const request: AxiosRequestConfig = {
+                url: 'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=50',
+                method: 'GET',
+                headers: {
+                    ...(this.bot.fingerprint?.headers ?? {})
+                }
+            }
+
+            const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine)
+            const hits = response.data?.hits ?? []
+            const out: string[] = Array.isArray(hits)
+                ? hits
+                      .map((h: { title?: string }) => h.title?.trim() ?? '')
+                      // Drop the "Show HN:" / "Ask HN:" etc. prefixes so queries read naturally.
+                      .map((t: string) => t.replace(/^(show|ask|tell|launch)\s+hn:\s*/i, '').trim())
+                      .filter(Boolean)
+                : []
+
+            if (!out.length) {
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-HACKERNEWS', 'empty hackernews front page')
+            }
+
+            return out
+        } catch (error) {
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'SEARCH-HACKERNEWS',
+                `request failed | error=${
                     error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)
                 }`
             )
