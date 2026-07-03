@@ -6,6 +6,22 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
+            # Docker Desktop's internal DNS proxy fails to resolve cdn.playwright.dev
+            # (Azure Front Door CNAME chain), which breaks the patchright/Chromium
+            # download during build. Pin it to a known-good edge IP as a workaround.
+            # If this ever breaks again, refresh the IP with:
+            #   nslookup cdn.playwright.dev 1.1.1.1
+            # and override it without editing this file via:
+            #   PLAYWRIGHT_CDN_IP=<new-ip> docker compose build
+            extra_hosts:
+                - "cdn.playwright.dev:${PLAYWRIGHT_CDN_IP:-150.171.109.20}"
+        # Docker Desktop's internal DNS proxy intermittently fails to resolve
+        # outbound domains the bot needs at runtime (edgeupdates.microsoft.com,
+        # webhook endpoints, etc.), not just the build-time CDN above. Point the
+        # running container at public resolvers instead of Docker's own proxy.
+        dns:
+            - 1.1.1.1
+            - 8.8.8.8
         entrypoint: ["/usr/local/bin/entrypoint.sh"]
         command: ["node", "dist/index.js"]
         volumes:

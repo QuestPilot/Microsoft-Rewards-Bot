@@ -18,37 +18,28 @@ Core is optional. If you do not have a Core license, disable it in `plugins/plug
 
 Docker images do not self-update. At startup, the bot checks GitHub and logs a warning if a newer version exists. Pull or rebuild the image to update.
 
-## Build
+## Build and Run (Compose)
 
-From the repository root:
-
-```bash
-docker build -t microsoft-rewards-bot .
-```
-
-The Dockerfile builds the TypeScript app, installs production dependencies, installs the browser runtime, and copies `plugins/` into the final image.
-
-## Run
-
-Use a mounted config directory if you want to keep accounts, sessions, and diagnostics outside the container:
+From the repository root, using the provided `compose.yaml`:
 
 ```bash
-docker run --rm \
-  -e CRON_SCHEDULE="0 2 * * *" \
-  -e RUN_ON_START=true \
-  -e TZ=UTC \
-  -e LICENSE_KEY="MSRB-XXXX-XXXX-XXXX-XXXX" \
-  microsoft-rewards-bot
+docker compose up -d --build
 ```
 
-For Core in Docker, `LICENSE_KEY` is the non-interactive license input. Without it, Core disables itself and the bot continues in public mode.
+This is the recommended way to build and run the bot. The Dockerfile builds the TypeScript app, installs production dependencies, installs the browser runtime, and copies `plugins/` into the final image.
 
 ## Compose Example
 
 ```yaml
 services:
   msrb:
-    build: .
+    build:
+      context: .
+      extra_hosts:
+        - "cdn.playwright.dev:${PLAYWRIGHT_CDN_IP:-150.171.109.20}"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       CRON_SCHEDULE: "0 2 * * *"
       RUN_ON_START: "true"
@@ -62,7 +53,27 @@ services:
     restart: unless-stopped
 ```
 
+The `extra_hosts` entry works around a Docker Desktop bug where its internal DNS proxy fails to resolve `cdn.playwright.dev` (used to download the Chromium build during `docker build`), causing `getaddrinfo EAI_AGAIN` errors. It's harmless on setups that aren't affected. If the build ever fails with that error and this IP has gone stale, refresh it with `nslookup cdn.playwright.dev 1.1.1.1`, then either update the default in the file or override it without editing anything via `PLAYWRIGHT_CDN_IP=<new-ip> docker compose build`.
+
+The `dns` entry works around the same Docker Desktop DNS proxy bug showing up at runtime instead of build time — the bot calls out to several Microsoft/webhook domains during a run (`edgeupdates.microsoft.com`, etc.), and on affected setups those lookups fail with `getaddrinfo EAI_AGAIN` too. Pointing the container at public DNS resolvers sidesteps Docker's internal proxy entirely. It's harmless on setups that aren't affected.
+
 The long-term recommended scheduler is the built-in Node scheduler in `src/config.json`. The cron entrypoint remains supported for existing Docker installs.
+
+## Build and Run (plain Docker, without Compose)
+
+```bash
+docker build -t microsoft-rewards-bot .
+docker run --rm \
+  -e CRON_SCHEDULE="0 2 * * *" \
+  -e RUN_ON_START=true \
+  -e TZ=UTC \
+  -e LICENSE_KEY="MSRB-XXXX-XXXX-XXXX-XXXX" \
+  microsoft-rewards-bot
+```
+
+For Core in Docker, `LICENSE_KEY` is the non-interactive license input. Without it, Core disables itself and the bot continues in public mode.
+
+If `docker build` fails with `getaddrinfo EAI_AGAIN cdn.playwright.dev` (a known Docker Desktop DNS proxy bug — see the Compose section above), either switch to `docker compose build`, or add `--add-host=cdn.playwright.dev:150.171.109.20` to the `docker build` command.
 
 ## Core Runtime Compatibility
 
