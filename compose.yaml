@@ -12,7 +12,7 @@ services:
             # If this ever breaks again, refresh the IP with:
             #   nslookup cdn.playwright.dev 1.1.1.1
             extra_hosts:
-                - "cdn.playwright.dev:150.171.109.20"
+                - "cdn.playwright.dev:${PLAYWRIGHT_CDN_IP:-150.171.109.20}"
         entrypoint: ["/usr/local/bin/entrypoint.sh"]
         command: ["node", "dist/index.js"]
         volumes:
