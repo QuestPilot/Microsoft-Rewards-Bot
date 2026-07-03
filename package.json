@@ -69,6 +69,7 @@
         "typescript": "^5.9.3"
     },
     "dependencies": {
+        "@playwright/test": "^1.61.1",
         "axios": "^1.16.1",
         "axios-retry": "^4.5.0",
         "bytenode": "^1.5.7",
@@ -82,7 +83,7 @@
         "ms": "^2.1.3",
         "otpauth": "^9.4.1",
         "p-queue": "^9.0.1",
-        "patchright": "^1.57.0",
+        "patchright": "^1.61.1",
         "semver": "^7.7.3",
         "socks-proxy-agent": "^8.0.5",
         "ts-node": "^10.9.2",
