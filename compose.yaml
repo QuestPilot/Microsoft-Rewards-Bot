@@ -6,6 +6,13 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
+            # Docker Desktop's internal DNS proxy fails to resolve cdn.playwright.dev
+            # (Azure Front Door CNAME chain), which breaks the patchright/Chromium
+            # download during build. Pin it to a known-good edge IP as a workaround.
+            # If this ever breaks again, refresh the IP with:
+            #   nslookup cdn.playwright.dev 1.1.1.1
+            extra_hosts:
+                - "cdn.playwright.dev:150.171.109.20"
         entrypoint: ["/usr/local/bin/entrypoint.sh"]
         command: ["node", "dist/index.js"]
         volumes:

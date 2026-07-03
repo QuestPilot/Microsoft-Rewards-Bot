@@ -96,8 +96,7 @@ The `main` branch is the supported public channel. Auto-updates read from it dir
 ### Docker
 
 ```bash
-docker build -t microsoft-rewards-bot .
-docker run --rm -e TZ=UTC microsoft-rewards-bot
+docker compose up -d --build
 ```
 
 See [Docker deployment](docs/docker.md) for the full Compose example and Core configuration.
