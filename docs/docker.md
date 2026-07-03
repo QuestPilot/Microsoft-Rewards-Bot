@@ -37,6 +37,9 @@ services:
       context: .
       extra_hosts:
         - "cdn.playwright.dev:${PLAYWRIGHT_CDN_IP:-150.171.109.20}"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       CRON_SCHEDULE: "0 2 * * *"
       RUN_ON_START: "true"
@@ -51,6 +54,8 @@ services:
 ```
 
 The `extra_hosts` entry works around a Docker Desktop bug where its internal DNS proxy fails to resolve `cdn.playwright.dev` (used to download the Chromium build during `docker build`), causing `getaddrinfo EAI_AGAIN` errors. It's harmless on setups that aren't affected. If the build ever fails with that error and this IP has gone stale, refresh it with `nslookup cdn.playwright.dev 1.1.1.1`, then either update the default in the file or override it without editing anything via `PLAYWRIGHT_CDN_IP=<new-ip> docker compose build`.
+
+The `dns` entry works around the same Docker Desktop DNS proxy bug showing up at runtime instead of build time — the bot calls out to several Microsoft/webhook domains during a run (`edgeupdates.microsoft.com`, etc.), and on affected setups those lookups fail with `getaddrinfo EAI_AGAIN` too. Pointing the container at public DNS resolvers sidesteps Docker's internal proxy entirely. It's harmless on setups that aren't affected.
 
 The long-term recommended scheduler is the built-in Node scheduler in `src/config.json`. The cron entrypoint remains supported for existing Docker installs.
 
