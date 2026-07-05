@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { writeJsonAtomic } from './AtomicFile'
 
-export const ACCOUNT_SAFETY_WARNING_THRESHOLD = 4
+export const ACCOUNT_SAFETY_WARNING_THRESHOLD = 6
 export const ACCOUNT_SAFETY_WARNING_SUPPRESSION_DAYS = 30
 
 const ACCOUNT_SAFETY_WARNING_SUPPRESSION_MS = ACCOUNT_SAFETY_WARNING_SUPPRESSION_DAYS * 24 * 60 * 60 * 1000

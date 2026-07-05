@@ -29,7 +29,11 @@ test('app window runs as a desktop-style launcher instead of the old browser pag
     assert.match(source, /\/manifest\.json/)
     assert.match(source, /chromium\.executablePath/)
     assert.match(source, /resolveBundledChromium\(\)/)
-    assert.match(source, /spawn\(process\.execPath,\s*\['\.\/dist\/index\.js',\s*'--ui-child'\]/)
+    // The literal spawn call now lives inside the shared spawnBotProcess helper
+    // (reused for the post-update relaunch); startBot() still requests the same
+    // direct, fast dist/index.js invocation for a normal run.
+    assert.match(source, /spawnBotProcess\(\['\.\/dist\/index\.js',\s*'--ui-child'\]\)/)
+    assert.match(source, /spawn\(process\.execPath,\s*args,/)
     assert.match(source, /POST' && req\.url === '\/api\/start'/)
     assert.match(source, /POST' && req\.url === '\/api\/stop'/)
     assert.match(source, /POST' && req\.url === '\/api\/close'/)

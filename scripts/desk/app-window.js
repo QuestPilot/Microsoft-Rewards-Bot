@@ -31,6 +31,10 @@ const APP_WINDOW_WIDTH = 1780
 const APP_WINDOW_HEIGHT = 1020
 const API_TOKEN = crypto.randomBytes(32).toString('base64url')
 const MAX_API_BODY_BYTES = 64 * 1024
+// Emitted by the bot's scheduler loop when it applies an update while running
+// under Desk supervision instead of self-detaching (see checkForUpdateAndRestart
+// in src/index.ts). Keep this value in sync with SUPERVISED_UPDATE_EXIT_CODE there.
+const UPDATE_RESTART_EXIT_CODE = 75
 const accountStorage = createAccountStorage({ root: ROOT })
 const desktopInstallManager = createDesktopInstallManager({ root: ROOT })
 const startupManager = createStartupManager({ root: ROOT })
@@ -860,7 +864,16 @@ async function startBot() {
     state.metrics.progress = 6
     pushLog('info', 'Starting Rewards Bot run.')
 
-    botProcess = childProcess.spawn(process.execPath, ['./dist/index.js', '--ui-child'], {
+    spawnBotProcess(['./dist/index.js', '--ui-child'])
+    return true
+}
+
+// Spawns the given command as the tracked `botProcess`, wiring stdout/stderr into
+// the Desk console and handling exit/error. Used both for the normal run (direct
+// dist/index.js — fast, no update check) and for the post-update relaunch below
+// (through the full launcher, so dist/ gets rebuilt from the freshly pulled source).
+function spawnBotProcess(args) {
+    botProcess = childProcess.spawn(process.execPath, args, {
         cwd: ROOT,
         env: {
             ...process.env,
@@ -887,6 +900,21 @@ async function startBot() {
     })
     botProcess.on('exit', code => {
         botProcess = null
+
+        // The bot applied an update mid-schedule and handed control back to us
+        // instead of self-detaching into an invisible, unmanaged process (see
+        // checkForUpdateAndRestart in src/index.ts). Relaunch through the full
+        // launcher (not dist/index.js directly) so dist/ gets rebuilt from the new
+        // source; it then re-execs the bot, still tracked as this same botProcess.
+        // Skipped if the user hit Stop in the meantime.
+        if (code === UPDATE_RESTART_EXIT_CODE && !stopRequested) {
+            pushLog('info', 'Update applied. Rebuilding and restarting the bot...')
+            state.status = 'Starting'
+            state.detail = 'Applying update...'
+            spawnBotProcess([path.join('scripts', 'start.js'), '--ui-child'])
+            return
+        }
+
         state.isRunning = false
         state.activeAccount = null
         state.exitCode = code
@@ -899,7 +927,6 @@ async function startBot() {
               : 'The bot stopped before completing'
         state.metrics.progress = code === 0 ? 100 : state.metrics.progress
     })
-    return true
 }
 
 async function connectToAgentLogs() {
@@ -3713,7 +3740,7 @@ function html() {
         <div class="modal-field">
           <label>Password</label>
           <div class="modal-pw">
-            <input class="modal-input" id="acc-password" type="password" autocomplete="new-password" placeholder="Password">
+            <input class="modal-input" id="acc-password" type="password" autocomplete="new-password" placeholder="Password" readonly onfocus="this.removeAttribute('readonly');">
             <button class="modal-pw-toggle" type="button" id="acc-pw-toggle">
               <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
@@ -3783,7 +3810,7 @@ function html() {
           </div>
           <div class="modal-field">
             <label>Password</label>
-            <input class="modal-input" id="acc-proxy-pass" type="password" autocomplete="new-password" placeholder="pass">
+            <input class="modal-input" id="acc-proxy-pass" type="password" autocomplete="new-password" placeholder="pass" readonly onfocus="this.removeAttribute('readonly');">
           </div>
         </div>
         <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
@@ -4819,9 +4846,16 @@ function html() {
 
       var safetyBox = G('acc-safety-advice');
       if (safetyBox) {
-        if (totalCount > 1) {
+        if (totalCount > 4) {
            safetyBox.style.display = 'block';
-           safetyBox.innerHTML = '<b style="color: #ffab00;">Safety Advice (2026):</b> You have ' + totalCount + ' accounts. Microsoft\'s new anti-bot system is strict. The max household limit is 6. Avoid generic searches to qualify for the <b>Bing Star Bonus</b>, and use high-quality mobile proxies if needed.';
+           safetyBox.style.borderLeft = '3px solid #ff453a';
+           safetyBox.style.background = 'rgba(255, 69, 58, 0.1)';
+           safetyBox.innerHTML = '<b style="color: #ff453a;">High Risk (2026):</b> You have ' + totalCount + ' accounts. The Microsoft household limit is 6. Running this many accounts significantly increases ban risk. Use high-quality mobile proxies (like Decodo) and high delays between runs.';
+        } else if (totalCount > 1) {
+           safetyBox.style.display = 'block';
+           safetyBox.style.borderLeft = '3px solid #0a84ff';
+           safetyBox.style.background = 'rgba(10, 132, 255, 0.1)';
+           safetyBox.innerHTML = '<b style="color: #0a84ff;">Tips for Multiple Accounts:</b> The new anti-bot system is strict. To keep your ' + totalCount + ' accounts safe, avoid generic searches (to qualify for the <b>Bing Star Bonus</b>) and do not run them simultaneously without proxies.';
         } else {
            safetyBox.style.display = 'none';
         }

@@ -15,11 +15,11 @@ const {
 
 const root = path.join(__dirname, '..', '..')
 
-test('account safety warning threshold is documented as more than 4 accounts', () => {
+test('account safety warning threshold is documented as more than 6 accounts', () => {
     const source = fs.readFileSync(path.join(root, 'src/index.ts'), 'utf8')
 
     assert.match(source, /ACCOUNT_SAFETY_WARNING_THRESHOLD/)
-    assert.match(source, /more than 4 accounts/)
+    assert.match(source, /more than 6 accounts/)
     assert.match(source, /show again/)
 })
 

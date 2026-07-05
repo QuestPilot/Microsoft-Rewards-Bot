@@ -387,12 +387,12 @@ export class MicrosoftRewardsBot {
         this.logger.warn(
             'main',
             'ACCOUNT-SAFETY',
-            `You have configured ${this.accounts.length} accounts. Running more than 4 accounts is strongly discouraged and may increase account risk.`
+            `You have configured ${this.accounts.length} accounts. Running more than 6 accounts is strongly discouraged (Household limit is 6) and may increase account risk.`
         )
         this.logger.warn(
             'main',
             'ACCOUNT-SAFETY',
-            'For safety, accounts are spaced out and shuffled. To be more cautious, raise "searchSettings.delayMultiplier" (e.g. 2) or widen "searchSettings.accountDelay", and use a per-account proxy.'
+            'For safety, accounts are spaced out and shuffled. The new 2026 anti-bot system is strict. Avoid generic searches to qualify for the Bing Star Bonus, use high-quality mobile proxies like Decodo, and do not use datacenter proxies.'
         )
 
         const schedulerEnabled = isSchedulerEnabled(this.config.scheduler)
@@ -1616,21 +1616,36 @@ async function runSingle(rewardsBot: MicrosoftRewardsBot): Promise<number> {
     return exitCode
 }
 
+// Exit code the scheduler loop returns when it applied an update while running
+// under Desk supervision (see checkForUpdateAndRestart below). Keep in sync with
+// UPDATE_RESTART_EXIT_CODE in scripts/desk/app-window.js.
+const SUPERVISED_UPDATE_EXIT_CODE = 75
+
 /**
  * Check for a published update before a scheduled run and, if one is applied,
- * relaunch the bot in the SAME terminal on the new version.
+ * hand off to a fresh process on the new version.
  *
  * A long-lived scheduler process otherwise stays pinned to whatever version it
  * booted on, because the launcher (`scripts/start.js`) only runs the updater
  * once at startup. We call the same UpdateManager here so each scheduled run
- * starts on the latest code. When an update lands, UpdateManager has already
- * written the new files to disk; we then hand off to `start.js` (which rebuilds
- * dist and re-enters the scheduler), so the fresh process resumes its normal
- * schedule.
+ * starts on the latest code.
  *
- * @returns `true` when a restart was launched (the caller must stop the loop).
+ * Two ways to hand off, depending on who is supervising this process:
+ *   - Standalone (terminal/CLI, `--background`): nothing else is watching this
+ *     process, so we self-detach — spawn `start.js` (which rebuilds dist and
+ *     re-enters the scheduler) as an independent, unref'd process and exit 0.
+ *   - Under Desk (`MSRB_UI_CHILD=1`): Desk tracks this process as `botProcess`
+ *     to show logs and own the Stop button. Self-detaching here would orphan an
+ *     invisible, unmanaged process outside Desk's control — no way to see its
+ *     logs or stop it, and a real risk of a second run starting on the same
+ *     accounts if the user clicks Start again while the orphan keeps going. So
+ *     instead we exit with SUPERVISED_UPDATE_EXIT_CODE and let Desk's own exit
+ *     handler relaunch through `start.js` as a new, still-tracked child.
+ *
+ * @returns the exit code the caller should stop the loop and return, or `false`
+ * if no update was applied (the loop should continue as normal).
  */
-async function checkForUpdateAndRestart(rewardsBot: MicrosoftRewardsBot): Promise<boolean> {
+async function checkForUpdateAndRestart(rewardsBot: MicrosoftRewardsBot): Promise<number | false> {
     try {
         const updaterPath = path.join(process.cwd(), 'scripts', 'updater', 'UpdateManager.js')
         // UpdateManager is a launcher-side CommonJS module that lives outside the
@@ -1649,16 +1664,25 @@ async function checkForUpdateAndRestart(rewardsBot: MicrosoftRewardsBot): Promis
             })
         )
 
+        await rewardsBot.closeAllBrowsers()
+        await rewardsBot.pluginManager.destroyAll()
+        // Flush analytics too — the process restarts right after, so a queued event would be lost.
+        await Promise.allSettled([flushAllWebhooks(), rewardsBot.analytics.flush()])
+
+        if (process.env.MSRB_UI_CHILD === '1') {
+            rewardsBot.logger.info(
+                'main',
+                'SCHEDULER',
+                `Update to ${result.remote?.version ?? 'a new version'} applied. Handing off to the Desk to restart.`
+            )
+            return SUPERVISED_UPDATE_EXIT_CODE
+        }
+
         rewardsBot.logger.info(
             'main',
             'SCHEDULER',
             `Update to ${result.remote?.version ?? 'a new version'} applied. Restarting in this terminal...`
         )
-
-        await rewardsBot.closeAllBrowsers()
-        await rewardsBot.pluginManager.destroyAll()
-        // Flush analytics too — the process restarts right after, so a queued event would be lost.
-        await Promise.allSettled([flushAllWebhooks(), rewardsBot.analytics.flush()])
 
         // Mirror start.js launchPostUpdateRestart: same console (stdio inherit),
         // detached + unref so this process can exit, and MSRB_POST_UPDATE_RESTART
@@ -1675,7 +1699,7 @@ async function checkForUpdateAndRestart(rewardsBot: MicrosoftRewardsBot): Promis
             }
         )
         child.unref()
-        return true
+        return 0
     } catch (error) {
         rewardsBot.logger.warn(
             'main',
@@ -1704,8 +1728,8 @@ async function runScheduled(rewardsBot: MicrosoftRewardsBot): Promise<number> {
     while (true) {
         if (shouldRunNow) {
             if (!bootChecked) {
-                const restarting = await checkForUpdateAndRestart(rewardsBot)
-                if (restarting) return 0
+                const restartExitCode = await checkForUpdateAndRestart(rewardsBot)
+                if (restartExitCode !== false) return restartExitCode
             }
 
             rewardsBot.analytics.track(
