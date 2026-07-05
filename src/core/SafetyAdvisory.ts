@@ -6,9 +6,15 @@ import type { ConfigSafetyAdvisory } from '../types/Config'
 type AdvisoryStatus = 'ok' | 'blocked'
 type AdvisorySeverity = 'info' | 'warning' | 'critical'
 
+// Backed by Core-API + Redis (lib/safety-advisory.ts), toggled from the admin
+// dashboard — no more hand-editing safety-advisory.json and pushing a commit to
+// change it. That static file (served via raw.githubusercontent.com) stays in the
+// repo unchanged as a fallback: its URL is baked into the compiled code of every
+// already-deployed bot version older than this one, and can never be changed
+// retroactively for them.
 const DEFAULT_SAFETY_ADVISORY: ConfigSafetyAdvisory = {
     enabled: true,
-    url: 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/HEAD/safety-advisory.json',
+    url: 'https://bot.lgtw.tf/api/safety-advisory',
     timeout: '10sec',
     blockedBehavior: 'prompt'
 }

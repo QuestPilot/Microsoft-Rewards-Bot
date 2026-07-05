@@ -5,7 +5,7 @@
 <h1 align="center">Microsoft Rewards Bot</h1>
 
 <p align="center">
-  <strong>The all-in-one Microsoft Rewards bot — both dashboards, a real control panel, fully automated.</strong>
+  <strong>Automate Microsoft Rewards — both dashboards, a real control panel, zero manual work.</strong>
 </p>
 
 <p align="center">
@@ -24,12 +24,7 @@
 
 ---
 
-Microsoft Rewards Bot automates daily sets, searches, and promotions on Microsoft Rewards — fully hands-free. It ships with a local control panel called **Rewards Desk**, a modular plugin system, and smart automatic updates. An optional premium **Core** plugin adds deeper rewards coverage, coupon claiming, streak protection, and a remote web dashboard.
-
-It supports **both** Microsoft Rewards dashboards in a single project — the new Next.js dashboard and the older one — detecting which one each account is served at login and using the right code path automatically, so every account earns regardless of which dashboard Microsoft has rolled out to it.
-
-> [!TIP]
-> **One bot. Both dashboards. Every point.** This isn't just another search script — it's a complete automation platform. It runs on **both** Microsoft Rewards dashboards (the new one *and* the classic one) with per-account auto-detection, ships a built-in control panel that needs no terminal, a sandboxed plugin system, and silent auto-updates. Add the optional **Core** plugin and you unlock full point coverage — claimable cards, dashboard coupons, streak protection, and app rewards — plus a remote web dashboard to run every machine from anywhere. Set it up once and leave nothing on the table.
+Microsoft Rewards Bot automates daily sets, searches, and promotions — fully hands-free, with a local control panel (**Rewards Desk**), a sandboxed plugin system, and silent auto-updates. It runs on **both** Microsoft Rewards dashboards, auto-detecting per account which one it's served so nothing is ever left uncollected. An optional premium **Core** plugin unlocks full point coverage — coupons, streak protection, app rewards — plus a remote web dashboard to run every machine from anywhere.
 
 ---
 
@@ -139,8 +134,8 @@ See [Docker deployment](docs/docker.md) for the full Compose example and Core co
 | Build your own plugin | [Create a Plugin](docs/create-plugin.md) · [Plugin API](docs/plugin-api.md) |
 | Fix launch, install, or update issues | [Troubleshooting](docs/troubleshooting.md) |
 | Run safely & reduce ban risk | [Account Safety](docs/account-safety.md) |
-| Understand privacy, telemetry, and security | [Privacy & Telemetry](docs/privacy.md) · [Security Policy](SECURITY.md) |
-| Licensing and allowed use | [License](LICENSE) · [Commercial Use](COMMERCIAL.md) · [Trademark](TRADEMARK.md) |
+| Understand privacy, telemetry, and security | [Privacy & Telemetry](docs/privacy.md) · [Security Policy](.github/SECURITY.md) |
+| Licensing and allowed use | [License](LICENSE) · [Commercial Use](docs/legal/COMMERCIAL.md) · [Trademark](docs/legal/TRADEMARK.md) |
 
 Full documentation index: [docs/README.md](docs/README.md)
 

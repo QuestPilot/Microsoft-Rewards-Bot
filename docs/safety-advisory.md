@@ -1,10 +1,10 @@
 # Safety Advisory
 
-The safety advisory check lets maintainers publish a small JSON file when running the bot is temporarily risky. It is enabled by default and is intentionally not part of the normal user configuration.
+The safety advisory check lets maintainers flag that running the bot is temporarily risky. It is enabled by default and is intentionally not part of the normal user configuration.
 
-## Advisory File
+Every run fetches the current advisory once from `https://bot.lgtw.tf/api/safety-advisory` (backed by Core-API + Redis) before starting. Maintainers toggle it instantly from the admin dashboard — no JSON file to hand-edit or commit.
 
-The remote JSON file uses this shape:
+The advisory payload has this shape:
 
 ```json
 {
@@ -16,7 +16,7 @@ The remote JSON file uses this shape:
 }
 ```
 
-To warn users, publish:
+A published advisory looks like:
 
 ```json
 {

@@ -31,6 +31,7 @@ const DEFAULT_EXCLUDES = [
     'node_modules',
     'dist',
     'release',
+    'data',
     'logs',
     'diagnostics',
     'Page',
@@ -56,6 +57,7 @@ const DEFAULT_BACKUP_PATHS = [
 
 const DEFAULT_MANAGED_PATHS = [
     'assets',
+    'docker',
     'docs',
     'plugins/core',
     'plugins/official-core.json',
@@ -64,25 +66,40 @@ const DEFAULT_MANAGED_PATHS = [
     'src',
     'tests',
     'updates',
-    'COMMERCIAL.md',
-    'CONTRIBUTING.md',
-    'Dockerfile',
     'LICENSE',
-    'NOTICE',
     'README.md',
-    'TRADEMARK.md',
     'compose.yaml',
     'flake.lock',
     'flake.nix',
     'package-lock.json',
     'package.json',
-    'safety-advisory.json',
     'tsconfig.json'
+    // COMMERCIAL.md, NOTICE, and TRADEMARK.md moved under docs/legal/ — already
+    // covered by the 'docs' entry above. CODE_OF_CONDUCT.md/CONTRIBUTING.md/
+    // SECURITY.md moved under .github/, which is deliberately excluded from
+    // archive-based syncing (see DEFAULT_EXCLUDES) since it has no effect on a
+    // locally-run install; git-based updates still sync it normally via checkout.
 ]
 
 const DEFAULT_OBSOLETE_PATHS = [
     'src/core/DashboardServer.ts',
-    'plugins/catalog.json'
+    'plugins/catalog.json',
+    // 2026-07-05 root cleanup: these moved into .github/ or docs/legal/, and
+    // Dockerfile into docker/ — delete the stale root copies on existing installs.
+    'CODE_OF_CONDUCT.md',
+    'CONTRIBUTING.md',
+    'SECURITY.md',
+    'COMMERCIAL.md',
+    'NOTICE',
+    'TRADEMARK.md',
+    'Dockerfile',
+    // Stray tracked dev scratch file — was never meant to ship.
+    'scratch.js',
+    // Safety advisory is now served by Core-API + Redis (lib/safety-advisory.ts),
+    // toggled from the admin dashboard, instead of this static file. No legacy
+    // fallback kept: the bot's fetch already fails open (warns, continues) on a
+    // 404, so a not-yet-updated bot simply skips the check until it updates.
+    'safety-advisory.json'
 ]
 
 const UPDATE_STRATEGIES = new Set(['auto', 'git', 'archive'])
@@ -113,6 +130,23 @@ function mkdirp(dir) {
     fs.mkdirSync(dir, { recursive: true })
 }
 
+// Best-effort, purely cosmetic: hide .updates/ (Windows/macOS) so it doesn't clutter
+// Explorer/Finder. Same helper as src/helpers/HiddenDir.ts — kept as a separate,
+// duplicated implementation here since this file runs as plain CommonJS outside the
+// compiled bot bundle. No-op on Linux (no attribute-based hidden mechanism without
+// renaming, which is out of scope — see HiddenDir.ts for why). Never throws.
+function markDirHidden(dir) {
+    try {
+        if (process.platform === 'win32') {
+            childProcess.spawn('attrib', ['+h', dir], { stdio: 'ignore', windowsHide: true }).unref()
+        } else if (process.platform === 'darwin') {
+            childProcess.spawn('chflags', ['hidden', dir], { stdio: 'ignore' }).unref()
+        }
+    } catch {
+        // Cosmetic only.
+    }
+}
+
 function rmrf(target) {
     fs.rmSync(target, { recursive: true, force: true })
 }
@@ -131,7 +165,9 @@ function runCommand(command, args, options = {}) {
 
     if (result.status !== 0) {
         const output = [result.stderr, result.stdout].filter(Boolean).join('\n').trim()
-        throw new Error(`${options.label ?? command} failed with exit code ${result.status}${output ? `: ${output}` : ''}`)
+        throw new Error(
+            `${options.label ?? command} failed with exit code ${result.status}${output ? `: ${output}` : ''}`
+        )
     }
 
     return result.stdout ?? ''
@@ -328,48 +364,56 @@ function requestBuffer(url, timeoutMs = 45_000, headers = {}, options = {}) {
     const maxBytes = options.maxBytes ?? 2 * 1024 * 1024
     assertAllowedUpdateUrl(url)
     return new Promise((resolve, reject) => {
-        const request = https.get(url, {
-            timeout: timeoutMs,
-            headers: {
-                'user-agent': 'msrb-updater',
-                'cache-control': 'no-cache',
-                pragma: 'no-cache',
-                ...headers
-            }
-        }, response => {
-            if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
-                response.resume()
-                if (redirects >= maxRedirects) {
-                    reject(new Error(`Too many redirects while requesting ${url}`))
+        const request = https.get(
+            url,
+            {
+                timeout: timeoutMs,
+                headers: {
+                    'user-agent': 'msrb-updater',
+                    'cache-control': 'no-cache',
+                    pragma: 'no-cache',
+                    ...headers
+                }
+            },
+            response => {
+                if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
+                    response.resume()
+                    if (redirects >= maxRedirects) {
+                        reject(new Error(`Too many redirects while requesting ${url}`))
+                        return
+                    }
+                    requestBuffer(new URL(response.headers.location, url).toString(), timeoutMs, headers, {
+                        ...options,
+                        redirects: redirects + 1
+                    }).then(resolve, reject)
                     return
                 }
-                requestBuffer(new URL(response.headers.location, url).toString(), timeoutMs, headers, {
-                    ...options,
-                    redirects: redirects + 1
-                }).then(resolve, reject)
-                return
-            }
 
-            const chunks = []
-            let received = 0
-            response.on('error', reject)
-            response.on('data', chunk => {
-                received += chunk.length
-                if (received > maxBytes) {
-                    response.destroy(new Error(`Response exceeded ${maxBytes} bytes: ${url}`))
-                    return
-                }
-                chunks.push(chunk)
-            })
-            response.on('end', () => {
-                const body = Buffer.concat(chunks)
-                if (response.statusCode < 200 || response.statusCode >= 300) {
-                    reject(new Error(`HTTP ${response.statusCode} while requesting ${url}: ${body.toString('utf8').slice(0, 200)}`))
-                    return
-                }
-                resolve(body)
-            })
-        })
+                const chunks = []
+                let received = 0
+                response.on('error', reject)
+                response.on('data', chunk => {
+                    received += chunk.length
+                    if (received > maxBytes) {
+                        response.destroy(new Error(`Response exceeded ${maxBytes} bytes: ${url}`))
+                        return
+                    }
+                    chunks.push(chunk)
+                })
+                response.on('end', () => {
+                    const body = Buffer.concat(chunks)
+                    if (response.statusCode < 200 || response.statusCode >= 300) {
+                        reject(
+                            new Error(
+                                `HTTP ${response.statusCode} while requesting ${url}: ${body.toString('utf8').slice(0, 200)}`
+                            )
+                        )
+                        return
+                    }
+                    resolve(body)
+                })
+            }
+        )
 
         request.on('timeout', () => request.destroy(new Error(`Request timed out after ${timeoutMs}ms`)))
         request.on('error', reject)
@@ -398,49 +442,53 @@ function download(url, dest, timeoutMs = 45_000, options = {}) {
         mkdirp(path.dirname(dest))
         const file = fs.createWriteStream(dest)
 
-        const request = https.get(url, {
-            timeout: timeoutMs,
-            headers: {
-                'user-agent': 'msrb-updater',
-                accept: options.accept || 'application/octet-stream, */*;q=0.8'
-            }
-        }, response => {
-            if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
-                file.close()
-                rmrf(dest)
-                if (redirects >= maxRedirects) {
-                    reject(new Error(`Too many redirects while downloading ${url}`))
+        const request = https.get(
+            url,
+            {
+                timeout: timeoutMs,
+                headers: {
+                    'user-agent': 'msrb-updater',
+                    accept: options.accept || 'application/octet-stream, */*;q=0.8'
+                }
+            },
+            response => {
+                if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
+                    file.close()
+                    rmrf(dest)
+                    if (redirects >= maxRedirects) {
+                        reject(new Error(`Too many redirects while downloading ${url}`))
+                        return
+                    }
+                    download(new URL(response.headers.location, url).toString(), dest, timeoutMs, {
+                        ...options,
+                        redirects: redirects + 1
+                    }).then(resolve, reject)
                     return
                 }
-                download(new URL(response.headers.location, url).toString(), dest, timeoutMs, {
-                    ...options,
-                    redirects: redirects + 1
-                }).then(resolve, reject)
-                return
-            }
 
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-                file.close()
-                rmrf(dest)
-                reject(new Error(`HTTP ${response.statusCode} while downloading ${url}`))
-                return
-            }
-
-            let received = 0
-            response.on('data', chunk => {
-                received += chunk.length
-                if (received > maxBytes) {
-                    response.destroy(new Error(`Download exceeded ${maxBytes} bytes: ${url}`))
+                if (response.statusCode < 200 || response.statusCode >= 300) {
+                    file.close()
+                    rmrf(dest)
+                    reject(new Error(`HTTP ${response.statusCode} while downloading ${url}`))
+                    return
                 }
-            })
-            response.on('error', error => {
-                file.close()
-                rmrf(dest)
-                reject(error)
-            })
-            response.pipe(file)
-            file.on('finish', () => file.close(resolve))
-        })
+
+                let received = 0
+                response.on('data', chunk => {
+                    received += chunk.length
+                    if (received > maxBytes) {
+                        response.destroy(new Error(`Download exceeded ${maxBytes} bytes: ${url}`))
+                    }
+                })
+                response.on('error', error => {
+                    file.close()
+                    rmrf(dest)
+                    reject(error)
+                })
+                response.pipe(file)
+                file.on('finish', () => file.close(resolve))
+            }
+        )
 
         request.on('timeout', () => request.destroy(new Error(`Download timed out after ${timeoutMs}ms`)))
         request.on('error', error => {
@@ -533,32 +581,40 @@ class UpdateManager {
             if (options.dryRun || env.MSRB_UPDATE_DRY_RUN === '1' || env.MSRB_UPDATE_CHECK_ONLY === '1') {
                 const action = initialDecision.reason === 'forced' ? 'repair from' : 'update to'
                 this.logger.log(`[UPDATER] Check only: would ${action} ${remote.version}`)
-                return { status: 'update-available', remote, checkOnly: true, forced: initialDecision.reason === 'forced' }
+                return {
+                    status: 'update-available',
+                    remote,
+                    checkOnly: true,
+                    forced: initialDecision.reason === 'forced'
+                }
             }
 
-            return await this.withUpdateLock(async () => {
-                this.packageJson = readJson(path.join(this.root, 'package.json'))
-                const decision = this.updateDecision(remote, force)
+            return await this.withUpdateLock(
+                async () => {
+                    this.packageJson = readJson(path.join(this.root, 'package.json'))
+                    const decision = this.updateDecision(remote, force)
 
-                if (!decision.apply) {
-                    this.logger.log(`[UPDATER] Already updated by another process (${this.packageJson.version})`)
-                    migrateUserFiles(this.root, this.logger)
-                    return { status: 'current', remote }
-                }
+                    if (!decision.apply) {
+                        this.logger.log(`[UPDATER] Already updated by another process (${this.packageJson.version})`)
+                        migrateUserFiles(this.root, this.logger)
+                        return { status: 'current', remote }
+                    }
 
-                this.assertCompatibleNode(remote.packageJson)
-                const applyResult = await this.applyRelease(remote)
-                this.syncDependencies()
-                this.verifyAppliedRelease(remote)
-                this.packageJson = readJson(path.join(this.root, 'package.json'))
-                const forced = decision.reason === 'forced'
-                this.logger.log(
-                    forced
-                        ? `[UPDATER] Repaired ${remote.version} via ${applyResult.strategy}`
-                        : `[UPDATER] Updated to ${remote.version} via ${applyResult.strategy}`
-                )
-                return { status: 'updated', remote, strategy: applyResult.strategy, forced }
-            }, { env })
+                    this.assertCompatibleNode(remote.packageJson)
+                    const applyResult = await this.applyRelease(remote)
+                    this.syncDependencies()
+                    this.verifyAppliedRelease(remote)
+                    this.packageJson = readJson(path.join(this.root, 'package.json'))
+                    const forced = decision.reason === 'forced'
+                    this.logger.log(
+                        forced
+                            ? `[UPDATER] Repaired ${remote.version} via ${applyResult.strategy}`
+                            : `[UPDATER] Updated to ${remote.version} via ${applyResult.strategy}`
+                    )
+                    return { status: 'updated', remote, strategy: applyResult.strategy, forced }
+                },
+                { env }
+            )
         } catch (error) {
             this.logger.warn(`[UPDATER] Update check failed: ${error.message}`)
             return { status: 'failed', error }
@@ -629,12 +685,17 @@ class UpdateManager {
     }
 
     logRemote(remote) {
-        this.logger.log(`[UPDATER] Local=${this.packageJson.version} Remote=${remote.version} SHA=${remote.commitSha.slice(0, 12)}`)
+        this.logger.log(
+            `[UPDATER] Local=${this.packageJson.version} Remote=${remote.version} SHA=${remote.commitSha.slice(0, 12)}`
+        )
     }
 
     logDockerUpdateAvailable(remote) {
         this.logger.warn(
-            color(33, `[UPDATER] Update available: local ${this.packageJson.version} -> remote ${remote.version}. Pull/rebuild the Docker image.`)
+            color(
+                33,
+                `[UPDATER] Update available: local ${this.packageJson.version} -> remote ${remote.version}. Pull/rebuild the Docker image.`
+            )
         )
     }
 
@@ -683,6 +744,7 @@ class UpdateManager {
         const lockPath = this.updateLockPath()
 
         mkdirp(this.updatesDir)
+        markDirHidden(this.updatesDir)
 
         while (true) {
             try {
@@ -782,7 +844,9 @@ class UpdateManager {
             this.git(['fetch', '--prune', 'origin', fetchRef], { stdio: 'pipe' })
             const fetchedSha = this.git(['rev-parse', `${remoteRef}^{commit}`]).trim()
             if (fetchedSha !== remote.commitSha) {
-                throw new Error(`Fetched ${fetchedSha.slice(0, 12)} but GitHub reported ${remote.commitSha.slice(0, 12)}`)
+                throw new Error(
+                    `Fetched ${fetchedSha.slice(0, 12)} but GitHub reported ${remote.commitSha.slice(0, 12)}`
+                )
             }
 
             this.git(['reset', '--hard', remote.commitSha], { stdio: 'pipe' })
@@ -861,7 +925,9 @@ class UpdateManager {
 
         const packageJson = readJson(packagePath)
         if (packageJson.version !== remote.version) {
-            throw new Error(`Downloaded release version ${packageJson.version || 'unknown'} does not match remote ${remote.version}`)
+            throw new Error(
+                `Downloaded release version ${packageJson.version || 'unknown'} does not match remote ${remote.version}`
+            )
         }
     }
 
@@ -873,7 +939,9 @@ class UpdateManager {
 
         const packageJson = readJson(packagePath)
         if (packageJson.version !== remote.version) {
-            throw new Error(`Update verification failed: local package.json is ${packageJson.version || 'unknown'}, expected ${remote.version}`)
+            throw new Error(
+                `Update verification failed: local package.json is ${packageJson.version || 'unknown'}, expected ${remote.version}`
+            )
         }
     }
 

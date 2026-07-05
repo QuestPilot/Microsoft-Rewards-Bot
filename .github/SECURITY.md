@@ -6,7 +6,7 @@ Microsoft Rewards Bot handles your Microsoft account credentials, so security is
 
 - **Credentials are encrypted at rest** with a key sealed in your operating system's secure vault — Windows DPAPI, macOS Keychain, or Linux Secret Service. They are never stored in plaintext.
 - **Your secrets never leave your machine.** Passwords, cookies, session tokens, proxy credentials, and webhook URLs are used locally only. They are not sent to us or to any third party.
-- **Anonymous telemetry is redacted** before it ever leaves your machine (emails masked, no secrets) and can be turned off in one line. See **[Privacy & Telemetry](docs/privacy.md)** for exactly what is and isn't collected.
+- **Anonymous telemetry is redacted** before it ever leaves your machine (emails masked, no secrets) and can be turned off in one line. See **[Privacy & Telemetry](../docs/privacy.md)** for exactly what is and isn't collected.
 - **The optional Core plugin is integrity-verified** (Ed25519 signature + SHA-256 checksum) before it loads, and marketplace plugins run **sandboxed** in a V8 isolate with no Node APIs.
 
 ## Reporting a vulnerability

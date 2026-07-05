@@ -40,9 +40,9 @@ Public plugins can extend the bot through the documented plugin API, but they ca
 
 The project names, logos, banners, badges, screenshots, and visual identity are reserved. Unofficial work must not imply endorsement or official status.
 
-Read [Trademark and branding policy](../TRADEMARK.md) for the exact rules.
+Read [Trademark and branding policy](legal/TRADEMARK.md) for the exact rules.
 
 ## Commercial Permission
 
-Read [Commercial use and Core boundary](../COMMERCIAL.md) if you need permission for commercial use, public redistribution, paid hosting, or integrations around Core.
+Read [Commercial use and Core boundary](legal/COMMERCIAL.md) if you need permission for commercial use, public redistribution, paid hosting, or integrations around Core.
 

@@ -123,7 +123,8 @@ export const ConfigSchema = z.object({
     }),
     debugLogs: z.boolean(),
     proxy: z.object({
-        queryEngine: z.boolean()
+        queryEngine: z.boolean(),
+        strictMode: z.boolean().default(false)
     }),
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
@@ -189,7 +190,9 @@ export const AccountSchema = z.object({
         desktop: z.boolean()
     }),
     // Optional per-account dashboard variant override (legacy support — removable).
-    dashboardMode: z.enum(['auto', 'next', 'legacy']).optional()
+    dashboardMode: z.enum(['auto', 'next', 'legacy']).optional(),
+    // Optional per-account override of the global proxy.strictMode kill-switch.
+    strictProxy: z.enum(['auto', 'require', 'exempt']).optional()
 })
 
 export function validateConfig(data: unknown): Config {

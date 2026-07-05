@@ -1755,6 +1755,12 @@ function html() {
     }
     .modal-input:focus{border-color:var(--blue);background:rgba(255,255,255,.04);box-shadow:0 0 0 2px rgba(30,155,255,.15);}
     .modal-input::placeholder{color:rgba(255,255,255,.25);}
+    /* <select> needs a solid background: a faint overlay (fine for text inputs sitting
+       on the modal backdrop) leaves Chromium's native control chrome showing through as
+       a plain white box, and the open option list is unstyled system white-on-black
+       text by default. Same fix already applied to .settings-input elsewhere. */
+    select.modal-input{background:rgba(2,7,16,.85);}
+    select.modal-input option{background:#07111f;color:var(--text);}
     .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
     
     .btn{
@@ -2185,6 +2191,7 @@ function html() {
     .cfg-input{width:100%;background:rgba(2,7,16,.7);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font:inherit;font-size:13.5px;outline:none;transition:border-color .15s}
     .cfg-input:focus{border-color:var(--cyan)}
     .cfg-input::placeholder{color:rgba(110,146,184,.4)}
+    select.cfg-input option{background:#07111f;color:var(--text)}
     .cfg-check{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid var(--border)}
     .cfg-check span{font-size:13px;font-weight:600}
     .cfg-adv{margin-top:6px;border-top:1px solid var(--border);padding-top:12px}
@@ -2915,7 +2922,7 @@ function html() {
         </div>
         <button class="btn btn-secondary" id="ins-refresh">Refresh</button>
       </div>
-      <div class="ins-empty" id="ins-empty" style="display:none">No stats yet &mdash; run the bot a few times and your insights will appear here.</div>
+      <div class="ins-empty" id="ins-empty" style="display:none">Not enough data to display anything yet. Run the bot a few more times first!</div>
       <div id="ins-body">
         <div class="ins-kpis" id="ins-kpis"></div>
         <div class="ins-card">
@@ -2964,7 +2971,7 @@ function html() {
           </button>
         </div>
       </div>
-      <div id="acc-safety-advice" style="display:none; margin: 15px 25px 0 25px; padding: 12px 15px; background: rgba(255, 171, 0, 0.1); border-left: 3px solid #ffab00; border-radius: 4px; font-size: 13px; color: var(--text-muted);"></div>
+      <div id="acc-safety-advice" style="display:none; margin: 15px 25px 0 25px; padding: 12px 15px; background: rgba(255, 171, 0, 0.1); border-left: 3px solid #ffab00; border-radius: 4px; font-size: 13px; color: var(--text);"></div>
       <!-- Scrollable account list -->
       <div class="acc-page-body" id="acc-editor-list"></div>
       <!-- First-time hints -->
@@ -3134,6 +3141,7 @@ function html() {
           <div class="settings-section">
             <h3>Browser</h3>
             <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Strict proxy mode</div><div class="toggle-sub">Skip accounts without a configured proxy to prevent real IP leaks</div></div><label class="toggle"><input type="checkbox" id="tog-strictProxy"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Headless mode</div><div class="toggle-sub">Run the browser hidden in the background</div></div><label class="toggle"><input type="checkbox" id="tog-headless"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Run on zero points</div><div class="toggle-sub">Keep running even when no points are left to earn</div></div><label class="toggle"><input type="checkbox" id="tog-runOnZero"><span class="toggle-slider"></span></label></div>
               <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Search on Bing local queries</div><div class="toggle-sub">Use local search-history suggestions as Bing queries</div></div><label class="toggle"><input type="checkbox" id="tog-searchOnBing"><span class="toggle-slider"></span></label></div>
@@ -3783,8 +3791,8 @@ function html() {
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
           Proxy <span class="lbl-opt" style="font-weight:400;font-size:10px;margin-left:4px">(optional)</span>
         </div>
-        <div class="modal-field" style="margin-top: 4px; margin-bottom: 8px; font-size: 11px; color: var(--text-muted); background: var(--surface-2); padding: 6px; border-radius: 4px;">
-           <span style="color:var(--primary)">💡 Recommendation:</span> We recommend <b>Decodo</b> for mobile proxies. They offer high success rates with Microsoft Rewards and excellent sticky session stability to minimize ban risks. Avoid cheap datacenter proxies.
+        <div class="modal-field" style="margin-top: 4px; margin-bottom: 8px; font-size: 11px; color: var(--muted); background: rgba(255,255,255,.025); border: 1px solid var(--border); padding: 8px 10px; border-radius: 8px;">
+           <span style="color:var(--cyan);font-weight:600">💡 Recommendation:</span> We recommend <b>Decodo</b> for mobile proxies. They offer high success rates with Microsoft Rewards and excellent sticky session stability to minimize ban risks. Avoid cheap datacenter proxies.
         </div>
         <div class="modal-field">
           <label>Host / URL</label>
@@ -3795,13 +3803,10 @@ function html() {
             <label>Port</label>
             <input class="modal-input" id="acc-proxy-port" type="number" autocomplete="off" placeholder="8080">
           </div>
-          <div class="modal-field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <label class="toggle" style="margin-bottom:4px">
-              <input type="checkbox" id="acc-proxy-axios">
-              <span class="toggle-slider"></span>
-              Use Axios
-            </label>
-          </div>
+          <label class="cfg-check" style="align-self:flex-end" title="Route the HTTP client (dashboard checks) through this proxy too, not just the browser">
+            <span>Use Axios</span>
+            <label class="toggle"><input type="checkbox" id="acc-proxy-axios"><span class="toggle-slider"></span></label>
+          </label>
         </div>
         <div class="acc-grid-2" style="gap: 12px; margin-top: 8px;">
           <div class="modal-field">
@@ -3818,6 +3823,14 @@ function html() {
             <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Test proxy connection
           </button>
           <div id="test-single-proxy-result" style="font-size:12px; font-weight:600; min-height:16px;"></div>
+        </div>
+        <div class="modal-field" style="margin-top: 8px;">
+          <label>Strict proxy mode <span class="lbl-opt">(this account)</span></label>
+          <select class="modal-input" id="acc-strict-proxy">
+            <option value="auto">Use global setting (Settings &gt; Behavior)</option>
+            <option value="require">Always require a proxy — skip this account if none is set</option>
+            <option value="exempt">Never require a proxy — always run this account</option>
+          </select>
         </div>
         <div class="acc-form-section-head" style="margin-top:6px">
           <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -4424,7 +4437,8 @@ function html() {
       var data;
       try { data = await fetch('/api/insights').then(function(r){return r.json();}); } catch(e) { return; }
       var empty = G('ins-empty'), body = G('ins-body');
-      if (!data || !data.hasData) {
+      var t = data ? data.totals || {} : {};
+      if (!data || !data.hasData || (t.points || 0) < 500) {
         if (empty) empty.style.display = 'block';
         if (body) body.style.display = 'none';
         return;
@@ -4850,12 +4864,12 @@ function html() {
            safetyBox.style.display = 'block';
            safetyBox.style.borderLeft = '3px solid #ff453a';
            safetyBox.style.background = 'rgba(255, 69, 58, 0.1)';
-           safetyBox.innerHTML = '<b style="color: #ff453a;">High Risk (2026):</b> You have ' + totalCount + ' accounts. The Microsoft household limit is 6. Running this many accounts significantly increases ban risk. Use high-quality mobile proxies (like Decodo) and high delays between runs.';
+           safetyBox.innerHTML = '<b style="color: #ff453a;">High Risk (2026):</b> You have ' + totalCount + ' accounts. The Microsoft household limit is 6. Running this many accounts significantly increases ban risk. Use high-quality mobile proxies (like Decodo) and high delays. Also remember: <b>1 Account = 1 Unique Phone Number</b>.';
         } else if (totalCount > 1) {
            safetyBox.style.display = 'block';
            safetyBox.style.borderLeft = '3px solid #0a84ff';
            safetyBox.style.background = 'rgba(10, 132, 255, 0.1)';
-           safetyBox.innerHTML = '<b style="color: #0a84ff;">Tips for Multiple Accounts:</b> The new anti-bot system is strict. To keep your ' + totalCount + ' accounts safe, avoid generic searches (to qualify for the <b>Bing Star Bonus</b>) and do not run them simultaneously without proxies.';
+           safetyBox.innerHTML = '<b style="color: #0a84ff;">Tips for Multiple Accounts:</b> The new anti-bot system is strict. Avoid generic searches (to qualify for the <b>Bing Star Bonus</b>), space out your runs, and always use <b>1 Unique Phone Number per Account</b>.';
         } else {
            safetyBox.style.display = 'none';
         }
@@ -4926,6 +4940,11 @@ function html() {
           }
 
           var metaInfo = '';
+          if (a.strictProxy === 'require') {
+            metaInfo += '<span title="Strict proxy: always required for this account" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(248,113,113,.15);color:#f87171">STRICT</span>';
+          } else if (a.strictProxy === 'exempt') {
+            metaInfo += '<span title="Strict proxy: exempt for this account" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.07);color:#9aa3b2">EXEMPT</span>';
+          }
           if (a.dashboardMode && a.dashboardMode !== 'auto') {
             metaInfo += '<span title="Dashboard override (forced)" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(96,165,250,.15);color:#93c5fd">' + (a.dashboardMode === 'legacy' ? 'ASP' : 'NEW') + '</span>';
           } else if (a.lastDetectedVariant) {
@@ -5122,6 +5141,7 @@ function html() {
       G('acc-proxy-user').value = p.username || '';
       G('acc-proxy-pass').value = p.password || '';
       G('acc-proxy-axios').checked = !!p.proxyAxios;
+      G('acc-strict-proxy').value = a.strictProxy || 'auto';
       var sResult = G('test-single-proxy-result');
       if (sResult) { sResult.textContent = ''; sResult.style.color = ''; }
       G('acc-fp-desktop').checked = !!fp.desktop;
@@ -5180,6 +5200,9 @@ function html() {
       // Per-account dashboard override (auto = omit, let the bot detect at login).
       var dm = G('acc-dashboard-mode').value;
       if (dm && dm !== 'auto') acc.dashboardMode = dm;
+      // Per-account strict-proxy override (auto = omit, follow the global setting).
+      var sp = G('acc-strict-proxy').value;
+      if (sp && sp !== 'auto') acc.strictProxy = sp;
 
       var btn = G('acc-modal-save');
       var prevItem = accEditIdx === -1 ? null : _raw[accEditIdx];
@@ -5218,6 +5241,7 @@ function html() {
       var wh = s.webhook || {};
       var elWd = G('tog-wh-discord'); if (elWd) elWd.checked = !!(wh.discord && wh.discord.enabled);
       var elWn = G('tog-wh-ntfy'); if (elWn) elWn.checked = !!(wh.ntfy && wh.ntfy.enabled);
+      var sp = G('tog-strictProxy'); if (sp && s.proxy) sp.checked = !!s.proxy.strictMode;
       var h = G('tog-headless'); if (h) h.checked = s.headless === true;
       var rz = G('tog-runOnZero'); if (rz) rz.checked = s.runOnZeroPoints === true;
       var dl = G('tog-debugLogs'); if (dl) dl.checked = s.debugLogs === true;
@@ -5641,6 +5665,7 @@ function html() {
       'tog-doDailySet':'workers.doDailySet','tog-doSpecialPromotions':'workers.doSpecialPromotions',
       'tog-doMorePromotions':'workers.doMorePromotions','tog-doDesktopSearch':'workers.doDesktopSearch',
       'tog-doMobileSearch':'workers.doMobileSearch','tog-doAppPromotions':'workers.doAppPromotions',
+      'tog-strictProxy':'proxy.strictMode',
       'tog-headless':'headless','tog-runOnZero':'runOnZeroPoints',
       'tog-debugLogs':'debugLogs','tog-searchOnBing':'searchOnBingLocalQueries',
       'tog-parallelSearching':'searchSettings.parallelSearching',
@@ -6009,7 +6034,7 @@ function html() {
       var card = G('core-real-card'); if (!card) return;
       var s; try { s = await fetch('/api/stats').then(function(r){return r.json();}); } catch(e) { return; }
       var empty = G('cr-empty'), grid = card.querySelector('.core-real-grid');
-      if (!s || !s.hasData || !s.totalRuns) {
+      if (!s || !s.hasData || (s.totalRuns || 0) < 3 || (s.totalPoints || 0) < 500) {
         if (empty) empty.style.display = 'block';
         if (grid) grid.style.display = 'none';
         return;

@@ -62,7 +62,7 @@ The long-term recommended scheduler is the built-in Node scheduler in `src/confi
 ## Build and Run (plain Docker, without Compose)
 
 ```bash
-docker build -t microsoft-rewards-bot .
+docker build -f docker/Dockerfile -t microsoft-rewards-bot .
 docker run --rm \
   -e CRON_SCHEDULE="0 2 * * *" \
   -e RUN_ON_START=true \
@@ -73,7 +73,7 @@ docker run --rm \
 
 For Core in Docker, `LICENSE_KEY` is the non-interactive license input. Without it, Core disables itself and the bot continues in public mode.
 
-If `docker build` fails with `getaddrinfo EAI_AGAIN cdn.playwright.dev` (a known Docker Desktop DNS proxy bug — see the Compose section above), either switch to `docker compose build`, or add `--add-host=cdn.playwright.dev:150.171.109.20` to the `docker build` command.
+If `docker build` fails with `getaddrinfo EAI_AGAIN cdn.playwright.dev` (a known Docker Desktop DNS proxy bug — see the Compose section above), either switch to `docker compose build`, or add `--add-host=cdn.playwright.dev:150.171.109.20` to the `docker build -f docker/Dockerfile` command.
 
 ## Core Runtime Compatibility
 

@@ -48,5 +48,5 @@ Fewer is safer. The bot warns above **4 accounts** because larger fleets meaning
 ## See also
 
 - [Privacy & Telemetry](./privacy.md) — what data the bot does and doesn't send.
-- [Security Policy](../SECURITY.md) — how your credentials are protected.
+- [Security Policy](../.github/SECURITY.md) — how your credentials are protected.
 - [Safety advisory](./safety-advisory.md) — the remote safety kill-switch.

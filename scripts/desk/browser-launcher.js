@@ -54,6 +54,34 @@ function createBrowserLauncher({ windowWidth, windowHeight, pushLog }) {
         } catch {
             // Best-effort — never block the launch on a cleanup error.
         }
+        disablePasswordManagerPrompts(profileDir)
+    }
+
+    // Seed the fresh profile's Preferences file so Chromium never shows the "Save
+    // password?" bubble (or the Google Password Manager onboarding prompt) in the
+    // Desk window — this is a controls surface for editing/testing accounts, not a
+    // browser a user saves real passwords into. There is no reliable command-line
+    // switch for this in current Chromium; the profile-scoped Preferences JSON is
+    // the standard, non-invasive way (no OS policy/registry, affects only this
+    // per-process profile dir, cross-platform since Chromium reads it identically
+    // on every OS). Written BEFORE first launch so it takes effect immediately.
+    function disablePasswordManagerPrompts(profileDir) {
+        try {
+            const defaultDir = path.join(profileDir, 'Default')
+            fs.mkdirSync(defaultDir, { recursive: true })
+            const prefsPath = path.join(defaultDir, 'Preferences')
+            if (fs.existsSync(prefsPath)) return // profile already initialized — don't clobber it
+            fs.writeFileSync(
+                prefsPath,
+                JSON.stringify({
+                    credentials_enable_service: false,
+                    credentials_enable_autosignin: false,
+                    profile: { password_manager_enabled: false }
+                })
+            )
+        } catch {
+            // Best-effort cosmetic tweak — never block the launch on it.
+        }
     }
 
     function openAppWindow(url, options = {}) {
@@ -124,6 +152,12 @@ function createBrowserLauncher({ windowWidth, windowHeight, pushLog }) {
                     // --test-type as a belt-and-suspenders fallback.
                     '--disable-infobars',
                     '--test-type=webdriver',
+                    // Belt-and-suspenders alongside the Preferences-file settings in
+                    // disablePasswordManagerPrompts(): the "Save password?" bubble is
+                    // primarily governed by the profile prefs, but the newer Google
+                    // Password Manager onboarding/promo surfaces are gated behind
+                    // Chromium feature flags instead — kill those too.
+                    '--disable-features=PasswordManagerOnboarding,AutofillServerCommunication',
                     `--user-data-dir=${profileDir}`,
                     process.platform === 'linux' ? '--class=RewardsBot' : ''
                 ].filter(Boolean),

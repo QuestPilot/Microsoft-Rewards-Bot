@@ -15,6 +15,16 @@ export interface Account {
      * Remove this field entirely when legacy support is dropped.
      */
     dashboardMode?: 'auto' | 'next' | 'legacy'
+    /**
+     * Per-account override for the global `config.proxy.strictMode` kill-switch
+     * (skip the account rather than run it without a configured proxy).
+     *  - 'auto' (default): follow the global setting.
+     *  - 'require': always skip this account without a proxy, even if the global
+     *    setting is off (e.g. an account you never want to risk running unprotected).
+     *  - 'exempt': never skip this account for missing a proxy, even if the global
+     *    setting is on (e.g. an account you're comfortable running on your real IP).
+     */
+    strictProxy?: 'auto' | 'require' | 'exempt'
 }
 
 export interface AccountProxy {

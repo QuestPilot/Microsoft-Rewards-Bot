@@ -130,6 +130,7 @@ export interface ConfigDelay {
 
 export interface ConfigProxy {
     queryEngine: boolean
+    strictMode: boolean
 }
 
 export interface ConfigWorkers {

@@ -5,7 +5,7 @@ services:
         restart: unless-stopped
         build:
             context: .
-            dockerfile: Dockerfile
+            dockerfile: docker/Dockerfile
             # Docker Desktop's internal DNS proxy fails to resolve cdn.playwright.dev
             # (Azure Front Door CNAME chain), which breaks the patchright/Chromium
             # download during build. Pin it to a known-good edge IP as a workaround.

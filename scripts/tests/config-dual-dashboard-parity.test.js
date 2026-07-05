@@ -44,3 +44,14 @@ test('account dashboardMode override is schema-validated and typed (legacy suppo
     assert.match(schema, /dashboardMode:\s*z\.enum\(\['auto', 'next', 'legacy'\]\)\.optional\(\)/)
     assert.match(account, /dashboardMode\?:\s*'auto'\s*\|\s*'next'\s*\|\s*'legacy'/)
 })
+
+test('account strictProxy override is schema-validated, typed, and wired in the Desk account editor', () => {
+    const schema = readText('src/helpers/SchemaValidator.ts')
+    const account = readText('src/types/Account.ts')
+    const desk = readText('scripts/desk/app-window.js')
+
+    assert.match(schema, /strictProxy:\s*z\.enum\(\['auto', 'require', 'exempt'\]\)\.optional\(\)/)
+    assert.match(account, /strictProxy\?:\s*'auto'\s*\|\s*'require'\s*\|\s*'exempt'/)
+    assert.match(desk, /id="acc-strict-proxy"/)
+    assert.match(desk, /acc\.strictProxy\s*=\s*sp/)
+})

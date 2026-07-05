@@ -34,7 +34,7 @@
         "predev": "node ./scripts/build/check-node-version.js",
         "dev": "ts-node ./src/index.ts -dev",
         "kill-chrome-win": "powershell -Command \"Get-Process | Where-Object { $_.MainModule.FileVersionInfo.FileDescription -eq 'Google Chrome for Testing' } | ForEach-Object { Stop-Process -Id $_.Id -Force }\"",
-        "create-docker": "docker build -t microsoft-rewards-bot .",
+        "create-docker": "docker build -f docker/Dockerfile -t microsoft-rewards-bot .",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "desk:install": "node ./scripts/start.js desk install",

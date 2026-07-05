@@ -8,6 +8,7 @@
         "geoLocale": "auto",
         "langCode": "en",
         "dashboardMode": "auto",
+        "strictProxy": "auto",
         "proxy": {
             "proxyAxios": true,
             "url": "",

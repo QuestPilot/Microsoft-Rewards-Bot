@@ -13,7 +13,8 @@ import { DESKTOP_BROWSER_VIEWPORT } from './automation/BrowserViewport'
 import PageController from './automation/PageController'
 
 import { loadAccounts, loadConfig, resolveConfigPath } from './helpers/ConfigLoader'
-import { runDataCleanup } from './helpers/DataManager'
+import { dataRoot, runDataCleanup } from './helpers/DataManager'
+import { markDirHidden } from './helpers/HiddenDir'
 import Helpers from './helpers/Helpers'
 import { readAccountSummary, recordAccountBan, recordAccountRun, recordRunComplete } from './helpers/StatsRecorder'
 import { AvatarFetcher } from './helpers/AvatarFetcher'
@@ -292,6 +293,8 @@ export class MicrosoftRewardsBot {
         this.accounts = loadAccounts()
         if (!this.isHarvesterMode) {
             await this.warnIfTooManyAccounts()
+            this.logUsageTips()
+            this.hideInternalDirs()
 
             void runDataCleanup(msg => this.logger.debug('main', 'DATA-CLEANUP', msg))
         }
@@ -442,6 +445,64 @@ export class MicrosoftRewardsBot {
                 ? 'This warning will stay hidden while the scheduler is enabled.'
                 : 'This warning will stay hidden for 30 days.'
         )
+    }
+
+    /**
+     * Passive, non-blocking usage tips logged once per run start. Unlike
+     * warnIfTooManyAccounts (an interactive prompt gated at 6+ accounts), these
+     * catch config-derived ban-risk signals that matter well below that threshold —
+     * several accounts sharing this machine's real IP, or an obviously roboticized
+     * search cadence, are both real 2026 Bing anti-bot signals regardless of account
+     * count. Plain log lines only (never interactive), so the Desk console (which
+     * pipes this process's stdout/stderr) and a plain terminal both see them —
+     * a Desk-only tip would leave terminal/headless users with no equivalent.
+     */
+    private logUsageTips(): void {
+        if (cluster.isWorker) return
+
+        if (this.accounts.length > 1 && this.accounts.every(account => !account.proxy?.url)) {
+            this.logger.warn(
+                'main',
+                'USAGE-TIP',
+                `${this.accounts.length} accounts are all running from this machine's real IP (no proxy configured on any of them). Microsoft's 2026 anti-bot system correlates accounts by IP and device signals — consider a mobile proxy per account, or turn on Strict proxy mode (Settings > Behavior > Browser) to catch any account missing one.`
+            )
+        }
+
+        try {
+            const minDelayMs = this.utils.stringToNumber(this.config.searchSettings.searchDelay.min)
+            if (minDelayMs < 8000) {
+                this.logger.warn(
+                    'main',
+                    'USAGE-TIP',
+                    `Search delay is set very low (min ${this.config.searchSettings.searchDelay.min}). Fast, consistent-interval searching is one of the timing signals the anti-bot system profiles — widening searchSettings.searchDelay makes each run's cadence look less scripted.`
+                )
+            }
+        } catch {
+            // Malformed delay strings are already caught by config validation elsewhere — never let a tip crash the run.
+        }
+    }
+
+    /**
+     * Cosmetic-only, best-effort: mark the bot's internal-state folders as OS-hidden
+     * (Windows/macOS) so they don't clutter Explorer/Finder next to the user's own
+     * files. Deliberately does NOT rename anything (data/sessions keep their exact
+     * names) — a rename would orphan every existing user's saved sessions/stats on
+     * update; the hidden ATTRIBUTE achieves the same visual goal with zero path
+     * changes and zero migration risk. Safe to call every startup: creating an
+     * already-existing dir is a no-op, and re-hiding an already-hidden one is too.
+     */
+    private hideInternalDirs(): void {
+        if (cluster.isWorker) return
+
+        const dirs = [dataRoot(), path.resolve(process.cwd(), this.config.sessionPath || 'sessions'), path.resolve(process.cwd(), '.tools')]
+        for (const dir of dirs) {
+            try {
+                fs.mkdirSync(dir, { recursive: true })
+                markDirHidden(dir)
+            } catch {
+                // Cosmetic only — never let this affect the run.
+            }
+        }
     }
 
     private async promptAccountSafetyWarning(schedulerEnabled: boolean): Promise<boolean> {
@@ -607,6 +668,19 @@ export class MicrosoftRewardsBot {
                 )
 
                 await this.pluginManager.notifyAccountStart(accountEmail)
+
+                // Per-account override of the global kill-switch: 'require' forces strict
+                // mode on for this account even if the global setting is off; 'exempt'
+                // opts this account out even if the global setting is on. 'auto' (or
+                // unset) just follows the global setting.
+                const strictProxyOverride = account.strictProxy ?? 'auto'
+                const strictProxyForAccount =
+                    strictProxyOverride === 'require' ||
+                    (strictProxyOverride === 'auto' && this.config.proxy?.strictMode === true)
+                if (strictProxyForAccount && !account.proxy?.url) {
+                    this.logger.error('main', 'PROXY-STRICT', `Strict proxy mode is enabled, but no proxy is configured for ${accountEmail}. Skipping account to prevent IP leak.`)
+                    continue
+                }
 
                 this.axios = new HttpClient(account.proxy)
 

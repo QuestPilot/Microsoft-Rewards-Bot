@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Microsoft Rewards Bot. This document provides guidelines for contributing to the **source-available public edition** of this project.
 
-By contributing, you agree to the contribution license in [LICENSE](LICENSE). Contributions may be used by the official project in the public edition, Core, documentation, dashboards, installers, update systems, and related products.
+By contributing, you agree to the contribution license in [LICENSE](../LICENSE). Contributions may be used by the official project in the public edition, Core, documentation, dashboards, installers, update systems, and related products.
 
 ---
 
@@ -361,7 +361,7 @@ Closes #123
 
 ### Creating a Plugin
 
-Plugins extend the bot's functionality. See the [Plugin Development Guide](docs/plugin-api.md) for a complete reference.
+Plugins extend the bot's functionality. See the [Plugin Development Guide](../docs/plugin-api.md) for a complete reference.
 
 **Quick example:**
 
@@ -402,7 +402,7 @@ export default class MyPlugin implements IPlugin {
 
 - **Discord:** [Join our server](https://discord.gg/k5uHkx9mne)
 - **Issues:** [GitHub Issues](https://github.com/QuestPilot/Microsoft-Rewards-Bot/issues)
-- **Plugin API:** [Read the docs](docs/plugin-api.md)
+- **Plugin API:** [Read the docs](../docs/plugin-api.md)
 
 ---
 

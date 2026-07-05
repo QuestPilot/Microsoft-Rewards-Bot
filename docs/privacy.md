@@ -42,4 +42,4 @@ Set telemetry off in your `config.json`:
 
 Diagnostics are sent over HTTPS to the project's own relay endpoint, which forwards anonymized events to our analytics. No third-party analytics SDK runs inside the bot, and no analytics key ships in the client.
 
-See also: **[Security Policy](../SECURITY.md)** for how your credentials are protected.
+See also: **[Security Policy](../.github/SECURITY.md)** for how your credentials are protected.
