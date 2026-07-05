@@ -20,6 +20,7 @@ export interface Config {
     scheduler?: ConfigScheduler
     core?: ConfigCore
     safetyAdvisory?: ConfigSafetyAdvisory
+    updateNotifier?: ConfigUpdateNotifier
 }
 
 /**
@@ -94,6 +95,19 @@ export interface ConfigSafetyAdvisory {
     url: string
     timeout: number | string
     blockedBehavior: 'prompt' | 'continue' | 'stop'
+}
+
+/**
+ * Tiny background process, desktop OSes only (Windows/macOS/Linux with a GUI
+ * session — never headless Linux or Docker, where a native notification has
+ * nowhere to appear). Installed at first launch, runs invisibly at OS login,
+ * stays in the install directory (removed if the folder is deleted), and
+ * periodically checks for bot updates and reminds idle users the bot is
+ * installed. Default on; disabling here stops it and removes its autostart
+ * registration on the next launch (does not fully uninstall/delete it).
+ */
+export interface ConfigUpdateNotifier {
+    enabled: boolean
 }
 
 export interface ConfigPlugins {

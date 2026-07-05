@@ -15,3 +15,13 @@ implementations indefinitely.
 
 If keeping a legacy path is genuinely required (a hard compatibility
 constraint, not just caution), say so explicitly and ask before doing it.
+
+## Always cross-platform
+
+Every feature must work on Windows, macOS, and Linux — including headless
+Linux/Docker where there is no desktop/GUI. Never ship an OS-specific path,
+command, or assumption without an equivalent (or an explicit, deliberate
+no-op) on the other platforms. When a feature genuinely cannot make sense on
+one platform (e.g. a GUI notification on a headless server), detect that
+platform explicitly and skip cleanly — never let it silently break or crash
+there.

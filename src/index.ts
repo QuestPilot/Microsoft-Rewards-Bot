@@ -460,11 +460,15 @@ export class MicrosoftRewardsBot {
     private logUsageTips(): void {
         if (cluster.isWorker) return
 
-        if (this.accounts.length > 1 && this.accounts.every(account => !account.proxy?.url)) {
+        // A handful of accounts sharing this machine's real IP is normal (a household
+        // rarely needs a proxy at all). Only worth a tip once the count is already
+        // past the household-limit threshold — same line where warnIfTooManyAccounts
+        // starts caring — otherwise this fires on every completely ordinary small setup.
+        if (this.accounts.length > ACCOUNT_SAFETY_WARNING_THRESHOLD && this.accounts.every(account => !account.proxy?.url)) {
             this.logger.warn(
                 'main',
                 'USAGE-TIP',
-                `${this.accounts.length} accounts are all running from this machine's real IP (no proxy configured on any of them). Microsoft's 2026 anti-bot system correlates accounts by IP and device signals — consider a mobile proxy per account, or turn on Strict proxy mode (Settings > Behavior > Browser) to catch any account missing one.`
+                `${this.accounts.length} accounts (above the household limit) are all running from this machine's real IP with no proxy configured. Microsoft's 2026 anti-bot system correlates accounts by IP and device signals — consider a mobile proxy per account beyond the household limit, or turn on Strict proxy mode (Settings > Behavior > Browser) to catch any account missing one.`
             )
         }
 

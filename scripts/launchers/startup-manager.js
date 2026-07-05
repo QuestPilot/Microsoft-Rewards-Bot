@@ -6,9 +6,11 @@ const { createRuntimeLaunchers } = require('./runtime-launchers')
 
 const DESK_TASK = 'Microsoft Rewards Bot Rewards Desk'
 const AGENT_TASK = 'Microsoft Rewards Bot Core Agent'
+const NOTIFIER_TASK = 'Microsoft Rewards Bot Update Notifier'
 const AGENT_SERVICE = 'msrb-core-agent.service'
 const DESK_LAUNCH_AGENT = 'com.msrb.rewards-desk'
 const CORE_LAUNCH_AGENT = 'com.msrb.core-agent'
+const NOTIFIER_LAUNCH_AGENT = 'com.msrb.update-notifier'
 
 function createStartupManager(options = {}) {
     const root = path.resolve(options.root || process.cwd())
@@ -46,7 +48,9 @@ function createStartupManager(options = {}) {
     }
 
     function launcher(mode) {
-        return mode === 'desk' ? launchers.ensureDeskLauncher() : launchers.ensureAgentLauncher()
+        if (mode === 'desk') return launchers.ensureDeskLauncher()
+        if (mode === 'notifier') return launchers.ensureNotifierLauncher()
+        return launchers.ensureAgentLauncher()
     }
 
     function windowsTaskState(name) {
@@ -55,7 +59,8 @@ function createStartupManager(options = {}) {
 
     function windowsStartupPath(mode) {
         const appData = env.APPDATA || path.join(home, 'AppData', 'Roaming')
-        const name = mode === 'desk' ? 'Rewards Desk.cmd' : 'Rewards Core Agent.cmd'
+        const name =
+            mode === 'desk' ? 'Rewards Desk.cmd' : mode === 'notifier' ? 'Rewards Update Notifier.cmd' : 'Rewards Core Agent.cmd'
         return path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', name)
     }
 
@@ -161,10 +166,27 @@ function createStartupManager(options = {}) {
         run('systemctl', ['--user', 'daemon-reload'])
     }
 
+    // Desktop-autostart, exactly like Desk — deliberately NOT systemd (which the Core
+    // agent uses precisely because it can run without a GUI session). The notifier's
+    // whole point is showing an OS notification, so it must never run on a headless
+    // Linux server or in Docker, where there is no desktop to notify.
+    function notifierLinuxPath() {
+        return path.join(home, '.config', 'autostart', 'rewards-update-notifier.desktop')
+    }
+
+    function installLinuxNotifier() {
+        atomicWrite(
+            notifierLinuxPath(),
+            `[Desktop Entry]\nType=Application\nName=Rewards Update Notifier\nExec=/bin/sh ${desktopQuote(launcher('notifier'))}\nX-GNOME-Autostart-enabled=true\nNoDisplay=true\n`,
+            0o600
+        )
+    }
+
     function status() {
         if (platform === 'win32') {
             const deskStartup = fs.existsSync(windowsStartupPath('desk'))
             const agentStartup = fs.existsSync(windowsStartupPath('agent'))
+            const notifierStartup = fs.existsSync(windowsStartupPath('notifier'))
             return {
                 desk: {
                     installed: deskStartup || windowsTaskState(DESK_TASK) || legacyDeskRegistryInstalled(),
@@ -174,25 +196,33 @@ function createStartupManager(options = {}) {
                     installed: agentStartup || windowsTaskState(AGENT_TASK),
                     method: agentStartup ? 'startup-folder' : 'legacy-task-scheduler',
                     supported: true
+                },
+                notifier: {
+                    installed: notifierStartup || windowsTaskState(NOTIFIER_TASK),
+                    method: notifierStartup ? 'startup-folder' : 'legacy-task-scheduler',
+                    supported: true
                 }
             }
         }
         if (platform === 'darwin') {
             return {
                 desk: { installed: fs.existsSync(launchAgentPath(DESK_LAUNCH_AGENT)), method: 'launch-agent' },
-                agent: { installed: fs.existsSync(launchAgentPath(CORE_LAUNCH_AGENT)), method: 'launch-agent', supported: true }
+                agent: { installed: fs.existsSync(launchAgentPath(CORE_LAUNCH_AGENT)), method: 'launch-agent', supported: true },
+                notifier: { installed: fs.existsSync(launchAgentPath(NOTIFIER_LAUNCH_AGENT)), method: 'launch-agent', supported: true }
             }
         }
         if (platform === 'linux') {
             const enabled = run('systemctl', ['--user', 'is-enabled', AGENT_SERVICE])
             return {
                 desk: { installed: fs.existsSync(deskLinuxPath()), method: 'desktop-autostart' },
-                agent: { installed: enabled.stdout === 'enabled', method: 'systemd-user', supported: true }
+                agent: { installed: enabled.stdout === 'enabled', method: 'systemd-user', supported: true },
+                notifier: { installed: fs.existsSync(notifierLinuxPath()), method: 'desktop-autostart', supported: true }
             }
         }
         return {
             desk: { installed: false, method: 'unsupported' },
-            agent: { installed: false, method: 'unsupported', supported: false }
+            agent: { installed: false, method: 'unsupported', supported: false },
+            notifier: { installed: false, method: 'unsupported', supported: false }
         }
     }
 
@@ -239,7 +269,28 @@ function createStartupManager(options = {}) {
         return status().agent
     }
 
-    return { setAgentEnabled, setDeskEnabled, status }
+    function setNotifierEnabled(enable) {
+        if (platform === 'win32') {
+            if (enable) {
+                installWindowsStartup('notifier')
+                removeWindowsTask(NOTIFIER_TASK, false)
+            } else {
+                fs.rmSync(windowsStartupPath('notifier'), { force: true })
+                removeWindowsTask(NOTIFIER_TASK)
+            }
+        } else if (platform === 'darwin') {
+            if (enable) installLaunchAgent(NOTIFIER_LAUNCH_AGENT, 'notifier')
+            else removeLaunchAgent(NOTIFIER_LAUNCH_AGENT)
+        } else if (platform === 'linux') {
+            if (enable) installLinuxNotifier()
+            else fs.rmSync(notifierLinuxPath(), { force: true })
+        } else {
+            throw new Error('Update notifier startup is not supported on this platform')
+        }
+        return status().notifier
+    }
+
+    return { setAgentEnabled, setDeskEnabled, setNotifierEnabled, status }
 }
 
 function systemdQuote(value) {

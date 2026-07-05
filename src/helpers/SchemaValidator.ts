@@ -63,6 +63,10 @@ const SafetyAdvisorySchema = z.object({
     blockedBehavior: z.enum(['prompt', 'continue', 'stop']).default('prompt')
 })
 
+const UpdateNotifierSchema = z.object({
+    enabled: z.boolean().default(true)
+})
+
 // Webhook — user notification channels only (Discord log lines, ntfy push)
 const WebhookSchema = z.object({
     discord: z
@@ -162,7 +166,8 @@ export const ConfigSchema = z.object({
         dashboardSync: z.boolean().optional(),
         captureDashboardPages: z.boolean().optional()
     }).optional(),
-    safetyAdvisory: SafetyAdvisorySchema.optional()
+    safetyAdvisory: SafetyAdvisorySchema.optional(),
+    updateNotifier: UpdateNotifierSchema.optional()
 })
     // Keep unknown top-level keys (e.g. `plugins`) instead of stripping them, so the
     // parsed result is safe to cache and use directly as the authoritative config.

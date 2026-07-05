@@ -103,3 +103,42 @@ test('Linux uses desktop autostart for Desk and systemd user service for Core ag
     assert.equal(fs.existsSync(path.join(home, '.config', 'autostart', 'rewards-desk.desktop')), true)
     assert.equal(fs.existsSync(path.join(home, '.config', 'systemd', 'user', 'msrb-core-agent.service')), true)
 })
+
+test('Windows update notifier installs a minimized Startup entry pointing at the daemon script', () => {
+    const { root, home, manager } = fixture('win32')
+    manager.setNotifierEnabled(true)
+    const status = manager.status()
+
+    assert.equal(status.notifier.installed, true)
+    assert.equal(status.notifier.method, 'startup-folder')
+    const runtimeScript = fs.readFileSync(path.join(root, 'scripts', 'runtime', 'start-notifier.cmd'), 'utf8')
+    assert.match(runtimeScript, /notifier-daemon\.js/)
+    const startupEntry = fs.readFileSync(
+        path.join(home, 'AppData', 'Roaming', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'Rewards Update Notifier.cmd'),
+        'utf8'
+    )
+    assert.match(startupEntry, /start "" \/min/)
+
+    manager.setNotifierEnabled(false)
+    assert.equal(manager.status().notifier.installed, false)
+})
+
+test('macOS update notifier uses a LaunchAgent, distinct from Desk and the Core agent', () => {
+    const { home, manager } = fixture('darwin')
+    manager.setNotifierEnabled(true)
+
+    assert.equal(manager.status().notifier.installed, true)
+    assert.equal(fs.existsSync(path.join(home, 'Library', 'LaunchAgents', 'com.msrb.update-notifier.plist')), true)
+})
+
+test('Linux update notifier uses desktop autostart, never systemd (must never run headless)', () => {
+    const { home, manager } = fixture('linux')
+    manager.setNotifierEnabled(true)
+
+    assert.equal(manager.status().notifier.installed, true)
+    assert.equal(fs.existsSync(path.join(home, '.config', 'autostart', 'rewards-update-notifier.desktop')), true)
+    assert.equal(fs.existsSync(path.join(home, '.config', 'systemd', 'user', 'msrb-update-notifier.service')), false)
+
+    manager.setNotifierEnabled(false)
+    assert.equal(fs.existsSync(path.join(home, '.config', 'autostart', 'rewards-update-notifier.desktop')), false)
+})

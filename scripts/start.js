@@ -4,6 +4,7 @@ const path = require('path')
 const { UpdateManager } = require('./updater/UpdateManager')
 const { bootstrapUserFiles, migrateUserFiles } = require('./updater/ConfigMigrator')
 const { ensurePatchrightChromium } = require('./build/ensure-patchright-browser')
+const { createStartupManager } = require('./launchers/startup-manager')
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -95,6 +96,41 @@ function terminalModeEnabled(config = readConfig()) {
 // stays reachable + controllable from Nexus without a GUI. Opt-in via config desk.headless.
 function headlessDeskService(config = readConfig()) {
     return config?.desk?.headless === true
+}
+
+// Update Notifier: tiny invisible background process, desktop OSes only (never a
+// headless Linux server or Docker — see hasGuiEnvironment below). Installed on the
+// first normal launch and kept in sync with config.updateNotifier.enabled on every
+// launch after that: disabling it in config.json removes its OS autostart
+// registration AND kills it if it's currently running (it doesn't fully uninstall —
+// deleting the bot folder is what actually removes it, matching every other
+// in-place launcher here).
+function killRunningNotifier(root = ROOT) {
+    const statePath = path.join(root, 'data', 'notifier', 'notifier.json')
+    try {
+        const state = JSON.parse(fs.readFileSync(statePath, 'utf8'))
+        if (state?.pid) process.kill(state.pid, 'SIGTERM')
+    } catch {
+        // Not running, or already gone — nothing to do.
+    }
+    fs.rmSync(statePath, { force: true })
+}
+
+function syncUpdateNotifier(config = readConfig(), root = ROOT, env = process.env) {
+    if (!hasGuiEnvironment(env)) return // nowhere for a native notification to appear
+    const enabled = config?.updateNotifier?.enabled !== false
+    const manager = createStartupManager({ root })
+    try {
+        const installed = manager.status().notifier.installed
+        if (enabled && !installed) {
+            manager.setNotifierEnabled(true)
+        } else if (!enabled) {
+            if (installed) manager.setNotifierEnabled(false)
+            killRunningNotifier(root)
+        }
+    } catch (error) {
+        console.warn(`[START] Update notifier sync skipped: ${error instanceof Error ? error.message : String(error)}`)
+    }
 }
 
 function hasGuiEnvironment(env = process.env) {
@@ -437,6 +473,13 @@ async function main() {
             migrateUserFiles(ROOT)
         } catch (error) {
             console.warn(`[START] Config migration skipped: ${error instanceof Error ? error.message : String(error)}`)
+        }
+
+        // Only for normal desktop launches — never a background/agent run (headless
+        // farming, no GUI expectation) or an --attach (reattaching to an already-
+        // running agent, not a fresh startup event).
+        if (!isBackgroundLaunch() && !isAttachLaunch()) {
+            syncUpdateNotifier(readConfig(ROOT), ROOT, process.env)
         }
     }
 

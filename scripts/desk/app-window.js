@@ -3417,6 +3417,13 @@ function html() {
             </div>
           </div>
           <div class="settings-section">
+            <h3>Update notifier</h3>
+            <div class="settings-section-note">A tiny background process (desktop only, no window) that starts with your computer, checks for bot updates, and reminds you to open Rewards Desk if it's been a while. Stays inside this install folder — deleting the bot removes it too.</div>
+            <div class="toggle-grid">
+              <div class="toggle-wrap"><div class="toggle-wrap-left"><div class="toggle-label">Background update notifier</div><div class="toggle-sub">Notify me about updates and remind me to run the bot</div></div><label class="toggle"><input type="checkbox" id="tog-updateNotifier"><span class="toggle-slider"></span></label></div>
+            </div>
+          </div>
+          <div class="settings-section">
             <h3>Search tuning</h3>
             <div class="settings-section-note">Fine-tune search behaviour and timing. Delays accept values like <b>3min</b> or <b>8sec</b>.</div>
             <div class="toggle-grid">
@@ -5250,6 +5257,7 @@ function html() {
       var analyticsEnabled = s.analytics != null ? s.analytics.enabled !== false : true;
       var togAn = G('tog-analytics'); if (togAn) togAn.checked = analyticsEnabled;
       var anWarn = G('analytics-warning'); if (anWarn) anWarn.style.display = analyticsEnabled ? 'none' : 'block';
+      var notifTog = G('tog-updateNotifier'); if (notifTog) notifTog.checked = s.updateNotifier == null || s.updateNotifier.enabled !== false;
       // Local network access (LAN) — toggle + bookmarkable address for other devices
       var lan = G('tog-lanAccess'); if (lan) lan.checked = s.deskLanAccess === true;
       var lanRow = G('lan-url-row'); if (lanRow) lanRow.style.display = s.deskLanAccess ? '' : 'none';
@@ -5687,6 +5695,15 @@ function html() {
     });
     var _openRemote = G('btn-open-remote');
     if (_openRemote) _openRemote.addEventListener('click', function() { var b = G('remote-btn'); if (b) b.click(); });
+    // Update notifier — the background process is installed/removed by scripts/start.js
+    // at the NEXT launch (not live), so this just persists the flag and tells the user.
+    var _notifierTog = G('tog-updateNotifier');
+    if (_notifierTog) _notifierTog.addEventListener('change', function() {
+      saveSetting('updateNotifier.enabled', this.checked);
+      showToast(this.checked
+        ? 'Update notifier enabled — restart the Desk to apply.'
+        : 'Update notifier disabled — restart the Desk to apply.');
+    });
     // Free-text search-tuning fields (debounced save on change; brief saved pulse).
     var TEXT_MAP = {
       'set-visitTime':'searchSettings.searchResultVisitTime',
@@ -7261,6 +7278,7 @@ const server = http.createServer((req, res) => {
                 debugLogs: cfg.debugLogs,
                 searchOnBingLocalQueries: cfg.searchOnBingLocalQueries,
                 analytics: cfg.analytics,
+                updateNotifier: cfg.updateNotifier || {},
                 terminal: cfg.terminal || { enabled: false },
                 scheduler: cfg.scheduler || {},
                 core: cfg.core || {},
