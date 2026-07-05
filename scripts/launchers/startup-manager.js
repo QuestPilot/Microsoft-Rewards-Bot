@@ -290,7 +290,50 @@ function createStartupManager(options = {}) {
         return status().notifier
     }
 
-    return { setAgentEnabled, setDeskEnabled, setNotifierEnabled, status }
+    // Re-create the generated launchers (scripts/runtime/*) that installed
+    // shortcuts and OS auto-start entries resolve to, so they always exist and
+    // reflect the current template. Those files live in the gitignored
+    // scripts/runtime and are otherwise only written at install time — this is
+    // what lets an ordinary launch self-heal them (e.g. after a manual folder
+    // copy, or an older updater build that wiped scripts/runtime). The Desk
+    // launcher is the primary entry point (every desktop/menu shortcut and the
+    // Desk auto-start target point at it), so it is always regenerated; the
+    // agent/notifier launchers only when their OS auto-start entry is present.
+    // Best-effort per launcher — never throws, never blocks startup.
+    function ensureInstalledLaunchers() {
+        const ensured = { desk: false, agent: false, notifier: false }
+        let state
+        try {
+            state = status()
+        } catch {
+            state = {}
+        }
+        try {
+            launchers.ensureDeskLauncher()
+            ensured.desk = true
+        } catch {
+            /* ignore */
+        }
+        if (state.agent && state.agent.installed) {
+            try {
+                launchers.ensureAgentLauncher()
+                ensured.agent = true
+            } catch {
+                /* ignore */
+            }
+        }
+        if (state.notifier && state.notifier.installed) {
+            try {
+                launchers.ensureNotifierLauncher()
+                ensured.notifier = true
+            } catch {
+                /* ignore */
+            }
+        }
+        return ensured
+    }
+
+    return { setAgentEnabled, setDeskEnabled, setNotifierEnabled, status, ensureInstalledLaunchers }
 }
 
 function systemdQuote(value) {

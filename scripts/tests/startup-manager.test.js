@@ -142,3 +142,36 @@ test('Linux update notifier uses desktop autostart, never systemd (must never ru
     manager.setNotifierEnabled(false)
     assert.equal(fs.existsSync(path.join(home, '.config', 'autostart', 'rewards-update-notifier.desktop')), false)
 })
+
+test('ensureInstalledLaunchers self-heals launchers wiped from scripts/runtime', () => {
+    const { root, manager } = fixture('win32')
+    manager.setDeskEnabled(true)
+    manager.setAgentEnabled(true)
+
+    // Simulate an update that removed the generated launchers (the original bug).
+    fs.rmSync(path.join(root, 'scripts', 'runtime'), { recursive: true, force: true })
+    assert.equal(fs.existsSync(path.join(root, 'scripts', 'runtime', 'start-desk.cmd')), false)
+
+    const ensured = manager.ensureInstalledLaunchers()
+
+    assert.equal(ensured.desk, true)
+    assert.equal(ensured.agent, true)
+    // Desk + agent launchers are back because both auto-start entries are installed;
+    // the notifier one is not, so it is not created.
+    assert.equal(fs.existsSync(path.join(root, 'scripts', 'runtime', 'start-desk.cmd')), true)
+    assert.equal(fs.existsSync(path.join(root, 'scripts', 'runtime', 'start-background.cmd')), true)
+    assert.equal(fs.existsSync(path.join(root, 'scripts', 'runtime', 'start-notifier.cmd')), false)
+})
+
+test('ensureInstalledLaunchers always restores the Desk launcher even with no auto-start entry', () => {
+    // The desktop/menu shortcut points at start-desk.cmd but is tracked separately
+    // from OS auto-start, so the Desk launcher must be regenerated regardless.
+    const { root, manager } = fixture('win32')
+
+    const ensured = manager.ensureInstalledLaunchers()
+
+    assert.equal(ensured.desk, true)
+    assert.equal(ensured.agent, false)
+    assert.equal(fs.existsSync(path.join(root, 'scripts', 'runtime', 'start-desk.cmd')), true)
+    assert.equal(fs.existsSync(path.join(root, 'scripts', 'runtime', 'start-background.cmd')), false)
+})

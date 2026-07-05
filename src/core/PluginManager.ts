@@ -1045,10 +1045,8 @@ export class PluginManager {
         // Pin the LOADED entrypoint too, not just the bytecode it loads. `filePath` here
         // is the tiny in-process shim (plugins/core/index.js) that require()s the verified
         // .jsc — a tampered shim could load a different file while the bytecode hash still
-        // "passes". Enforced when the signed manifest pins the shim hash; current manifests
-        // may omit it (absent = skip, so existing signed Cores keep loading — no regression).
-        // TODO(review): have the signer ALWAYS populate shimSha256 in official-core.json
-        // (and re-sign), then make this mandatory for entryName 'core' loaded via index.js.
+        // "passes". The signer always populates shimSha256 now; the fallback branch below
+        // only still applies to Cores signed before that (older manifests without the pin).
         if (path.basename(filePath) === 'index.js') {
             const shimSha = target.shimSha256 ?? manifest.shimSha256
             if (shimSha) {

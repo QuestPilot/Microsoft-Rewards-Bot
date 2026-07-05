@@ -36,6 +36,12 @@ const DEFAULT_EXCLUDES = [
     'diagnostics',
     'Page',
     'sessions',
+    // Generated at runtime (gitignored, never shipped in a release) — the OS
+    // shortcuts and auto-start entries point straight at scripts/runtime/*.cmd,
+    // so pruning them because they're absent from the release tree silently
+    // breaks every launcher until start.js/the notifier re-creates them. Keep
+    // them across updates; start.js re-ensures their content on each launch.
+    'scripts/runtime',
     'src/config.json',
     'src/accounts.json',
     'src/accounts.enc.json',

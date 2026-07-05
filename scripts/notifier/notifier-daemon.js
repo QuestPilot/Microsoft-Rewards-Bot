@@ -214,6 +214,17 @@ async function main() {
     if (!notifierEnabled()) return
     if (!claimSingleInstance()) return
 
+    // The notifier is the one launcher that survives a scripts/runtime wipe (its own
+    // start-notifier.* is what keeps this process coming back at login). So it is also
+    // the only entry point that can repair a broken install where the Desk launcher
+    // was removed — regenerate start-desk.* here so the dead desktop shortcut works
+    // again at the next login, without waiting for the user to click a notification.
+    try {
+        launchers.ensureDeskLauncher()
+    } catch {
+        // Best-effort: openDesk() also re-ensures it on click as a fallback.
+    }
+
     await tick()
     intervalHandle = setInterval(() => {
         tick().catch(() => undefined)

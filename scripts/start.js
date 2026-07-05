@@ -443,6 +443,21 @@ async function main() {
         migrateLaunchers(ROOT, process.env)
     }
 
+    // Self-heal the generated launchers (scripts/runtime/*) that the OS shortcuts
+    // and auto-start entries point at. They are gitignored and were only written
+    // at install time, so anything that removed them — a manual folder copy, or an
+    // older updater build that pruned scripts/runtime — left the shortcut pointing
+    // at a missing file (clicking it did nothing). Re-ensuring them here on every
+    // real launch keeps them present and in sync with the current template. Never
+    // allowed to block startup.
+    if (!harvesterLaunch) {
+        try {
+            createStartupManager({ root: ROOT }).ensureInstalledLaunchers()
+        } catch {
+            /* best-effort: a launch that got this far already has a working launcher */
+        }
+    }
+
     if (shouldRunUpdater()) {
         const updater = new UpdateManager()
         const updateResult = await updater.run()

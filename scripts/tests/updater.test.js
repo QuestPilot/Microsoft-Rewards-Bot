@@ -483,6 +483,35 @@ test('applying release preserves user files and removes obsolete managed files',
     assert.equal(fs.readFileSync(path.join(root, 'src', 'new.ts'), 'utf8'), 'new')
 })
 
+test('applying release preserves generated launchers under scripts/runtime', () => {
+    // scripts/ is a managed path but scripts/runtime holds gitignored launchers the
+    // OS shortcuts point at; pruning them (absent from the release tree) used to
+    // silently break every shortcut. They must survive an update untouched.
+    const root = tempRoot()
+    const source = tempRoot()
+    const backup = path.join(root, '.updates', 'backup')
+
+    fs.mkdirSync(path.join(root, 'scripts', 'runtime'), { recursive: true })
+    fs.mkdirSync(path.join(source, 'scripts'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    // A launcher generated locally, plus a stale tracked script the release drops.
+    fs.writeFileSync(path.join(root, 'scripts', 'runtime', 'start-desk.cmd'), '@echo off\r\n')
+    fs.writeFileSync(path.join(root, 'scripts', 'old-tool.js'), 'old')
+    fs.writeFileSync(path.join(source, 'scripts', 'new-tool.js'), 'new')
+
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.applyFromSourceRoot(source, backup)
+
+    assert.equal(
+        fs.readFileSync(path.join(root, 'scripts', 'runtime', 'start-desk.cmd'), 'utf8'),
+        '@echo off\r\n',
+        'generated launcher under scripts/runtime must survive an update'
+    )
+    assert.equal(fs.existsSync(path.join(root, 'scripts', 'old-tool.js')), false, 'stale managed script is still pruned')
+    assert.equal(fs.readFileSync(path.join(root, 'scripts', 'new-tool.js'), 'utf8'), 'new')
+})
+
 test('git updater resets to the target commit and restores user config files', async t => {
     if (!hasGit()) {
         t.skip('git is not available')
