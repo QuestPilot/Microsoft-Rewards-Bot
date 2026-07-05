@@ -51,9 +51,8 @@ export async function sendNtfy(config: WebhookNtfyConfig, content: string, level
     await ntfyQueue.add(async () => {
         try {
             await axios(request)
-        } catch (err: any) {
-            const status = err?.response?.status
-            if (status === 429) return
+        } catch (err: unknown) {
+            if (axios.isAxiosError(err) && err.response?.status === 429) return
         }
     })
 }
