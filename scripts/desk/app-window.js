@@ -40,7 +40,11 @@ try {
 } catch {}
 
 function readVersion() {
-    try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version } catch { return '4.0.x' }
+    try {
+        return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version
+    } catch {
+        return '4.0.x'
+    }
 }
 
 // The address other devices on the home network use to reach the Desk when LAN
@@ -84,14 +88,20 @@ function reportDeskPresence() {
         const u = new URL(DASHBOARD_URL + '/api/desk/presence')
         const transport = u.protocol === 'http:' ? require('http') : require('https')
         const payload = JSON.stringify({ port: deskBoundPort, lanUrl: deskLanUrl })
-        const req = transport.request({
-            hostname: u.hostname,
-            port: u.port || (u.protocol === 'http:' ? 80 : 443),
-            path: u.pathname,
-            method: 'POST',
-            headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) },
-            timeout: 8000
-        }, resp => { resp.on('data', () => {}); resp.on('end', () => {}) })
+        const req = transport.request(
+            {
+                hostname: u.hostname,
+                port: u.port || (u.protocol === 'http:' ? 80 : 443),
+                path: u.pathname,
+                method: 'POST',
+                headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) },
+                timeout: 8000
+            },
+            resp => {
+                resp.on('data', () => {})
+                resp.on('end', () => {})
+            }
+        )
         req.on('error', () => {})
         req.on('timeout', () => req.destroy())
         req.end(payload)
@@ -140,7 +150,13 @@ function killPidTree(pid) {
         if (process.platform === 'win32') {
             childProcess.spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
         } else {
-            try { process.kill(-pid, 'SIGKILL') } catch { try { process.kill(pid, 'SIGKILL') } catch {} }
+            try {
+                process.kill(-pid, 'SIGKILL')
+            } catch {
+                try {
+                    process.kill(pid, 'SIGKILL')
+                } catch {}
+            }
         }
     } catch {}
 }
@@ -155,7 +171,9 @@ async function stopAgentProcess() {
         if (!status.active) return
         pid = status.pid || null
     } catch {}
-    try { await agentApi.stopExistingAgent() } catch {}
+    try {
+        await agentApi.stopExistingAgent()
+    } catch {}
     try {
         const after = await agentApi.getAgentStatus().catch(() => ({ active: false }))
         if (after.active) killPidTree(after.pid || pid)
@@ -192,9 +210,20 @@ const APP_VERSION = readVersion()
 function readBotStats() {
     const statsDir = path.join(ROOT, 'data', 'stats')
     const out = {
-        hasData: false, totalPoints: 0, totalRuns: 0, totalAccountRuns: 0, successfulAccountRuns: 0,
-        successRate: null, claimedPoints: 0, couponsApplied: 0, couponPointsSaved: 0,
-        last7Points: 0, last30Points: 0, firstRunAt: null, lastRunAt: null, accountsTracked: 0
+        hasData: false,
+        totalPoints: 0,
+        totalRuns: 0,
+        totalAccountRuns: 0,
+        successfulAccountRuns: 0,
+        successRate: null,
+        claimedPoints: 0,
+        couponsApplied: 0,
+        couponPointsSaved: 0,
+        last7Points: 0,
+        last30Points: 0,
+        firstRunAt: null,
+        lastRunAt: null,
+        accountsTracked: 0
     }
     try {
         const g = JSON.parse(fs.readFileSync(path.join(statsDir, 'global.json'), 'utf8'))
@@ -203,13 +232,16 @@ function readBotStats() {
         out.totalRuns = g.totalRuns || 0
         out.totalAccountRuns = g.totalAccountRuns || 0
         out.successfulAccountRuns = g.totalSuccessfulAccountRuns || 0
-        out.successRate = out.totalAccountRuns > 0 ? Math.round((out.successfulAccountRuns / out.totalAccountRuns) * 100) : null
+        out.successRate =
+            out.totalAccountRuns > 0 ? Math.round((out.successfulAccountRuns / out.totalAccountRuns) * 100) : null
         out.claimedPoints = g.totalClaimedPoints || 0
         out.couponsApplied = g.totalCouponsApplied || 0
         out.couponPointsSaved = g.totalCouponPointsSaved || 0
         out.firstRunAt = g.firstRunAt || null
         out.lastRunAt = g.lastRunAt || null
-    } catch { /* no global stats yet */ }
+    } catch {
+        /* no global stats yet */
+    }
     try {
         const dailyDir = path.join(statsDir, 'daily')
         const now = Date.now()
@@ -219,14 +251,20 @@ function readBotStats() {
             if (Number.isNaN(t)) continue
             const ageDays = (now - t) / 86400000
             let pts = 0
-            try { pts = JSON.parse(fs.readFileSync(path.join(dailyDir, f), 'utf8')).totalPointsCollected || 0 } catch {}
+            try {
+                pts = JSON.parse(fs.readFileSync(path.join(dailyDir, f), 'utf8')).totalPointsCollected || 0
+            } catch {}
             if (ageDays <= 7) out.last7Points += pts
             if (ageDays <= 30) out.last30Points += pts
         }
-    } catch { /* no daily stats yet */ }
+    } catch {
+        /* no daily stats yet */
+    }
     try {
         out.accountsTracked = fs.readdirSync(path.join(statsDir, 'accounts')).filter(f => f.endsWith('.json')).length
-    } catch { /* no per-account stats yet */ }
+    } catch {
+        /* no per-account stats yet */
+    }
     return out
 }
 
@@ -239,10 +277,16 @@ function buildInsights() {
     const out = {
         hasData: base.hasData,
         totals: {
-            points: base.totalPoints, runs: base.totalRuns, accountRuns: base.totalAccountRuns,
-            successRate: base.successRate, claimedPoints: base.claimedPoints,
-            couponsApplied: base.couponsApplied, accountsTracked: base.accountsTracked,
-            last7Points: base.last7Points, last30Points: base.last30Points, lastRunAt: base.lastRunAt
+            points: base.totalPoints,
+            runs: base.totalRuns,
+            accountRuns: base.totalAccountRuns,
+            successRate: base.successRate,
+            claimedPoints: base.claimedPoints,
+            couponsApplied: base.couponsApplied,
+            accountsTracked: base.accountsTracked,
+            last7Points: base.last7Points,
+            last30Points: base.last30Points,
+            lastRunAt: base.lastRunAt
         },
         daily: [],
         accounts: [],
@@ -256,7 +300,9 @@ function buildInsights() {
             const date = f.slice(0, -5)
             if (Number.isNaN(Date.parse(date))) continue
             let d = {}
-            try { d = JSON.parse(fs.readFileSync(path.join(dailyDir, f), 'utf8')) } catch {}
+            try {
+                d = JSON.parse(fs.readFileSync(path.join(dailyDir, f), 'utf8'))
+            } catch {}
             const ar = d.accountRuns || 0
             rows.push({
                 date,
@@ -267,20 +313,25 @@ function buildInsights() {
         }
         rows.sort((a, b) => (a.date < b.date ? -1 : 1))
         out.daily = rows.slice(-30)
-    } catch { /* no daily stats */ }
+    } catch {
+        /* no daily stats */
+    }
     try {
         const accDir = path.join(statsDir, 'accounts')
         for (const f of fs.readdirSync(accDir)) {
             if (!f.endsWith('.json')) continue
             let a = {}
-            try { a = JSON.parse(fs.readFileSync(path.join(accDir, f), 'utf8')) } catch {}
+            try {
+                a = JSON.parse(fs.readFileSync(path.join(accDir, f), 'utf8'))
+            } catch {}
             const totalRuns = a.totalRuns || 0
             const hist = Array.isArray(a.history) ? a.history : []
             const recent = hist.slice(-3)
             const lastErr = [...hist].reverse().find(h => h && h.error)
             let status = 'ok'
             if (recent.length >= 2 && recent.every(h => h && h.success === false)) status = 'failing'
-            else if (totalRuns > 0 && (a.lastKnownPoints || 0) === 0 && (a.totalPointsCollected || 0) === 0) status = 'idle'
+            else if (totalRuns > 0 && (a.lastKnownPoints || 0) === 0 && (a.totalPointsCollected || 0) === 0)
+                status = 'idle'
             out.accounts.push({
                 name: a.maskedEmail || a.emailKey || 'account',
                 points: a.totalPointsCollected || 0,
@@ -292,8 +343,10 @@ function buildInsights() {
                 signedOut: !!(lastErr && /sign|enrol|onboard|authenticat|session/i.test(String(lastErr.error)))
             })
         }
-    } catch { /* no per-account stats */ }
-    out.accounts.sort((a, b) => (b.points - a.points) || (b.lastKnownPoints - a.lastKnownPoints))
+    } catch {
+        /* no per-account stats */
+    }
+    out.accounts.sort((a, b) => b.points - a.points || b.lastKnownPoints - a.lastKnownPoints)
     out.recommendations = computeRecommendations(out)
     return out
 }
@@ -307,36 +360,74 @@ function computeRecommendations(ins) {
         recs.push({
             severity: 'high',
             title: signedOut.length + ' account' + (signedOut.length > 1 ? 's look' : ' looks') + ' signed out',
-            detail: 'They earn nothing until you re-login or finish Microsoft Rewards enrollment: ' +
-                signedOut.slice(0, 6).map(a => a.name).join(', ') + (signedOut.length > 6 ? '…' : '') + '.'
+            detail:
+                'They earn nothing until you re-login or finish Microsoft Rewards enrollment: ' +
+                signedOut
+                    .slice(0, 6)
+                    .map(a => a.name)
+                    .join(', ') +
+                (signedOut.length > 6 ? '…' : '') +
+                '.'
         })
     }
     const failing = accts.filter(a => a.status === 'failing' && !signedOutNames.has(a.name))
     if (failing.length) {
-        recs.push({ severity: 'high', title: failing.length + ' account' + (failing.length > 1 ? 's keep' : ' keeps') + ' failing',
-            detail: 'Check the login or proxy for: ' + failing.slice(0, 6).map(a => a.name).join(', ') + '.' })
+        recs.push({
+            severity: 'high',
+            title: failing.length + ' account' + (failing.length > 1 ? 's keep' : ' keeps') + ' failing',
+            detail:
+                'Check the login or proxy for: ' +
+                failing
+                    .slice(0, 6)
+                    .map(a => a.name)
+                    .join(', ') +
+                '.'
+        })
     }
     const zero = accts.filter(a => a.runs > 0 && a.points === 0 && a.status === 'ok' && !signedOutNames.has(a.name))
     if (zero.length) {
-        recs.push({ severity: 'medium', title: zero.length + ' account' + (zero.length > 1 ? 's' : '') + ' collected 0 points',
-            detail: 'They run but earn nothing — make sure searches and the daily set are enabled, and the accounts are enrolled.' })
+        recs.push({
+            severity: 'medium',
+            title: zero.length + ' account' + (zero.length > 1 ? 's' : '') + ' collected 0 points',
+            detail: 'They run but earn nothing — make sure searches and the daily set are enabled, and the accounts are enrolled.'
+        })
     }
     if (ins.totals.successRate != null && ins.totals.successRate < 70 && ins.totals.accountRuns >= 3) {
-        recs.push({ severity: 'medium', title: 'Success rate is ' + ins.totals.successRate + '%',
-            detail: 'Several account runs fail. Fixing the accounts above should raise it.' })
+        recs.push({
+            severity: 'medium',
+            title: 'Success rate is ' + ins.totals.successRate + '%',
+            detail: 'Several account runs fail. Fixing the accounts above should raise it.'
+        })
     }
     if (ins.totals.lastRunAt) {
         const days = Math.floor((Date.now() - Date.parse(ins.totals.lastRunAt)) / 86400000)
-        if (days >= 2) recs.push({ severity: 'low', title: 'No run in ' + days + ' days',
-            detail: 'Turn on the scheduler (Settings) so points are collected automatically every day.' })
+        if (days >= 2)
+            recs.push({
+                severity: 'low',
+                title: 'No run in ' + days + ' days',
+                detail: 'Turn on the scheduler (Settings) so points are collected automatically every day.'
+            })
     }
     if (!recs.length) {
         const top = accts.find(a => a.points > 0)
-        recs.push(top
-            ? { severity: 'low', title: 'Everything looks healthy',
-                detail: 'Top account ' + top.name + ' collected ' + top.points.toLocaleString() + ' points. Keep it running daily to maximise earnings.' }
-            : { severity: 'low', title: 'Not enough data yet',
-                detail: 'Run the bot a few more times to unlock deeper recommendations.' })
+        recs.push(
+            top
+                ? {
+                      severity: 'low',
+                      title: 'Everything looks healthy',
+                      detail:
+                          'Top account ' +
+                          top.name +
+                          ' collected ' +
+                          top.points.toLocaleString() +
+                          ' points. Keep it running daily to maximise earnings.'
+                  }
+                : {
+                      severity: 'low',
+                      title: 'Not enough data yet',
+                      detail: 'Run the bot a few more times to unlock deeper recommendations.'
+                  }
+        )
     }
     return recs
 }
@@ -379,7 +470,11 @@ function accountsWithAvatarId() {
     return masked.map((m, i) => {
         const r = raw[i]
         if (!r || !r.email) return m
-        const avatarId = crypto.createHash('sha256').update(String(r.email).toLowerCase().trim()).digest('hex').slice(0, 16)
+        const avatarId = crypto
+            .createHash('sha256')
+            .update(String(r.email).toLowerCase().trim())
+            .digest('hex')
+            .slice(0, 16)
         return { ...m, avatarId }
     })
 }
@@ -390,14 +485,20 @@ const STAR_GITHUB = 'https://github.com/QuestPilot/Microsoft-Rewards-Bot'
 const STAR_MAX_SHOWS = 2
 
 function readStarState() {
-    try { return JSON.parse(fs.readFileSync(DATA_STORE, 'utf8')).star || {} } catch { return {} }
+    try {
+        return JSON.parse(fs.readFileSync(DATA_STORE, 'utf8')).star || {}
+    } catch {
+        return {}
+    }
 }
 function saveStarState(obj) {
     try {
-        const dataDir = path.dirname(DATA_STORE);
+        const dataDir = path.dirname(DATA_STORE)
         if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
         let data = {}
-        try { data = JSON.parse(fs.readFileSync(DATA_STORE, 'utf8')) } catch {}
+        try {
+            data = JSON.parse(fs.readFileSync(DATA_STORE, 'utf8'))
+        } catch {}
         data.star = obj
         fs.writeFileSync(DATA_STORE, JSON.stringify(data, null, 2), 'utf8')
     } catch {}
@@ -459,12 +560,16 @@ function runCoreLicenseWorker(payload) {
 function startAccountStorageWorker() {
     if (accountWorkerReady) return accountWorkerReady
     accountWorkerReady = new Promise((resolve, reject) => {
-        accountWorker = childProcess.spawn(process.execPath, [path.join(__dirname, '..', 'account-storage-worker.js')], {
-            cwd: ROOT,
-            env: process.env,
-            stdio: ['pipe', 'pipe', 'pipe'],
-            windowsHide: true
-        })
+        accountWorker = childProcess.spawn(
+            process.execPath,
+            [path.join(__dirname, '..', 'account-storage-worker.js')],
+            {
+                cwd: ROOT,
+                env: process.env,
+                stdio: ['pipe', 'pipe', 'pipe'],
+                windowsHide: true
+            }
+        )
         let stdout = ''
         let stderr = ''
         const timeout = setTimeout(() => reject(new Error('Account storage initialization timed out')), 45_000)
@@ -598,7 +703,9 @@ function stripSpinnerFrame(s) {
 }
 
 function pushLog(level, message) {
-    const clean = String(message || '').replace(/\x1b\[[0-9;]*m/g, '').trim()
+    const clean = String(message || '')
+        .replace(/\x1b\[[0-9;]*m/g, '')
+        .trim()
     if (!clean) return
 
     updateStateFromLine(clean)
@@ -620,7 +727,11 @@ function pushLog(level, message) {
 
     // The friendly log feed dedupes spinner frames the same way.
     const prevFriendly = state.logs[state.logs.length - 1]
-    if (isSpinnerFrame && prevFriendly && stripSpinnerFrame(prevFriendly.message) === stripSpinnerFrame(toFriendlyLog(clean))) {
+    if (
+        isSpinnerFrame &&
+        prevFriendly &&
+        stripSpinnerFrame(prevFriendly.message) === stripSpinnerFrame(toFriendlyLog(clean))
+    ) {
         prevFriendly.message = toFriendlyLog(clean)
         prevFriendly.at = now
     } else {
@@ -638,7 +749,8 @@ function toFriendlyLog(line) {
     if (/Completed all accounts/i.test(line)) return 'Run complete.'
     if (/Applied .*coupon/i.test(line)) return line.replace(/^.*COUPONS\s*/i, '')
     if (/Claimed .*points/i.test(line)) return line.replace(/^.*CLAIM-POINTS\s*/i, '')
-    if (/Search counters unavailable/i.test(line)) return 'Microsoft dashboard counters are unavailable; using safe fallback.'
+    if (/Search counters unavailable/i.test(line))
+        return 'Microsoft dashboard counters are unavailable; using safe fallback.'
     if (/requires Core/i.test(line)) return 'A premium action needs Core.'
     return line
 }
@@ -659,7 +771,9 @@ function updateStateFromLine(line) {
         state.licensePrompt.visible = true
         state.licensePrompt.status = 'waiting'
         state.licensePrompt.message = 'Enter your Core license key, or continue without Core.'
-    } else if (/Invalid license key|License server not configured|Unable to reach the license server|Try again/i.test(line)) {
+    } else if (
+        /Invalid license key|License server not configured|Unable to reach the license server|Try again/i.test(line)
+    ) {
         state.licensePrompt.visible = true
         state.licensePrompt.status = 'invalid'
         state.licensePrompt.message = toFriendlyLog(line)
@@ -682,7 +796,8 @@ function updateStateFromLine(line) {
         state.detail = `${accountMatch[1]} account(s) processed`
     }
 
-    const pointsMatch = line.match(/Total points collected:\s*\+?(-?\d+)/i) || line.match(/Points collected:\s*\+?(-?\d+)/i)
+    const pointsMatch =
+        line.match(/Total points collected:\s*\+?(-?\d+)/i) || line.match(/Points collected:\s*\+?(-?\d+)/i)
     if (pointsMatch) state.metrics.points = Number(pointsMatch[1])
 
     const couponMatch = line.match(/(\d+)\/(\d+)\s+coupon/i)
@@ -739,7 +854,9 @@ async function startBot() {
     state.isRunning = true
     state.licensePrompt.visible = false
     state.licensePrompt.status = state.hasLicenseCache ? 'checking' : 'skipped'
-    state.licensePrompt.message = state.hasLicenseCache ? 'Checking Core license...' : 'Starting without a Core license.'
+    state.licensePrompt.message = state.hasLicenseCache
+        ? 'Checking Core license...'
+        : 'Starting without a Core license.'
     state.metrics.progress = 6
     pushLog('info', 'Starting Rewards Bot run.')
 
@@ -775,7 +892,11 @@ async function startBot() {
         state.exitCode = code
         state.finishedAt = new Date().toISOString()
         state.status = stopRequested ? 'Stopped' : code === 0 ? 'Complete' : 'Attention'
-        state.detail = stopRequested ? 'Stopped by user' : code === 0 ? 'Run finished' : 'The bot stopped before completing'
+        state.detail = stopRequested
+            ? 'Stopped by user'
+            : code === 0
+              ? 'Run finished'
+              : 'The bot stopped before completing'
         state.metrics.progress = code === 0 ? 100 : state.metrics.progress
     })
     return true
@@ -844,6 +965,12 @@ function sendInput(value) {
 const { createConfig } = require('./config')
 const { readConfigRaw, writeConfigPatch } = createConfig({ root: ROOT, atomicWriteText })
 
+// Desk-side anonymous telemetry (same relay, same instance id, same opt-out as the
+// bot's AnalyticsService). Emits `feature_toggled` on settings changes and
+// `desk_session_ended` on shutdown.
+const { createDeskAnalytics } = require('./analytics')
+const deskAnalytics = createDeskAnalytics({ root: ROOT, readConfigRaw, version: readVersion() })
+
 // ── Auto-detected dashboard variant (cosmetic badge hint) ────────────────────
 // The bot writes sessions/<email>/dashboard-variant.json after detecting which
 // Microsoft dashboard (legacy ASP vs new Next.js) each account was served. We read
@@ -851,31 +978,42 @@ const { readConfigRaw, writeConfigPatch } = createConfig({ root: ROOT, atomicWri
 // never persisted back into the account store (see /api/accounts-save).
 function readDetectedVariant(email) {
     try {
-        if (!email) return null;
-        var cfg = readConfigRaw();
-        var sessionPath = (cfg && cfg.sessionPath) ? cfg.sessionPath : 'sessions';
-        var file = path.join(ROOT, sessionPath, email, 'dashboard-variant.json');
-        if (!fs.existsSync(file)) return null;
-        var data = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (!email) return null
+        var cfg = readConfigRaw()
+        var sessionPath = cfg && cfg.sessionPath ? cfg.sessionPath : 'sessions'
+        var file = path.join(ROOT, sessionPath, email, 'dashboard-variant.json')
+        if (!fs.existsSync(file)) return null
+        var data = JSON.parse(fs.readFileSync(file, 'utf8'))
         // Prefer desktop (its served dashboard rarely differs from mobile); fall back.
-        var v = (data && (data.desktop || data.mobile)) || null;
-        return (v === 'next' || v === 'legacy') ? v : null;
-    } catch (e) { return null; }
+        var v = (data && (data.desktop || data.mobile)) || null
+        return v === 'next' || v === 'legacy' ? v : null
+    } catch (e) {
+        return null
+    }
 }
 
 function enrichAccountsWithVariant(accounts) {
-    if (!Array.isArray(accounts)) return accounts;
+    if (!Array.isArray(accounts)) return accounts
     return accounts.map(function (a) {
-        if (!a || !a.email) return a;
-        var v = readDetectedVariant(a.email);
-        return v ? Object.assign({}, a, { lastDetectedVariant: v }) : a;
-    });
+        if (!a || !a.email) return a
+        var v = readDetectedVariant(a.email)
+        return v ? Object.assign({}, a, { lastDetectedVariant: v }) : a
+    })
 }
 
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 // Extracted to ./desk/plugins-config.js (behavior identical).
 const { createPluginsConfig } = require('./plugins-config')
-const { isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion, setPluginAutoUpdate } = createPluginsConfig({ root: ROOT, atomicWriteText })
+const {
+    isPluginEnabled,
+    readPluginsList,
+    setPluginEnabled,
+    setPluginTrust,
+    addMarketplacePlugin,
+    removePlugin,
+    setPluginVersion,
+    setPluginAutoUpdate
+} = createPluginsConfig({ root: ROOT, atomicWriteText })
 
 function atomicWriteText(filePath, content) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -908,13 +1046,28 @@ function launchTerminalMode() {
         const psFile = path.join(os.tmpdir(), 'msrb-terminal-launch.ps1')
         fs.writeFileSync(psFile, psBody, 'utf8')
         childProcess
-            .spawn('cmd.exe', ['/c', 'start', 'Microsoft Rewards Bot', 'powershell', '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psFile], {
-                cwd: ROOT,
-                env: { ...process.env, MSRB_TERMINAL_MODE: '1', MSRB_UI_CHILD: '0' },
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: false
-            })
+            .spawn(
+                'cmd.exe',
+                [
+                    '/c',
+                    'start',
+                    'Microsoft Rewards Bot',
+                    'powershell',
+                    '-NoExit',
+                    '-NoProfile',
+                    '-ExecutionPolicy',
+                    'Bypass',
+                    '-File',
+                    psFile
+                ],
+                {
+                    cwd: ROOT,
+                    env: { ...process.env, MSRB_TERMINAL_MODE: '1', MSRB_UI_CHILD: '0' },
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsHide: false
+                }
+            )
             .unref()
         return
     }
@@ -922,7 +1075,12 @@ function launchTerminalMode() {
     const env = { ...process.env, MSRB_TERMINAL_MODE: '1', MSRB_UI_CHILD: '0' }
     if (process.platform === 'darwin') {
         const script = `cd "${ROOT}" && "${process.execPath}" "${startScript}" --terminal`
-        childProcess.spawn('osascript', ['-e', `tell application "Terminal" to do script "${script.replace(/"/g, '\\"')}"`], { detached: true, stdio: 'ignore' }).unref()
+        childProcess
+            .spawn('osascript', ['-e', `tell application "Terminal" to do script "${script.replace(/"/g, '\\"')}"`], {
+                detached: true,
+                stdio: 'ignore'
+            })
+            .unref()
         return
     }
     const terminals = [
@@ -938,7 +1096,9 @@ function launchTerminalMode() {
         }
     }
     // No terminal emulator — run detached with inherited stdio is impossible here; just spawn
-    childProcess.spawn(process.execPath, [startScript, '--terminal'], { cwd: ROOT, env, detached: true, stdio: 'ignore' }).unref()
+    childProcess
+        .spawn(process.execPath, [startScript, '--terminal'], { cwd: ROOT, env, detached: true, stdio: 'ignore' })
+        .unref()
 }
 
 // ── Docs (docs/*.md) ────────────────────────────────────────────────────────
@@ -1010,19 +1170,22 @@ function maybeAutoEnableDeskStartup() {
 function initializeDeskInBackground() {
     void loadDeskLicenseState()
     setTimeout(() => {
-        void startAccountStorageWorker().then(result => {
-            if (result.storage?.warning) pushLog('warn', result.storage.warning)
-            state.accounts = Array.isArray(result.accounts) ? result.accounts : []
-            // Decrypted accounts are no longer pushed in the startup `ready` message
-            // (security). They are fetched on demand via the `read` action the first
-            // time /api/accounts-raw is hit (see accountCache === null branch there).
-            accountCache = null
-        }).catch(error => {
-            pushLog('warn', `Account encryption could not be enabled: ${error.message}`)
-        }).finally(() => {
-            state.boot.accountsReady = true
-            finishDeskBoot()
-        })
+        void startAccountStorageWorker()
+            .then(result => {
+                if (result.storage?.warning) pushLog('warn', result.storage.warning)
+                state.accounts = Array.isArray(result.accounts) ? result.accounts : []
+                // Decrypted accounts are no longer pushed in the startup `ready` message
+                // (security). They are fetched on demand via the `read` action the first
+                // time /api/accounts-raw is hit (see accountCache === null branch there).
+                accountCache = null
+            })
+            .catch(error => {
+                pushLog('warn', `Account encryption could not be enabled: ${error.message}`)
+            })
+            .finally(() => {
+                state.boot.accountsReady = true
+                finishDeskBoot()
+            })
     }, 150)
 }
 
@@ -1033,7 +1196,9 @@ function openAccountsFile() {
     if (!fs.existsSync(accountsFile)) return false
 
     if (process.platform === 'win32') {
-        childProcess.spawn('notepad.exe', [accountsFile], { detached: true, stdio: 'ignore', windowsHide: false }).unref()
+        childProcess
+            .spawn('notepad.exe', [accountsFile], { detached: true, stdio: 'ignore', windowsHide: false })
+            .unref()
         return true
     }
 
@@ -1074,7 +1239,9 @@ function serveStaticGif(res, filePath) {
     fs.createReadStream(filePath).pipe(res)
 }
 
-function serveAppIcon(res) { serveStaticImage(res, APP_ICON_PATH) }
+function serveAppIcon(res) {
+    serveStaticImage(res, APP_ICON_PATH)
+}
 
 function html() {
     return `<!doctype html>
@@ -1182,6 +1349,7 @@ function html() {
     .nav-item-core:hover{background:rgba(247,200,92,.1) !important}
     .nav-item-core.active{background:linear-gradient(90deg,rgba(247,200,92,.2),rgba(247,200,92,.06)) !important;border-color:rgba(247,200,92,.22) !important}
     .core-nav-badge{margin-left:auto;font-size:9px;font-weight:800;letter-spacing:.07em;padding:1px 5px;border-radius:4px;background:rgba(247,200,92,.2);color:var(--gold);border:1px solid rgba(247,200,92,.3)}
+    .beta-nav-badge{margin-left:auto;font-size:9px;font-weight:800;letter-spacing:.07em;padding:1px 5px;border-radius:4px;background:rgba(167,139,250,.18);color:#c4b5fd;border:1px solid rgba(167,139,250,.32)}
     .sidebar-bottom{margin-top:auto;padding-top:clamp(10px,1.4vh,16px);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
     .discord-btn{
       display:flex;align-items:center;justify-content:center;gap:8px;
@@ -2561,6 +2729,7 @@ function html() {
       <div class="nav-item" id="nav-plugins">
         <svg viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5"/></svg>
         Plugins
+        <span class="beta-nav-badge">BETA</span>
       </div>
       <div class="nav-item" id="nav-settings">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -2768,6 +2937,7 @@ function html() {
           </button>
         </div>
       </div>
+      <div id="acc-safety-advice" style="display:none; margin: 15px 25px 0 25px; padding: 12px 15px; background: rgba(255, 171, 0, 0.1); border-left: 3px solid #ffab00; border-radius: 4px; font-size: 13px; color: var(--text-muted);"></div>
       <!-- Scrollable account list -->
       <div class="acc-page-body" id="acc-editor-list"></div>
       <!-- First-time hints -->
@@ -3249,6 +3419,27 @@ function html() {
               </div>
             </div>
           </div>
+          <div class="settings-section">
+            <h3>Maintenance</h3>
+            <div class="settings-section-note">Manage temporary files and cached data. <strong>Warning:</strong> Deleting the data folder resets avatars, launch statistics, and cached markers.</div>
+            <div class="acc-grid-2">
+              <button class="btn btn-secondary" id="btn-clear-sessions" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>Delete all sessions
+              </button>
+              <button class="btn btn-secondary" id="btn-clear-data" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border-color:rgba(255,107,138,.38);color:var(--rose)">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete data folder
+              </button>
+            </div>
+            <div id="maintenance-confirm-area" style="display:none; margin-top: 12px">
+              <div class="reset-warning" style="border-color: rgba(255, 107, 138, 0.4);">
+                <p id="maintenance-confirm-text"></p>
+                <div class="reset-warning-actions">
+                  <button class="btn-danger-sm" id="maintenance-confirm-yes">Yes, delete</button>
+                  <button class="btn btn-secondary btn-sm" id="maintenance-confirm-no">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -3465,7 +3656,7 @@ function html() {
             <svg viewBox="0 0 24 24"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
           </div>
           <div class="plugins-head-titles">
-            <div class="plugins-head-title">Plugins</div>
+            <div class="plugins-head-title">Plugins<span class="beta-badge">BETA</span></div>
             <div class="plugins-head-sub">Extend your bot with official and community add-ons.</div>
           </div>
           <div class="plugins-head-actions">
@@ -3565,11 +3756,14 @@ function html() {
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
           Proxy <span class="lbl-opt" style="font-weight:400;font-size:10px;margin-left:4px">(optional)</span>
         </div>
+        <div class="modal-field" style="margin-top: 4px; margin-bottom: 8px; font-size: 11px; color: var(--text-muted); background: var(--surface-2); padding: 6px; border-radius: 4px;">
+           <span style="color:var(--primary)">💡 Recommendation:</span> We recommend <b>Decodo</b> for mobile proxies. They offer high success rates with Microsoft Rewards and excellent sticky session stability to minimize ban risks. Avoid cheap datacenter proxies.
+        </div>
         <div class="modal-field">
           <label>Host / URL</label>
           <input class="modal-input" id="acc-proxy-url" autocomplete="off" placeholder="http://host or ip">
         </div>
-        <div class="acc-grid-2">
+        <div class="acc-grid-2" style="gap: 12px; margin-top: 8px;">
           <div class="modal-field">
             <label>Port</label>
             <input class="modal-input" id="acc-proxy-port" type="number" autocomplete="off" placeholder="8080">
@@ -3582,7 +3776,7 @@ function html() {
             </label>
           </div>
         </div>
-        <div class="acc-grid-2">
+        <div class="acc-grid-2" style="gap: 12px; margin-top: 8px;">
           <div class="modal-field">
             <label>Username</label>
             <input class="modal-input" id="acc-proxy-user" autocomplete="off" placeholder="user">
@@ -3591,6 +3785,12 @@ function html() {
             <label>Password</label>
             <input class="modal-input" id="acc-proxy-pass" type="password" autocomplete="new-password" placeholder="pass">
           </div>
+        </div>
+        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
+          <button class="btn btn-secondary" id="btn-test-single-proxy" type="button" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Test proxy connection
+          </button>
+          <div id="test-single-proxy-result" style="font-size:12px; font-weight:600; min-height:16px;"></div>
         </div>
         <div class="acc-form-section-head" style="margin-top:6px">
           <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -4617,6 +4817,16 @@ function html() {
       if (G('acc-stat-disabled')) G('acc-stat-disabled').textContent = disabledCount;
       if (G('acc-page-sub')) G('acc-page-sub').textContent = totalCount + ' account' + (totalCount !== 1 ? 's' : '') + ' configured';
 
+      var safetyBox = G('acc-safety-advice');
+      if (safetyBox) {
+        if (totalCount > 1) {
+           safetyBox.style.display = 'block';
+           safetyBox.innerHTML = '<b style="color: #ffab00;">Safety Advice (2026):</b> You have ' + totalCount + ' accounts. Microsoft\'s new anti-bot system is strict. The max household limit is 6. Avoid generic searches to qualify for the <b>Bing Star Bonus</b>, and use high-quality mobile proxies if needed.';
+        } else {
+           safetyBox.style.display = 'none';
+        }
+      }
+
       var proxyAccs = [];
       var directAccs = [];
       _raw.forEach(function(a, i) {
@@ -4878,6 +5088,8 @@ function html() {
       G('acc-proxy-user').value = p.username || '';
       G('acc-proxy-pass').value = p.password || '';
       G('acc-proxy-axios').checked = !!p.proxyAxios;
+      var sResult = G('test-single-proxy-result');
+      if (sResult) { sResult.textContent = ''; sResult.style.color = ''; }
       G('acc-fp-desktop').checked = !!fp.desktop;
       G('acc-fp-mobile').checked = !!fp.mobile;
       G('acc-dashboard-mode').value = a.dashboardMode || 'auto';
@@ -5166,6 +5378,97 @@ function html() {
       if (idx !== -1) { toggleAcc(idx); dismissHint('acc-dbl'); }
     });
     G('btn-test-proxies').addEventListener('click', function() { runProxyTest(); });
+    G('btn-test-single-proxy').addEventListener('click', function() {
+      var url = G('acc-proxy-url').value.trim();
+      var port = Number(G('acc-proxy-port').value) || 0;
+      var username = G('acc-proxy-user').value.trim();
+      var password = G('acc-proxy-pass').value;
+      var btn = G('btn-test-single-proxy');
+      var res = G('test-single-proxy-result');
+      
+      if (!url) {
+        if (res) { res.textContent = 'Enter a proxy URL'; res.style.color = 'var(--rose)'; }
+        return;
+      }
+      
+      if (btn) btn.disabled = true;
+      if (res) { res.textContent = 'Testing…'; res.style.color = 'var(--muted)'; }
+      
+      fetch('/api/test-single-proxy', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: url, port: port, username: username, password: password })
+      }).then(function(r) {
+        if (r.status === 403) {
+          throw new Error('Core Premium required');
+        }
+        if (!r.ok) {
+          throw new Error('Test failed');
+        }
+        return r.json();
+      }).then(function(data) {
+        if (res) {
+          if (data.ok) {
+            res.textContent = 'Success (' + data.latencyMs + 'ms)';
+            res.style.color = '#2fd27d';
+          } else {
+            res.textContent = data.error || 'Connection failed';
+            res.style.color = 'var(--rose)';
+          }
+        }
+      }).catch(function(err) {
+        if (res) {
+          res.textContent = err.message || 'Error occurred';
+          res.style.color = 'var(--rose)';
+        }
+      }).finally(function() {
+        if (btn) btn.disabled = false;
+      });
+    });
+
+    // Settings: Clear sessions / clear data
+    var _maintenanceAction = '';
+    if (G('btn-clear-sessions')) G('btn-clear-sessions').addEventListener('click', function() {
+      var area = G('maintenance-confirm-area');
+      var txt = G('maintenance-confirm-text');
+      if (area && txt) {
+        _maintenanceAction = 'clear-sessions';
+        txt.innerHTML = 'This will delete all saved browser sessions. You will need to log in to all accounts again on the next run. This cannot be undone.';
+        area.style.display = '';
+      }
+    });
+    if (G('btn-clear-data')) G('btn-clear-data').addEventListener('click', function() {
+      var area = G('maintenance-confirm-area');
+      var txt = G('maintenance-confirm-text');
+      if (area && txt) {
+        _maintenanceAction = 'clear-data';
+        txt.innerHTML = 'This will delete the local <strong>data</strong> folder. This resets your avatars, first-launch screen, update checks, and build caches. Your accounts and config are <strong>not</strong> affected. This cannot be undone.';
+        area.style.display = '';
+      }
+    });
+    if (G('maintenance-confirm-no')) G('maintenance-confirm-no').addEventListener('click', function() {
+      var area = G('maintenance-confirm-area'); if (area) area.style.display = 'none';
+      _maintenanceAction = '';
+    });
+    if (G('maintenance-confirm-yes')) G('maintenance-confirm-yes').addEventListener('click', function() {
+      var btn = G('maintenance-confirm-yes');
+      if (!btn || !_maintenanceAction) return;
+      btn.disabled = true; btn.textContent = 'Deleting…';
+      fetch('/api/' + _maintenanceAction, { method: 'POST' }).then(function(r) {
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        return r.json();
+      }).then(function() {
+        var actionText = _maintenanceAction === 'clear-sessions' ? 'Sessions' : 'Data folder';
+        showToast(actionText + ' deleted successfully. Reloading…');
+        setTimeout(function() { location.reload(); }, 1200);
+      }).catch(function(e) {
+        showToast('Operation failed: ' + (e.message || 'unknown error'), true);
+      }).finally(function() {
+        btn.disabled = false; btn.textContent = 'Yes, delete';
+        var area = G('maintenance-confirm-area'); if (area) area.style.display = 'none';
+        _maintenanceAction = '';
+      });
+    });
     G('acc-modal-save').addEventListener('click', saveAccModal);
     G('acc-modal-cancel').addEventListener('click', function() { setView('accounts'); });
     G('acc-email').addEventListener('keydown', function(e) { if (e.key==='Enter') G('acc-password').focus(); });
@@ -6662,19 +6965,22 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/api/state') {
         res.writeHead(200, { 'content-type': 'application/json' })
         const gs = readBotStats()
-        res.end(JSON.stringify({
-            ...state,
-            accounts: accountsWithAvatarId(),
-            corePluginEnabled: isPluginEnabled('core'),
-            claimedPoints: gs.claimedPoints,
-            accountPointsMap: cachedAccountPointsMap()
-        }))
+        res.end(
+            JSON.stringify({
+                ...state,
+                accounts: accountsWithAvatarId(),
+                corePluginEnabled: isPluginEnabled('core'),
+                claimedPoints: gs.claimedPoints,
+                accountPointsMap: cachedAccountPointsMap()
+            })
+        )
         return
     }
     if (req.method === 'POST' && req.url === '/api/clear-logs') {
         state.consoleLogs = []
         state.logs = []
-        res.writeHead(204); res.end()
+        res.writeHead(204)
+        res.end()
         return
     }
     if (req.method === 'GET' && req.url === '/api/license') {
@@ -6733,7 +7039,10 @@ const server = http.createServer((req, res) => {
                             core: { dashboardSync: false }
                         })
                     } catch (cleanupError) {
-                        pushLog('warn', `Core was deactivated, but startup cleanup needs attention: ${cleanupError.message}`)
+                        pushLog(
+                            'warn',
+                            `Core was deactivated, but startup cleanup needs attention: ${cleanupError.message}`
+                        )
                         result.message += ' Automatic startup cleanup could not be completed.'
                     }
                 }
@@ -6770,13 +7079,15 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'POST' && req.url === '/api/star/done') {
         saveStarState({ done: true, shows: STAR_MAX_SHOWS })
-        res.writeHead(204); res.end()
+        res.writeHead(204)
+        res.end()
         return
     }
     if (req.method === 'POST' && req.url === '/api/star/later') {
         const st = readStarState()
         saveStarState({ ...st, shows: st.shows || 0 })
-        res.writeHead(204); res.end()
+        res.writeHead(204)
+        res.end()
         return
     }
     // ── end GitHub Star routes ────────────────────────────────────────────
@@ -6848,7 +7159,9 @@ const server = http.createServer((req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=86400' })
             fs.createReadStream(avatarPath).pipe(res)
         } else {
-            const fallback = isPluginEnabled('core') ? path.join(ROOT, 'assets', 'core.png') : path.join(ROOT, 'assets', 'logo.png')
+            const fallback = isPluginEnabled('core')
+                ? path.join(ROOT, 'assets', 'core.png')
+                : path.join(ROOT, 'assets', 'logo.png')
             res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store, no-cache, must-revalidate' })
             fs.createReadStream(fallback).pipe(res)
         }
@@ -6857,9 +7170,15 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/api/accounts-save') {
         readApiBody(req, res, async body => {
             const accounts = parseJson(body, null)
-            if (!Array.isArray(accounts)) { res.writeHead(400); res.end('Invalid'); return }
+            if (!Array.isArray(accounts)) {
+                res.writeHead(400)
+                res.end('Invalid')
+                return
+            }
             // Strip the transient Desk-only enrichment so it never lands in the store.
-            accounts.forEach(a => { if (a && typeof a === 'object') delete a.lastDetectedVariant })
+            accounts.forEach(a => {
+                if (a && typeof a === 'object') delete a.lastDetectedVariant
+            })
             try {
                 const result = await accountStorageRequest('write', { accounts })
                 state.accounts = Array.isArray(result.masked) ? result.masked : []
@@ -6875,28 +7194,30 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/api/settings') {
         const cfg = readConfigRaw()
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({
-            workers: cfg.workers || {},
-            headless: cfg.headless,
-            runOnZeroPoints: cfg.runOnZeroPoints,
-            debugLogs: cfg.debugLogs,
-            searchOnBingLocalQueries: cfg.searchOnBingLocalQueries,
-            analytics: cfg.analytics,
-            terminal: cfg.terminal || { enabled: false },
-            scheduler: cfg.scheduler || {},
-            core: cfg.core || {},
-            backgroundAgent: cfg.backgroundAgent || {},
-            webhook: cfg.webhook || {},
-            hasCoreLicense: state.deskLicense.tier === 'premium',
-            // Live Desk network coordinates (source of truth = what's actually bound,
-            // not just the stored config). The toggle writes desk.lanAccess; the bound
-            // value only changes after a restart.
-            deskLanAccess: deskLanEnabled,
-            deskLanUrl,
-            deskPort: deskBoundPort,
-            deskRemoteAccess: (cfg.core && cfg.core.dashboardSync === true) || false,
-            deskHeadless: (cfg.desk && cfg.desk.headless === true) || false
-        }))
+        res.end(
+            JSON.stringify({
+                workers: cfg.workers || {},
+                headless: cfg.headless,
+                runOnZeroPoints: cfg.runOnZeroPoints,
+                debugLogs: cfg.debugLogs,
+                searchOnBingLocalQueries: cfg.searchOnBingLocalQueries,
+                analytics: cfg.analytics,
+                terminal: cfg.terminal || { enabled: false },
+                scheduler: cfg.scheduler || {},
+                core: cfg.core || {},
+                backgroundAgent: cfg.backgroundAgent || {},
+                webhook: cfg.webhook || {},
+                hasCoreLicense: state.deskLicense.tier === 'premium',
+                // Live Desk network coordinates (source of truth = what's actually bound,
+                // not just the stored config). The toggle writes desk.lanAccess; the bound
+                // value only changes after a restart.
+                deskLanAccess: deskLanEnabled,
+                deskLanUrl,
+                deskPort: deskBoundPort,
+                deskRemoteAccess: (cfg.core && cfg.core.dashboardSync === true) || false,
+                deskHeadless: (cfg.desk && cfg.desk.headless === true) || false
+            })
+        )
         return
     }
     if (req.method === 'GET' && req.url === '/api/stats') {
@@ -6932,7 +7253,10 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/api/remote-access') {
         readApiBody(req, res, body => {
             const data = parseJson(body, null)
-            if (!data || typeof data.enable !== 'boolean') { jsonResponse(res, 400, { error: 'Invalid request' }); return }
+            if (!data || typeof data.enable !== 'boolean') {
+                jsonResponse(res, 400, { error: 'Invalid request' })
+                return
+            }
             if (data.enable && state.deskLicense.tier !== 'premium') {
                 jsonResponse(res, 403, { error: 'An active Core license is required for remote access.' })
                 return
@@ -6951,30 +7275,52 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/api/settings') {
         readApiBody(req, res, body => {
             const patch = parseJson(body, null)
-            if (!patch || typeof patch !== 'object') { res.writeHead(400); res.end(); return }
-            try { writeConfigPatch(patch); res.writeHead(204); res.end() }
-            catch (e) { res.writeHead(500); res.end(String(e.message)) }
+            if (!patch || typeof patch !== 'object') {
+                res.writeHead(400)
+                res.end()
+                return
+            }
+            try {
+                writeConfigPatch(patch)
+                deskAnalytics.trackSettingsPatch(patch)
+                res.writeHead(204)
+                res.end()
+            } catch (e) {
+                res.writeHead(500)
+                res.end(String(e.message))
+            }
         })
         return
     }
     if (req.method === 'POST' && req.url === '/api/reset-config') {
         const _https = require('https')
-        const _cfgUrl = 'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/refs/heads/main/src/config.example.json'
-        _https.get(_cfgUrl, function(r) {
-            let _raw = ''
-            r.on('data', function(c) { _raw += c })
-            r.on('end', function() {
-                try {
-                    const obj = JSON.parse(_raw)
-                    const cfgSrc = path.join(ROOT, 'config.json')
-                    const cfgDist = path.join(ROOT, 'dist', 'config.json')
-                    fs.writeFileSync(cfgSrc, JSON.stringify(obj, null, 4), 'utf8')
-                    if (fs.existsSync(cfgDist)) fs.writeFileSync(cfgDist, JSON.stringify(obj, null, 4), 'utf8')
-                    res.writeHead(200, { 'content-type': 'application/json' })
-                    res.end(JSON.stringify({ ok: true }))
-                } catch(e) { res.writeHead(500); res.end(String(e.message)) }
+        const _cfgUrl =
+            'https://raw.githubusercontent.com/QuestPilot/Microsoft-Rewards-Bot/refs/heads/main/src/config.example.json'
+        _https
+            .get(_cfgUrl, function (r) {
+                let _raw = ''
+                r.on('data', function (c) {
+                    _raw += c
+                })
+                r.on('end', function () {
+                    try {
+                        const obj = JSON.parse(_raw)
+                        const cfgSrc = path.join(ROOT, 'config.json')
+                        const cfgDist = path.join(ROOT, 'dist', 'config.json')
+                        fs.writeFileSync(cfgSrc, JSON.stringify(obj, null, 4), 'utf8')
+                        if (fs.existsSync(cfgDist)) fs.writeFileSync(cfgDist, JSON.stringify(obj, null, 4), 'utf8')
+                        res.writeHead(200, { 'content-type': 'application/json' })
+                        res.end(JSON.stringify({ ok: true }))
+                    } catch (e) {
+                        res.writeHead(500)
+                        res.end(String(e.message))
+                    }
+                })
             })
-        }).on('error', function(e) { res.writeHead(502); res.end(String(e.message)) })
+            .on('error', function (e) {
+                res.writeHead(502)
+                res.end(String(e.message))
+            })
         return
     }
     if (req.method === 'POST' && req.url === '/api/open-discord') {
@@ -7030,12 +7376,17 @@ const server = http.createServer((req, res) => {
         })
         return
     }
-    if (req.method === 'GET' && (req.url === '/api/marketplace-catalog' || req.url.startsWith('/api/marketplace-catalog?'))) {
+    if (
+        req.method === 'GET' &&
+        (req.url === '/api/marketplace-catalog' || req.url.startsWith('/api/marketplace-catalog?'))
+    ) {
         const catalogPath = path.join(ROOT, 'plugins', 'marketplace.json')
         const forceRefresh = req.url.includes('refresh=1')
         let catalog = null
         if (!forceRefresh) {
-            try { catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8')) } catch {}
+            try {
+                catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'))
+            } catch {}
         }
         if (catalog) {
             res.writeHead(200, { 'content-type': 'application/json' })
@@ -7046,25 +7397,33 @@ const server = http.createServer((req, res) => {
         // box; override with MSRB_MARKETPLACE_CATALOG_URL for local/staging testing.
         const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL || 'https://bot.lgtw.tf/api/marketplace/catalog'
         const { fetchSignedCatalog } = require('../plugins/marketplace-fetch')
-        fetchSignedCatalog(catalogUrl).then(function(result) {
-            let parsed = null
-            try { parsed = JSON.parse(result.catalog) } catch {}
-            // Cache the catalog ONLY with its signature: the bot's verifier is fail-closed,
-            // so a marketplace.json without a matching marketplace.sig is rejected as
-            // 'absent' and the plugins are skipped. Write both atomically, or neither.
-            if (parsed && result.signature) {
+        fetchSignedCatalog(catalogUrl)
+            .then(function (result) {
+                let parsed = null
                 try {
-                    fs.mkdirSync(path.join(ROOT, 'plugins'), { recursive: true });
-                    fs.writeFileSync(catalogPath, result.catalog, 'utf8');
-                    fs.writeFileSync(path.join(ROOT, 'plugins', 'marketplace.sig'), String(result.signature).trim() + '\n', 'utf8');
+                    parsed = JSON.parse(result.catalog)
                 } catch {}
-            }
-            res.writeHead(200, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({ catalog: parsed, source: parsed ? 'live' : 'none' }))
-        }).catch(function(e) {
-            res.writeHead(200, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({ catalog: null, source: 'none', error: e.message }))
-        })
+                // Cache the catalog ONLY with its signature: the bot's verifier is fail-closed,
+                // so a marketplace.json without a matching marketplace.sig is rejected as
+                // 'absent' and the plugins are skipped. Write both atomically, or neither.
+                if (parsed && result.signature) {
+                    try {
+                        fs.mkdirSync(path.join(ROOT, 'plugins'), { recursive: true })
+                        fs.writeFileSync(catalogPath, result.catalog, 'utf8')
+                        fs.writeFileSync(
+                            path.join(ROOT, 'plugins', 'marketplace.sig'),
+                            String(result.signature).trim() + '\n',
+                            'utf8'
+                        )
+                    } catch {}
+                }
+                res.writeHead(200, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ catalog: parsed, source: parsed ? 'live' : 'none' }))
+            })
+            .catch(function (e) {
+                res.writeHead(200, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ catalog: null, source: 'none', error: e.message }))
+            })
         return
     }
     if (req.method === 'GET' && req.url === '/api/plugins') {
@@ -7073,13 +7432,22 @@ const server = http.createServer((req, res) => {
         // accurate "update available", and a "may be outdated" flag when this bot has
         // moved well ahead of the bot version the plugin was published for.
         let mpcat = null
-        try { mpcat = require('../security/marketplace-catalog') } catch {}
+        try {
+            mpcat = require('../security/marketplace-catalog')
+        } catch {}
         const staleWindow = Number(process.env.MSRB_PLUGIN_STALE_WINDOW) || undefined
         for (const p of list) {
             try {
-                const marker = JSON.parse(fs.readFileSync(path.join(ROOT, 'plugins', p.name, '.installed.json'), 'utf8'))
+                const marker = JSON.parse(
+                    fs.readFileSync(path.join(ROOT, 'plugins', p.name, '.installed.json'), 'utf8')
+                )
                 if (marker && typeof marker.version === 'string') p.installedVersion = marker.version
-                if (marker && marker.publishedBotVersion && mpcat && mpcat.isPluginStale(marker.publishedBotVersion, APP_VERSION, staleWindow)) {
+                if (
+                    marker &&
+                    marker.publishedBotVersion &&
+                    mpcat &&
+                    mpcat.isPluginStale(marker.publishedBotVersion, APP_VERSION, staleWindow)
+                ) {
                     p.stale = true
                 }
             } catch {}
@@ -7091,15 +7459,26 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/api/plugins') {
         readApiBody(req, res, body => {
             const data = parseJson(body, null)
-            if (!data || typeof data.name !== 'string') { res.writeHead(400); res.end(); return }
+            if (!data || typeof data.name !== 'string') {
+                res.writeHead(400)
+                res.end()
+                return
+            }
             try {
                 if (typeof data.enabled === 'boolean') setPluginEnabled(data.name, data.enabled)
                 else if (data.trust === 'full' || data.trust === 'sandbox') setPluginTrust(data.name, data.trust)
                 else if (typeof data.autoUpdate === 'boolean') setPluginAutoUpdate(data.name, data.autoUpdate)
-                else { res.writeHead(400); res.end(); return }
-                res.writeHead(204); res.end()
+                else {
+                    res.writeHead(400)
+                    res.end()
+                    return
+                }
+                res.writeHead(204)
+                res.end()
+            } catch (e) {
+                res.writeHead(500)
+                res.end(String(e.message))
             }
-            catch (e) { res.writeHead(500); res.end(String(e.message)) }
         })
         return
     }
@@ -7107,13 +7486,17 @@ const server = http.createServer((req, res) => {
         readApiBody(req, res, body => {
             const data = parseJson(body, null)
             if (!data || typeof data.name !== 'string' || typeof data.version !== 'string') {
-                res.writeHead(400); res.end('Missing name or version'); return
+                res.writeHead(400)
+                res.end('Missing name or version')
+                return
             }
             try {
                 addMarketplacePlugin(data.name, data.version)
-                res.writeHead(204); res.end()
-            } catch(e) {
-                res.writeHead(400); res.end(String(e.message))
+                res.writeHead(204)
+                res.end()
+            } catch (e) {
+                res.writeHead(400)
+                res.end(String(e.message))
             }
         })
         return
@@ -7122,13 +7505,17 @@ const server = http.createServer((req, res) => {
         readApiBody(req, res, body => {
             const data = parseJson(body, null)
             if (!data || typeof data.name !== 'string' || typeof data.version !== 'string') {
-                res.writeHead(400); res.end('Missing name or version'); return
+                res.writeHead(400)
+                res.end('Missing name or version')
+                return
             }
             try {
                 setPluginVersion(data.name, data.version)
-                res.writeHead(204); res.end()
-            } catch(e) {
-                res.writeHead(400); res.end(String(e.message))
+                res.writeHead(204)
+                res.end()
+            } catch (e) {
+                res.writeHead(400)
+                res.end(String(e.message))
             }
         })
         return
@@ -7136,20 +7523,35 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/api/plugins/remove') {
         readApiBody(req, res, body => {
             const data = parseJson(body, null)
-            if (!data || typeof data.name !== 'string') { res.writeHead(400); res.end('Missing name'); return }
-            if (data.name === 'core') { res.writeHead(400); res.end('Core cannot be removed'); return }
-            if (!/^[a-z0-9][a-z0-9._-]{0,48}$/i.test(data.name)) { res.writeHead(400); res.end('Invalid plugin name'); return }
+            if (!data || typeof data.name !== 'string') {
+                res.writeHead(400)
+                res.end('Missing name')
+                return
+            }
+            if (data.name === 'core') {
+                res.writeHead(400)
+                res.end('Core cannot be removed')
+                return
+            }
+            if (!/^[a-z0-9][a-z0-9._-]{0,48}$/i.test(data.name)) {
+                res.writeHead(400)
+                res.end('Invalid plugin name')
+                return
+            }
             try {
                 removePlugin(data.name)
                 // Best-effort: delete the downloaded plugin folder (guarded against path escape).
                 try {
                     const pluginsDir = path.join(ROOT, 'plugins')
                     const dir = path.join(pluginsDir, data.name)
-                    if (dir.startsWith(pluginsDir + path.sep) && fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true })
+                    if (dir.startsWith(pluginsDir + path.sep) && fs.existsSync(dir))
+                        fs.rmSync(dir, { recursive: true, force: true })
                 } catch {}
-                res.writeHead(204); res.end()
-            } catch(e) {
-                res.writeHead(400); res.end(String(e.message))
+                res.writeHead(204)
+                res.end()
+            } catch (e) {
+                res.writeHead(400)
+                res.end(String(e.message))
             }
         })
         return
@@ -7158,42 +7560,67 @@ const server = http.createServer((req, res) => {
         try {
             const _cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open'
             childProcess.spawn(_cmd, [ROOT], { detached: true, stdio: 'ignore' }).unref()
-            res.writeHead(204); res.end()
-        } catch(e) {
-            res.writeHead(500); res.end(String(e.message))
+            res.writeHead(204)
+            res.end()
+        } catch (e) {
+            res.writeHead(500)
+            res.end(String(e.message))
         }
         return
     }
     if (req.method === 'POST' && req.url === '/api/open-portal') {
         try {
             openAppWindow('https://bot.lgtw.tf/?view=developers', { profileSuffix: 'portal' })
-            res.writeHead(204); res.end()
-        } catch(e) {
-            res.writeHead(500); res.end(String(e.message))
+            res.writeHead(204)
+            res.end()
+        } catch (e) {
+            res.writeHead(500)
+            res.end(String(e.message))
         }
         return
     }
     if (req.method === 'POST' && req.url === '/api/plugins/report') {
         readApiBody(req, res, async body => {
             const data = parseJson(body, null)
-            if (!data || typeof data.name !== 'string' || typeof data.reason !== 'string' || data.reason.trim().length < 3) {
-                res.writeHead(400); res.end('Missing name or reason'); return
+            if (
+                !data ||
+                typeof data.name !== 'string' ||
+                typeof data.reason !== 'string' ||
+                data.reason.trim().length < 3
+            ) {
+                res.writeHead(400)
+                res.end('Missing name or reason')
+                return
             }
             // Forward to core-api server-to-server (no browser CORS). The report URL is
             // derived from the configured catalog URL (.../catalog -> .../report).
             const catalogUrl = process.env.MSRB_MARKETPLACE_CATALOG_URL
-            if (!catalogUrl) { res.writeHead(503); res.end('Marketplace not configured'); return }
+            if (!catalogUrl) {
+                res.writeHead(503)
+                res.end('Marketplace not configured')
+                return
+            }
             const reportUrl = catalogUrl.replace(/\/catalog(\?.*)?$/, '/report')
             try {
                 const r = await fetch(reportUrl, {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ name: data.name, version: data.version, reason: String(data.reason).slice(0, 500) })
+                    body: JSON.stringify({
+                        name: data.name,
+                        version: data.version,
+                        reason: String(data.reason).slice(0, 500)
+                    })
                 })
-                if (r.ok) { res.writeHead(204); res.end() }
-                else { res.writeHead(r.status); res.end((await r.text()).slice(0, 300)) }
+                if (r.ok) {
+                    res.writeHead(204)
+                    res.end()
+                } else {
+                    res.writeHead(r.status)
+                    res.end((await r.text()).slice(0, 300))
+                }
             } catch (e) {
-                res.writeHead(502); res.end(String(e.message))
+                res.writeHead(502)
+                res.end(String(e.message))
             }
         })
         return
@@ -7206,19 +7633,74 @@ const server = http.createServer((req, res) => {
             res.end(JSON.stringify({ ok: true }))
             scheduleShutdown()
         } catch (e) {
-            res.writeHead(500); res.end(String(e.message))
+            res.writeHead(500)
+            res.end(String(e.message))
         }
         return
     }
     if (req.method === 'GET' && req.url === '/api/whats-new') {
         childProcess.exec('git log --oneline --no-merges -30', { cwd: ROOT, timeout: 5000 }, (err, stdout) => {
-            if (err || !stdout) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ commits: [] })); return }
-            const commits = stdout.trim().split('\n').filter(Boolean).map(line => {
-                const sp = line.indexOf(' ')
-                return { hash: sp > 0 ? line.slice(0, sp) : line, message: sp > 0 ? line.slice(sp + 1).trim() : '' }
-            })
+            if (err || !stdout) {
+                res.writeHead(200, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ commits: [] }))
+                return
+            }
+            const commits = stdout
+                .trim()
+                .split('\n')
+                .filter(Boolean)
+                .map(line => {
+                    const sp = line.indexOf(' ')
+                    return { hash: sp > 0 ? line.slice(0, sp) : line, message: sp > 0 ? line.slice(sp + 1).trim() : '' }
+                })
             res.writeHead(200, { 'content-type': 'application/json' })
             res.end(JSON.stringify({ commits }))
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/clear-sessions') {
+        try {
+            const sessionPath = readConfigRaw().sessionPath || 'sessions'
+            const sessionDir = path.resolve(ROOT, sessionPath)
+            if (fs.existsSync(sessionDir)) {
+                fs.rmSync(sessionDir, { recursive: true, force: true })
+            }
+            jsonResponse(res, 200, { ok: true })
+        } catch (e) {
+            jsonResponse(res, 500, { error: e.message })
+        }
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/clear-data') {
+        try {
+            const dataDir = path.join(ROOT, 'data')
+            if (fs.existsSync(dataDir)) {
+                fs.rmSync(dataDir, { recursive: true, force: true })
+            }
+            jsonResponse(res, 200, { ok: true })
+        } catch (e) {
+            jsonResponse(res, 500, { error: e.message })
+        }
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/test-single-proxy') {
+        if (state.deskLicense.tier !== 'premium') {
+            res.writeHead(403, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Proxy testing is a Core Premium advantage.' }))
+            return
+        }
+        readApiBody(req, res, async body => {
+            try {
+                const proxyConfig = parseJson(body, {})
+                if (!proxyConfig || !proxyConfig.url) {
+                    jsonResponse(res, 400, { error: 'Missing proxy URL' })
+                    return
+                }
+                const result = await testProxy(proxyConfig)
+                jsonResponse(res, 200, result)
+            } catch (error) {
+                jsonResponse(res, 500, { error: error.message })
+            }
         })
         return
     }
@@ -7232,26 +7714,30 @@ const server = http.createServer((req, res) => {
             try {
                 const data = parseJson(body, {})
                 const targetIndex = typeof data.index === 'number' ? data.index : -1
-                
+
                 const storageResult = await accountStorageRequest('read')
                 const accounts = Array.isArray(storageResult.accounts) ? storageResult.accounts : []
-                
+
                 const results = {}
                 const tasks = []
 
                 if (targetIndex >= 0 && targetIndex < accounts.length) {
                     const a = accounts[targetIndex]
                     if (a.proxy && a.proxy.url) {
-                        tasks.push((async () => {
-                            results[a.email] = await testProxy(a.proxy)
-                        })())
+                        tasks.push(
+                            (async () => {
+                                results[a.email] = await testProxy(a.proxy)
+                            })()
+                        )
                     }
                 } else {
                     accounts.forEach(a => {
                         if (a.proxy && a.proxy.url) {
-                            tasks.push((async () => {
-                                results[a.email] = await testProxy(a.proxy)
-                            })())
+                            tasks.push(
+                                (async () => {
+                                    results[a.email] = await testProxy(a.proxy)
+                                })()
+                            )
                         }
                     })
                 }
@@ -7269,7 +7755,11 @@ const server = http.createServer((req, res) => {
         const file = u.searchParams.get('file')
         if (file) {
             const content = readDocFile(file)
-            if (content === null) { res.writeHead(404); res.end('Not found'); return }
+            if (content === null) {
+                res.writeHead(404)
+                res.end('Not found')
+                return
+            }
             res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' })
             res.end(content)
         } else {
@@ -7344,7 +7834,11 @@ function finalizeDeskServer() {
 
 // Browser launcher extracted to ./desk/browser-launcher.js (behavior identical).
 const { createBrowserLauncher } = require('./browser-launcher')
-const { openAppWindow } = createBrowserLauncher({ windowWidth: APP_WINDOW_WIDTH, windowHeight: APP_WINDOW_HEIGHT, pushLog })
+const { openAppWindow } = createBrowserLauncher({
+    windowWidth: APP_WINDOW_WIDTH,
+    windowHeight: APP_WINDOW_HEIGHT,
+    pushLog
+})
 
 // parseJson is provided by ./desk/http.js (destructured from createHttp above).
 
@@ -7354,6 +7848,10 @@ process.on('SIGTERM', shutdown)
 function shutdown() {
     if (shuttingDown) return
     shuttingDown = true
+
+    // Best-effort session telemetry — fire-and-forget with its own short timeout;
+    // the exit path below never waits on it.
+    deskAnalytics.trackSessionEnd({ has_core: state.deskLicense.tier === 'premium' })
 
     // Desk closing = remote off (owner's model): force the background agent to exit too.
     // Synchronous force-kill (the Desk is exiting, no time for the IPC handshake).
@@ -7383,7 +7881,10 @@ function scheduleShutdown() {
 }
 
 function cancelShutdown() {
-    if (shutdownTimer) { clearTimeout(shutdownTimer); shutdownTimer = null }
+    if (shutdownTimer) {
+        clearTimeout(shutdownTimer)
+        shutdownTimer = null
+    }
 }
 
 function closeServerAndExit() {

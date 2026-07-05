@@ -68,7 +68,7 @@ export interface DashboardCaptureResult {
     routes: string[]
     /** Output directory the snapshots were written to, relative to the run cwd. */
     outputDir: string | null
-    /** Aggregated analyzer problems across every captured route (selector drift hints). */
+    /** Aggregated harvester problems across every captured route (selector drift hints). */
     problems: string[]
     /** Detailed in-memory analysis used by the terminal-only harvester report. */
     analyses?: DashboardHarvesterPageAnalysis[]

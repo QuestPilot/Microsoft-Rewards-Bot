@@ -33,7 +33,7 @@ function loadCookieSession() {
     try {
         dirs = fs
             .readdirSync(sessionsRoot, { withFileTypes: true })
-            .filter(d => d.isDirectory() && d.name !== 'dashboard-live-diagnostics')
+            .filter(d => d.isDirectory() && d.name.includes('@'))
             .map(d => d.name)
     } catch {
         return null

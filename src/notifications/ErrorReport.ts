@@ -10,6 +10,8 @@ export interface ErrorReportInput {
     hasCore: boolean
     coreVersion?: string
     durationSeconds?: number
+    /** Extra anonymous context forwarded to the PostHog event only (not the Discord relay). */
+    analyticsProps?: Record<string, string | number | boolean>
 }
 
 function maskEmail(email: string): string {

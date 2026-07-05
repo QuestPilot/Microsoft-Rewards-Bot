@@ -125,13 +125,17 @@ The public bot no longer starts a local dashboard server.
 
 ## Rewards Dashboard Automation Stops Working
 
-Run the page analyzer against saved Microsoft Rewards captures:
+Run the integrated Rewards harvester. It captures the live Microsoft Rewards pages and
+validates selectors, RSC/flight data, route inventories, fingerprints, and screenshots in
+one pass:
 
 ```bash
-npm run analyze:pages
+npm start -- harvester
 ```
 
-If it reports missing RSC data, missing `reportActivity`, or unknown activity models, Microsoft likely changed the dashboard payload. This is normally fixed in a bot update, so make sure you are on the latest version.
+If it reports missing required selectors, RSC data, or unknown activity models, Microsoft
+likely changed the dashboard payload. This is normally fixed in a bot update, so make
+sure you are on the latest version.
 
 ## Advanced Environment Variables
 

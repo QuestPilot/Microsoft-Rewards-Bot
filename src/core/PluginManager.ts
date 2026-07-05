@@ -1056,6 +1056,12 @@ export class PluginManager {
                 if (shimHash.toLowerCase() !== String(shimSha).toLowerCase()) {
                     throw new Error('Official Core loader (index.js) checksum mismatch')
                 }
+            } else if (cluster.isPrimary) {
+                this.bot.logger.warn(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    'Official Core loader (plugins/core/index.js) has no pinned shimSha256 in the signed manifest — the loader shim itself is not integrity-checked (only the .jsc bytecode it loads is). Run `npm run core:release-check` for details.'
+                )
             }
         }
 

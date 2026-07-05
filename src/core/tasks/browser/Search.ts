@@ -18,6 +18,7 @@ export class Search extends TaskBase {
         // event per platform. `finally` guarantees it fires on every return path of
         // the inner method (and even if it throws), without touching the hot-path logic.
         let gained = 0
+        const searchCountBefore = this.searchCount
         try {
             gained = await this.doSearchInner(data, page, isMobile)
             return gained
@@ -25,6 +26,9 @@ export class Search extends TaskBase {
             this.bot.analytics.track('search_completed', this.bot.analytics.withContext({
                 platform: isMobile ? 'mobile' : 'desktop',
                 points_gained: gained,
+                // Searches executed vs points gained separates "searches ran but earned
+                // nothing" (anonymous Bing session) from "no searches were scheduled".
+                searches_performed: this.searchCount - searchCountBefore,
                 has_core: this.bot.pluginManager.hasOfficialCoreEntitlement()
             }))
         }
@@ -90,14 +94,14 @@ export class Search extends TaskBase {
             // points (observed in production on accounts with real point balances,
             // not just fresh ones). Detect that here and re-establish the session
             // once before committing to the search loop.
-            if (!isMobile && (await this.bot['login'].isBingSignedOut(page))) {
+            if (!isMobile && (await this.bot.login.isBingSignedOut(page))) {
                 this.bot.logger.warn(
                     isMobile,
                     'SEARCH-BING',
                     'Bing search session is signed out — re-establishing before searching (searches would otherwise earn 0 points)'
                 )
 
-                await this.bot['login'].verifyBingSession(page, getCurrentContext().account)
+                await this.bot.login.verifyBingSession(page, getCurrentContext().account)
 
                 await page.goto(targetUrl).catch(() => {})
                 await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
@@ -106,7 +110,7 @@ export class Search extends TaskBase {
                 // Only bail out when Bing still *positively* shows the signed-out state.
                 // If detection is ambiguous we fall through and search as before, so a
                 // drifted selector can never skip a genuinely signed-in account's run.
-                if (await this.bot['login'].isBingSignedOut(page)) {
+                if (await this.bot.login.isBingSignedOut(page)) {
                     this.bot.logger.error(
                         isMobile,
                         'SEARCH-BING',
@@ -473,7 +477,7 @@ export class Search extends TaskBase {
     private async checkMidLoopAnonymous(isMobile: boolean, page: Page): Promise<boolean> {
         if (isMobile) return false
         try {
-            return await this.bot['login'].isBingSignedOut(page)
+            return await this.bot.login.isBingSignedOut(page)
         } catch {
             return false
         }

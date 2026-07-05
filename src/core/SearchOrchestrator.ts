@@ -337,7 +337,7 @@ export class SearchOrchestrator {
             `Init | account=${accountEmail} | proxy=${account.proxy ?? 'none'}`
         )
 
-        const session = await this.bot['browserFactory'].createBrowser(account)
+        const session = await this.bot.browserFactory.createBrowser(account)
         this.bot.logger.debug('main', 'SEARCH-DESKTOP-LOGIN', 'Browser created, new page')
 
         this.bot.mainDesktopPage = await session.context.newPage()
@@ -346,12 +346,12 @@ export class SearchOrchestrator {
         this.bot.logger.info('main', 'SEARCH-DESKTOP-LOGIN', 'Login start')
         this.bot.logger.debug('main', 'SEARCH-DESKTOP-LOGIN', 'Calling login handler')
 
-        await this.bot['login'].login(this.bot.mainDesktopPage, account)
+        await this.bot.login.login(this.bot.mainDesktopPage, account)
 
         this.bot.logger.info('main', 'SEARCH-DESKTOP-LOGIN', 'Login passed, verifying')
         this.bot.logger.debug('main', 'SEARCH-DESKTOP-LOGIN', 'verifyBingSession')
 
-        await this.bot['login'].verifyBingSession(this.bot.mainDesktopPage, account)
+        await this.bot.login.verifyBingSession(this.bot.mainDesktopPage, account)
         this.bot.cookies.desktop = await session.context.cookies()
 
         this.bot.logger.debug('main', 'SEARCH-DESKTOP-LOGIN', 'Cookies stored')

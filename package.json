@@ -44,9 +44,6 @@
         "clear-sessions": "node ./scripts/main/clearSessions.js",
         "open-session": "node ./scripts/main/browserSession.js -email",
         "open-session:dev": "node ./scripts/main/browserSession.js -dev -email dev@example.com",
-        "analyze:pages": "node ./scripts/diagnostics/rewards-page-analyzer.js",
-        "diagnostics:dashboard:live": "node ./scripts/diagnostics/dashboard-live-diagnostics.js",
-        "capture:pages": "node ./scripts/diagnostics/capture-rewards-pages.js",
         "test": "node --test",
         "test:dashboard:mock": "npm run build && node -e \"process.env.MSRB_DASHBOARD_MOCK_TEST='1'; require('child_process').execFileSync(process.execPath, ['--test', 'scripts/tests/rewards-side-panel.test.js'], { stdio: 'inherit', env: process.env })\""
     },

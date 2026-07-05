@@ -181,14 +181,27 @@ export class MicrosoftRewardsBot {
 
     private activeWorkers: number
     private exitedWorkers: number[]
-    private browserFactory: BrowserManager = new BrowserManager(this)
+    // Public so SearchOrchestrator (a sibling module, not a subclass) can reach these
+    // without bypassing access control via bracket-notation (`bot['browserFactory']`).
+    public browserFactory: BrowserManager = new BrowserManager(this)
 
     async closeAllBrowsers(): Promise<void> {
         await this.browserFactory.closeAll()
     }
+
+    private async ensureLiveMobilePage(context: BrowserContext, reason: string): Promise<Page> {
+        if (this.mainMobilePage && !this.mainMobilePage.isClosed()) return this.mainMobilePage
+
+        const recoveredPage = context.pages().find(candidate => !candidate.isClosed()) ?? (await context.newPage())
+        await recoveredPage.setViewportSize(DESKTOP_BROWSER_VIEWPORT).catch(() => {})
+        this.mainMobilePage = recoveredPage
+        this.logger.warn('main', 'BROWSER', `Recovered mobile page after ${reason}; previous tab was closed`)
+        return recoveredPage
+    }
+
     private accounts: Account[]
     private workers: TaskBase
-    private login = new AuthManager(this)
+    public login = new AuthManager(this)
     private searchManager: SearchOrchestrator
 
     public axios!: HttpClient
@@ -316,6 +329,13 @@ export class MicrosoftRewardsBot {
                     account_count: totalAccounts,
                     clusters: this.config.core?.clusters ?? 1,
                     has_core: this.pluginManager.hasOfficialCoreEntitlement(),
+                    // Environment/config snapshot: lets ban rate, zero-point rate and
+                    // failure rate be segmented by setup (docker vs desktop, headless,
+                    // proxies, scheduler) instead of guessing which configs break.
+                    docker: BrowserManager.isDocker(),
+                    headless: this.config.headless === true,
+                    scheduler_enabled: this.config.scheduler?.enabled === true,
+                    accounts_with_proxy: enabledAccounts.filter(a => !!a.proxy?.url).length,
                     workers_enabled: Object.entries(this.config.workers)
                         .filter(([, v]) => v === true)
                         .map(([k]) => k)
@@ -596,6 +616,8 @@ export class MicrosoftRewardsBot {
                     | {
                           initialPoints: number
                           collectedPoints: number
+                          searchPointsGained: number
+                          countersAvailable: boolean
                           coreStats: CoreRunStats
                           starBonus?: StarBonusInfo
                       }
@@ -662,6 +684,13 @@ export class MicrosoftRewardsBot {
                         this.analytics.withContext({
                             success: true,
                             points_gained: collectedPoints,
+                            // Diagnostic split for zero-point runs: a 0 balance delta with a
+                            // positive search gain means the balance READ failed (measurement
+                            // bug); 0 on both means the searches genuinely earned nothing.
+                            initial_points: accountInitialPoints,
+                            final_points: accountFinalPoints,
+                            search_points_gained: result.searchPointsGained,
+                            counters_available: result.countersAvailable,
                             duration_ms: Math.round(parseFloat(durationSeconds) * 1000),
                             has_core: this.pluginManager.hasOfficialCoreEntitlement()
                         })
@@ -675,7 +704,13 @@ export class MicrosoftRewardsBot {
                             email: accountEmail,
                             error: `Run completed but collected 0 points (balance ${accountInitialPoints} → ${accountFinalPoints})`,
                             hasCore: this.pluginManager.hasOfficialCoreEntitlement(),
-                            durationSeconds: parseFloat(durationSeconds)
+                            durationSeconds: parseFloat(durationSeconds),
+                            analyticsProps: {
+                                initial_points: accountInitialPoints,
+                                final_points: accountFinalPoints,
+                                search_points_gained: result.searchPointsGained,
+                                counters_available: result.countersAvailable
+                            }
                         })
                     }
                 } else {
@@ -817,6 +852,34 @@ export class MicrosoftRewardsBot {
     }
 
     /**
+     * Run a single worker/activity with telemetry: times it, emits `worker_executed`
+     * (success or failure with duration), and preserves the exact return value / rethrows
+     * on error so control flow is completely unchanged. Telemetry is fire-and-forget and
+     * can never break a run.
+     */
+    private async trackWorker<T>(name: string, fn: () => Promise<T>): Promise<T> {
+        const startedAt = Date.now()
+        try {
+            const result = await fn()
+            this.analytics.track('worker_executed', this.analytics.withContext({
+                worker: name,
+                success: true,
+                duration_ms: Date.now() - startedAt,
+                has_core: this.pluginManager.hasOfficialCoreEntitlement()
+            }))
+            return result
+        } catch (error) {
+            this.analytics.track('worker_executed', this.analytics.withContext({
+                worker: name,
+                success: false,
+                duration_ms: Date.now() - startedAt,
+                has_core: this.pluginManager.hasOfficialCoreEntitlement()
+            }))
+            throw error
+        }
+    }
+
+    /**
      * Report a run/account failure to the maintainer through both telemetry channels,
      * gated by the single `analytics.enabled` switch:
      *   - PostHog `error_occurred` — anonymous & structured, for trend analysis (no
@@ -833,7 +896,12 @@ export class MicrosoftRewardsBot {
             this.analytics.withContext({
                 kind: input.kind,
                 has_core: input.hasCore,
-                ...(input.durationSeconds != null ? { duration_seconds: input.durationSeconds } : {})
+                // The error text makes the event actionable in PostHog (top failure
+                // modes, per-version regressions). AnalyticsService.scrubProps strips
+                // emails/keys/IPs/URLs/paths and caps it at 255 chars before sending.
+                ...(input.error ? { error_message: input.error } : {}),
+                ...(input.durationSeconds != null ? { duration_seconds: input.durationSeconds } : {}),
+                ...(input.analyticsProps ?? {})
             })
         )
         if (this.analytics.isEnabled) {
@@ -972,6 +1040,7 @@ export class MicrosoftRewardsBot {
                 this.mainMobilePage = await session.context.newPage()
                 await this.mainMobilePage.setViewportSize(DESKTOP_BROWSER_VIEWPORT)
                 await this.login.login(this.mainMobilePage, account)
+                await this.ensureLiveMobilePage(session.context, 'login verification')
                 return this.activities.doCaptureDashboardPages(this.mainMobilePage)
             })
 
@@ -1058,7 +1127,14 @@ export class MicrosoftRewardsBot {
         console.log(`${'='.repeat(width)}\n`)
     }
 
-    async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number; coreStats: CoreRunStats }> {
+    async Main(account: Account): Promise<{
+        initialPoints: number
+        collectedPoints: number
+        searchPointsGained: number
+        countersAvailable: boolean
+        coreStats: CoreRunStats
+        starBonus?: StarBonusInfo
+    }> {
         const accountEmail = account.email
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`)
         this.userData.coreStats = createEmptyCoreRunStats()
@@ -1080,6 +1156,7 @@ export class MicrosoftRewardsBot {
                 this.logger.info('main', 'BROWSER', `Mobile Browser started | ${accountEmail}`)
 
                 await this.login.login(this.mainMobilePage, account)
+                await this.ensureLiveMobilePage(initialContext, 'login verification')
 
                 const needsAppAccessToken =
                     this.config.workers.doAppPromotions ||
@@ -1199,7 +1276,7 @@ export class MicrosoftRewardsBot {
                 }
 
                 if (this.config.workers.doApplyCoupons) {
-                    const couponResult = await this.activities.doApplyCoupons(this.mainMobilePage)
+                    const couponResult = await this.trackWorker('applyCoupons', () => this.activities.doApplyCoupons(this.mainMobilePage))
                     this.userData.coreStats.couponsAvailable += couponResult.available
                     this.userData.coreStats.couponsApplied += couponResult.applied
                     this.userData.coreStats.couponPointsDiscount += couponResult.totalPointsDiscount
@@ -1216,7 +1293,7 @@ export class MicrosoftRewardsBot {
 
                 // Claim ready dashboard points before spending time on other activities.
                 if (this.config.workers.doClaimPoints) {
-                    const claimResult = await this.activities.doClaimPoints(this.mainMobilePage)
+                    const claimResult = await this.trackWorker('claimPoints', () => this.activities.doClaimPoints(this.mainMobilePage))
                     if (claimResult.claimed) {
                         this.userData.coreStats.claimPoints += claimResult.pointsClaimed
                         addCoreFeature(this.userData.coreStats, 'Claimable point cards')
@@ -1230,15 +1307,15 @@ export class MicrosoftRewardsBot {
 
                 // Dashboard Info: collect hero data BEFORE any activities (for before/after comparison)
                 if (this.config.workers.doDashboardInfo) {
-                    const dashInfo = await this.activities.collectDashboardInfo(this.mainMobilePage)
+                    const dashInfo = await this.trackWorker('dashboardInfo', () => this.activities.collectDashboardInfo(this.mainMobilePage))
                     this.userData.dashboardInfo = dashInfo
                 }
 
-                if (this.config.workers.doAppPromotions) await this.workers.doAppPromotions(appData)
-                if (this.config.workers.doDailySet) await this.workers.doDailySet(data, this.mainMobilePage)
-                if (this.config.workers.doSpecialPromotions) await this.workers.doSpecialPromotions(data)
+                if (this.config.workers.doAppPromotions) await this.trackWorker('appPromotions', () => this.workers.doAppPromotions(appData))
+                if (this.config.workers.doDailySet) await this.trackWorker('dailySet', () => this.workers.doDailySet(data, this.mainMobilePage))
+                if (this.config.workers.doSpecialPromotions) await this.trackWorker('specialPromotions', () => this.workers.doSpecialPromotions(data))
                 if (this.config.workers.doMorePromotions) {
-                    await this.workers.doMorePromotions(data, this.mainMobilePage)
+                    await this.trackWorker('morePromotions', () => this.workers.doMorePromotions(data, this.mainMobilePage))
                     if (
                         this.pluginManager.hasOfficialCoreEntitlement() &&
                         this.config.core?.temporaryPunchcards !== false
@@ -1248,11 +1325,11 @@ export class MicrosoftRewardsBot {
                 }
                 // Classic punch cards (legacy dashboard; no-op on next where punchCards is empty).
                 if (this.config.workers.doPunchCards) {
-                    await this.workers.doPunchCards(data, this.mainMobilePage)
+                    await this.trackWorker('punchCards', () => this.workers.doPunchCards(data, this.mainMobilePage))
                 }
                 if (this.accessToken) {
-                    if (this.config.workers.doDailyCheckIn) await this.activities.doDailyCheckIn()
-                    if (this.config.workers.doReadToEarn) await this.activities.doReadToEarn()
+                    if (this.config.workers.doDailyCheckIn) await this.trackWorker('dailyCheckIn', () => this.activities.doDailyCheckIn())
+                    if (this.config.workers.doReadToEarn) await this.trackWorker('readToEarn', () => this.activities.doReadToEarn())
                 } else if (this.config.workers.doDailyCheckIn || this.config.workers.doReadToEarn) {
                     this.logger.warn(
                         'main',
@@ -1263,7 +1340,7 @@ export class MicrosoftRewardsBot {
 
                 // Daily Streak: expand progression, activate protection, read bonus info
                 if (this.config.workers.doDailyStreak) {
-                    const streakInfo = await this.activities.doDailyStreak(this.mainMobilePage)
+                    const streakInfo = await this.trackWorker('dailyStreak', () => this.activities.doDailyStreak(this.mainMobilePage))
                     if (streakInfo) {
                         this.logger.info(
                             'main',
@@ -1299,7 +1376,8 @@ export class MicrosoftRewardsBot {
                 // search. When the counters are absent, schedule searches with an estimated
                 // target — the search task measures real gains from the balance and stops at
                 // Microsoft's daily cap, so the estimate only needs to be positive.
-                if (!this.browser.func.hasSearchCounters(searchPoints)) {
+                const countersAvailable = this.browser.func.hasSearchCounters(searchPoints)
+                if (!countersAvailable) {
                     missingSearchPoints.mobilePoints = missingSearchPoints.mobilePoints || 90
                     missingSearchPoints.desktopPoints = missingSearchPoints.desktopPoints || 90
                     this.logger.warn(
@@ -1324,7 +1402,21 @@ export class MicrosoftRewardsBot {
                 this.userData.gainedPoints = mobilePoints + desktopPoints
 
                 const finalPoints = await this.browser.func.getCurrentPoints()
-                const collectedPoints = finalPoints - initialPoints
+                const measuredPoints = finalPoints - initialPoints
+                // Points only ever go UP during a run. A negative or non-finite delta means
+                // getCurrentPoints() failed to read the live balance (it fell back to 0/NaN) —
+                // a measurement failure, NOT a real loss. Fall back to the directly-measured
+                // search gain so we never record impossible negative points (which would corrupt
+                // the dashboard totals and the PostHog analytics aggregates).
+                let collectedPoints = measuredPoints
+                if (!Number.isFinite(measuredPoints) || measuredPoints < 0) {
+                    this.logger.warn(
+                        'main',
+                        'POINTS',
+                        `Balance read looks wrong (initial=${initialPoints} → final=${finalPoints} = ${measuredPoints}); falling back to measured search gain ${mobilePoints + desktopPoints}`
+                    )
+                    collectedPoints = Math.max(0, mobilePoints + desktopPoints)
+                }
 
                 this.logger.info(
                     'main',
@@ -1335,6 +1427,8 @@ export class MicrosoftRewardsBot {
                 return {
                     initialPoints,
                     collectedPoints: collectedPoints || 0,
+                    searchPointsGained: Math.max(0, mobilePoints + desktopPoints),
+                    countersAvailable,
                     coreStats: this.userData.coreStats,
                     starBonus: this.userData.starBonus
                 }

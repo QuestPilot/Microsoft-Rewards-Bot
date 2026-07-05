@@ -70,6 +70,26 @@ test('harvester result exposes detailed route, selector and failure diagnostics'
     assert.match(api, /httpStatus\?: number/)
 })
 
+test('harvester recovers a live authenticated page before invoking Core capture', () => {
+    const index = read('src/index.ts')
+    const harvester = index.slice(index.indexOf('async runHarvester'), index.indexOf('private printHarvesterReport'))
+    const main = index.slice(index.indexOf('async Main(account'), index.indexOf('private async runWorker'))
+
+    assert.match(index, /private async ensureLiveMobilePage\(context: BrowserContext, reason: string\): Promise<Page>/)
+    assert.ok(
+        harvester.indexOf("await this.ensureLiveMobilePage(session.context, 'login verification')") >
+            harvester.indexOf('await this.login.login(this.mainMobilePage, account)')
+    )
+    assert.ok(
+        harvester.indexOf("await this.ensureLiveMobilePage(session.context, 'login verification')") <
+            harvester.indexOf('return this.activities.doCaptureDashboardPages(this.mainMobilePage)')
+    )
+    assert.ok(
+        main.indexOf("await this.ensureLiveMobilePage(initialContext, 'login verification')") >
+            main.indexOf('await this.login.login(this.mainMobilePage, account)')
+    )
+})
+
 test('Main() runs the harvester only when the opt-in core flag is set', () => {
     const index = read('src/index.ts')
     assert.match(index, /if \(this\.config\.core\?\.captureDashboardPages\)/)

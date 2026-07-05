@@ -132,6 +132,11 @@ function main() {
         }
     }
 
+    const shimPath = path.join(CORE_DIR, 'index.js')
+    if (fs.existsSync(shimPath)) {
+        assertNoForbiddenBytecodeMarkers(shimPath, 'plugins/core/index.js')
+    }
+
     const manifestPayload = fs.readFileSync(OFFICIAL_CORE_PATH)
     const signature = Buffer.from(fs.readFileSync(OFFICIAL_CORE_SIGNATURE_PATH, 'utf8').trim(), 'base64')
     const publicKey = crypto.createPublicKey(fs.readFileSync(CORE_PUBLIC_KEY_PATH, 'utf8'))
@@ -214,6 +219,30 @@ function main() {
             console.warn('[CORE-RELEASE-CHECK] Core bytecode target metadata is missing; single-target legacy artifact detected.')
         } else {
             console.log(`[CORE-RELEASE-CHECK] Core bytecode target: ${target.platform}/${target.arch}/node-${target.node}`)
+        }
+    }
+
+    // The in-process loader shim (plugins/core/index.js) require()s the verified
+    // .jsc bytecode but is never itself hashed against the bytecode — a tampered
+    // shim could load an attacker-controlled path while the bytecode hash still
+    // "passes" (PluginManager.isVerifiedOfficialCore pins this when present). One
+    // shim file covers every target, so the pin is top-level, not per-target.
+    if (fs.existsSync(shimPath)) {
+        const shimHash = sha256(shimPath)
+        const manifestShimSha = officialCore.shimSha256
+        const packageShimSha = corePackage.msrb?.shimSha256
+        if (!manifestShimSha && !packageShimSha) {
+            console.warn(
+                '[CORE-RELEASE-CHECK] plugins/core/index.js (loader shim) is not pinned by shimSha256 in official-core.json or package.json — ' +
+                'PluginManager currently SKIPS shim verification when this is absent. Add "shimSha256": "' + shimHash + '" before signing this release.'
+            )
+        } else {
+            if (manifestShimSha && manifestShimSha !== shimHash) {
+                fail('plugins/official-core.json shimSha256 does not match plugins/core/index.js')
+            }
+            if (packageShimSha && packageShimSha !== shimHash) {
+                fail('plugins/core/package.json msrb.shimSha256 does not match plugins/core/index.js')
+            }
         }
     }
 

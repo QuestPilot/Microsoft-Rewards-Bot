@@ -26,7 +26,7 @@ function createRuntimeLaunchers(options = {}) {
                     '@echo off',
                     'title Rewards Desk - Starting',
                     'color 0B',
-                    `set "MSRB_ROOT=${root}"`,
+                    'for %%i in ("%~dp0..\\..") do set "MSRB_ROOT=%%~fi"',
                     'set "MSRB_LAUNCHER=%~f0"',
                     'if /i "%~1"=="--msrb-elevated" set "MSRB_ELEVATED_RELAUNCH=1"',
                     'cd /d "%MSRB_ROOT%"',
@@ -55,8 +55,8 @@ function createRuntimeLaunchers(options = {}) {
                     'echo   Rewards Desk is preparing...',
                     'echo   Updates and local files are being checked.',
                     'echo.',
-                    `set "MSRB_LAUNCHER_DIR=${runtimeDir}"`,
-                    `"${nodePath}" "${startScript}"`,
+                    'for %%i in ("%~dp0.") do set "MSRB_LAUNCHER_DIR=%%~fi"',
+                    `"${nodePath}" "%MSRB_ROOT%\\scripts\\start.js"`,
                     'set "MSRB_EXIT=%errorlevel%"',
                     'if not "%MSRB_EXIT%"=="0" (',
                     '  echo.',
@@ -81,17 +81,16 @@ function createRuntimeLaunchers(options = {}) {
 
     function ensureAgentLauncher() {
         fs.mkdirSync(runtimeDir, { recursive: true })
-        const logsDir = path.join(root, 'data', 'logs')
-        fs.mkdirSync(logsDir, { recursive: true })
         if (platform === 'win32') {
             const filePath = path.join(runtimeDir, 'start-background.cmd')
             atomicWrite(
                 filePath,
                 [
                     '@echo off',
-                    `cd /d "${root}"`,
-                    `set "MSRB_LAUNCHER_DIR=${runtimeDir}"`,
-                    `"${nodePath}" "${startScript}" --background >> "${path.join(logsDir, 'background-agent.log')}" 2>&1`,
+                    'for %%i in ("%~dp0..\\..") do set "MSRB_ROOT=%%~fi"',
+                    'cd /d "%MSRB_ROOT%"',
+                    'for %%i in ("%~dp0.") do set "MSRB_LAUNCHER_DIR=%%~fi"',
+                    `"${nodePath}" "%MSRB_ROOT%\\scripts\\start.js" --background >> "%MSRB_ROOT%\\data\\logs\\background-agent.log" 2>&1`,
                     ''
                 ].join('\r\n')
             )

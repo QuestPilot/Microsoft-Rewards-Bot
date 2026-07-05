@@ -262,7 +262,7 @@ class BrowserManager {
         await Promise.allSettled(browsers.map(browser => browser.close()))
     }
 
-    private static isDocker(): boolean {
+    static isDocker(): boolean {
         try {
             if (fs.existsSync('/.dockerenv')) return true
             return fs.readFileSync('/proc/1/cgroup', 'utf8').includes('docker')
