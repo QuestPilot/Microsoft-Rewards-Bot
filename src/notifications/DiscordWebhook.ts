@@ -165,8 +165,8 @@ async function enqueueDiscordRequest(request: AxiosRequestConfig, kind: string):
                 // eslint-disable-next-line no-console
                 console.log('[INFO ] [SYSTEM ] [AUTO-REPORT] Report delivery reachable again, delivery resumed')
             }
-        } catch (err: any) {
-            const status = err?.response?.status
+        } catch (err: unknown) {
+            const status = axios.isAxiosError(err) ? err.response?.status : undefined
             // 429 = rate limited; the queue already paces requests, so retry silently.
             if (status === 429) return
 
@@ -174,7 +174,7 @@ async function enqueueDiscordRequest(request: AxiosRequestConfig, kind: string):
             // endpoint or an invalid webhook produced "nothing sent" with zero
             // feedback. Surface the reason once per outage. We use console directly
             // (not the bot logger) to avoid recursing back through the webhook log filter.
-            const detail = status ? `HTTP ${status}` : err?.message || String(err)
+            const detail = status ? `HTTP ${status}` : err instanceof Error ? err.message : String(err)
             if (!deliveryOffline) {
                 deliveryOffline = true
                 // eslint-disable-next-line no-console
