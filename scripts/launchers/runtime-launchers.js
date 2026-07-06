@@ -164,12 +164,33 @@ function createRuntimeLaunchers(options = {}) {
                     // Best-effort foreground for the real Desk window too, once it has
                     // had a moment to appear. Same focus-stealing caveat as above.
                     'if "%MSRB_EXIT%"=="0" start "" /min powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "%MSRB_ROOT%\\scripts\\launchers\\win-window-helper.ps1" foreground "Rewards Desk"',
+                    // The write-test at :start only proves the ROOT folder accepts a new
+                    // file — it does not prove Node itself (or a deeper path start.js
+                    // touches) is accessible. Real users have hit both "cannot find the
+                    // path specified" and "Access is denied" here on installs the write-
+                    // test happily passed. Rather than guess which failures are actually
+                    // permission-related (the same underlying problem shows different,
+                    // locale-dependent OS text), retry ONCE with administrator permission
+                    // on ANY failure — bounded by MSRB_ELEVATED_RELAUNCH so it can never
+                    // loop, and a real (non-permission) bug still fails the same way, just
+                    // after one extra UAC prompt instead of a dead end.
+                    'if not "%MSRB_EXIT%"=="0" if not "%MSRB_ELEVATED_RELAUNCH%"=="1" goto retry_elevated',
                     'if not "%MSRB_EXIT%"=="0" (',
                     '  echo.',
                     '  echo Rewards Desk could not start. Review the error above.',
                     '  pause',
                     ')',
                     'exit /b %MSRB_EXIT%',
+                    ':retry_elevated',
+                    'echo.',
+                    'echo   Rewards Desk could not start - retrying with administrator permission...',
+                    'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "try{Start-Process -FilePath $env:MSRB_LAUNCHER -ArgumentList \'--msrb-elevated\' -WorkingDirectory $env:MSRB_ROOT -Verb RunAs -ErrorAction Stop;exit 0}catch{Write-Error $_;exit 1}"',
+                    'if not errorlevel 1 exit /b 0',
+                    'echo.',
+                    'echo Rewards Desk could not start, and administrator permission was not granted.',
+                    'echo Review the error above.',
+                    'pause',
+                    'exit /b 1',
                     ''
                 ]
                     .filter(line => line !== '')

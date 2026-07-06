@@ -56,6 +56,27 @@ test('macOS/Linux agent and notifier launchers also fall back to PATH node', () 
     assert.match(notifier, /exec "\$NODE_BIN" .*notifier-daemon\.js/)
 })
 
+test('Desk launcher retries elevated once on any startup failure, but never loops', () => {
+    // The write-test at :start only proves the root folder accepts a new file — real
+    // users hit both "cannot find the path specified" and "Access is denied" launching
+    // Node itself on installs that write-test happily passed. On any :run failure the
+    // launcher must offer one elevated retry (bounded by MSRB_ELEVATED_RELAUNCH so an
+    // unrelated app bug can't UAC-prompt forever), then fall through to the normal
+    // failure message if it still fails once already elevated.
+    const { launchers } = fixture('win32')
+    const content = fs.readFileSync(launchers.ensureDeskLauncher(), 'utf8')
+    assert.match(content, /if not "%MSRB_EXIT%"=="0" if not "%MSRB_ELEVATED_RELAUNCH%"=="1" goto retry_elevated/)
+    assert.match(content, /:retry_elevated/)
+    assert.match(content, /Start-Process -FilePath \$env:MSRB_LAUNCHER -ArgumentList '--msrb-elevated'/)
+    // The retry label must come AFTER the normal (already-elevated-or-looping) failure
+    // exit, so a second failure while already elevated falls straight through without
+    // ever reaching :retry_elevated again.
+    const runIndex = content.indexOf(':run')
+    const retryIndex = content.indexOf(':retry_elevated')
+    const normalExitIndex = content.indexOf('Rewards Desk could not start. Review the error above.')
+    assert.ok(runIndex < normalExitIndex && normalExitIndex < retryIndex, 'ordering: :run body, then the bounded normal-failure exit, then :retry_elevated')
+})
+
 test('re-ensuring an unchanged launcher never touches the file on disk (no rename)', () => {
     // start-desk.cmd runs its Node command synchronously, so the parent cmd.exe stays
     // open on the file for the whole run. If a self-heal call (or the "Install shortcuts"
