@@ -1194,6 +1194,32 @@ function maybeAutoEnableDeskStartup() {
     }
 }
 
+// First GUI launch only: create the Desktop + Start Menu shortcuts by default — same
+// one-shot pattern as maybeAutoEnableDeskStartup above, just for desktopInstallManager
+// instead of startupManager. Without this, a fresh install (git clone + npm start,
+// bypassing the separate native installer) never gets a clickable shortcut unless the
+// user finds Settings and clicks "Install shortcuts" themselves.
+function maybeAutoInstallDeskShortcuts() {
+    if (process.env.MSRB_APP_NO_OPEN === '1') return
+    const marker = path.join(ROOT, 'data', '.desk-shortcut-init')
+    try {
+        if (fs.existsSync(marker)) return
+        fs.mkdirSync(path.dirname(marker), { recursive: true })
+        fs.writeFileSync(marker, new Date().toISOString())
+    } catch {
+        return // can't persist the marker → don't risk reinstalling on every launch
+    }
+    try {
+        const st = desktopInstallManager.status()
+        if (st && st.supported && !st.complete) {
+            desktopInstallManager.install()
+            pushLog('info', 'Created Rewards Desk shortcuts (Desktop + Start Menu). Remove them anytime from Settings.')
+        }
+    } catch (error) {
+        pushLog('warn', `Could not create Desk shortcuts: ${error && error.message ? error.message : error}`)
+    }
+}
+
 function initializeDeskInBackground() {
     void loadDeskLicenseState()
     setTimeout(() => {
@@ -7901,6 +7927,7 @@ function finalizeDeskServer() {
     if (deskLanUrl) pushLog('info', `Desk reachable on your network at ${deskLanUrl}`)
     if (process.env.MSRB_APP_NO_OPEN !== '1') openAppWindow(url)
     maybeAutoEnableDeskStartup()
+    maybeAutoInstallDeskShortcuts()
     initializeDeskInBackground()
     void refreshAgentState()
     setInterval(() => void refreshAgentState(), 900)

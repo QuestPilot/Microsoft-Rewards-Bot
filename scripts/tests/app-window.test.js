@@ -102,6 +102,21 @@ test('Rewards Desk exposes visible protection, Core deactivation, and desktop in
     assert.doesNotMatch(source, /Include Core upgrade pitch/)
 })
 
+test('Rewards Desk auto-installs Desktop/Start Menu shortcuts on first GUI launch, mirroring the autostart auto-enable', () => {
+    // A fresh install (git clone + npm start, bypassing the separate native installer)
+    // used to never get a clickable shortcut unless the user found Settings and clicked
+    // "Install shortcuts" themselves. maybeAutoEnableDeskStartup already auto-enables
+    // login-autostart once on first launch — shortcuts must get the same one-shot
+    // treatment, gated the same way (skipped headless/CI via MSRB_APP_NO_OPEN).
+    assert.match(source, /function maybeAutoInstallDeskShortcuts\(\)/)
+    assert.match(source, /if \(process\.env\.MSRB_APP_NO_OPEN === '1'\) return/g)
+    assert.match(source, /\.desk-shortcut-init/)
+    assert.match(source, /desktopInstallManager\.status\(\)/)
+    assert.match(source, /st && st\.supported && !st\.complete/)
+    assert.match(source, /desktopInstallManager\.install\(\)/)
+    assert.match(source, /maybeAutoEnableDeskStartup\(\)\s*\n\s*maybeAutoInstallDeskShortcuts\(\)/)
+})
+
 test('Rewards Desk uses one Core activation flow and synchronizes plugin state', () => {
     assert.match(source, /if \(promptVisible && !_licensePromptVisible\) licOpenOverlay\('key'\)/)
     assert.match(source, /if \(s\.hasLicenseCache \|\| s\.corePluginEnabled === false\)/)

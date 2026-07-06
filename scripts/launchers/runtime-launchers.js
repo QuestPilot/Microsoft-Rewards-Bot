@@ -20,6 +20,15 @@ function createRuntimeLaunchers(options = {}) {
     const root = path.resolve(options.root || process.cwd())
     const platform = options.platform || process.platform
     const nodePath = options.nodePath || process.execPath
+    // nodePath is an absolute snapshot of whichever Node process last (re)wrote these
+    // launchers — if that exact binary later moves (Node upgraded in place at a new
+    // path, a portable/nvm-managed install replaced), the launcher would try to exec a
+    // path that no longer exists and fail with a bare OS "path not found" error before
+    // Node — and any of our own logging — ever runs. Fall back to whatever `node`
+    // resolves to on PATH in that case (covers the common case: Node installed via the
+    // official installer, which adds itself to PATH on every OS) instead of hard-failing.
+    const winNodeSetup = `if exist "${nodePath}" (set "MSRB_NODE=${nodePath}") else (set "MSRB_NODE=node")`
+    const shNodeSetup = `NODE_BIN=${shellQuote(nodePath)}\n[ -x "$NODE_BIN" ] || NODE_BIN=node\n`
     const runtimeDir = path.join(root, 'scripts', 'runtime')
     const startScript = path.join(root, 'scripts', 'start.js')
     const splashPath = path.join(root, 'scripts', 'desk', 'splash.html')
@@ -33,6 +42,22 @@ function createRuntimeLaunchers(options = {}) {
 
     function atomicWrite(filePath, content, mode = 0o600) {
         fs.mkdirSync(path.dirname(filePath), { recursive: true })
+        // Skip entirely when the file already holds this exact content. Without this, a
+        // Desk launcher regenerates start-desk.cmd on every ordinary launch (self-heal in
+        // start.js) or "Install shortcuts" click — but start-desk.cmd runs its Node command
+        // synchronously (no `start`), so the parent cmd.exe is STILL mid-script, holding
+        // the file open, while that very Node process tries to rename a new version onto
+        // it. Windows then refuses the rename (EPERM/sharing violation) even though the
+        // directory itself is perfectly writable (the .tmp write above always succeeds —
+        // only the rename-over-the-currently-open-file fails). The regenerated content is
+        // identical to what's on disk on almost every call (nothing about the launcher
+        // actually changed), so this also means we practically never touch the file again
+        // after its first write — the collision this avoids essentially never gets hit.
+        try {
+            if (fs.readFileSync(filePath, 'utf8') === content) return
+        } catch {
+            // missing or unreadable → fall through to a real write
+        }
         const tempPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${process.pid}-${Date.now()}.tmp`)
         fs.writeFileSync(tempPath, content, { encoding: 'utf8', mode })
         fs.renameSync(tempPath, filePath)
@@ -131,7 +156,8 @@ function createRuntimeLaunchers(options = {}) {
                     'echo   Updates and local files are being checked.',
                     'echo.',
                     'for %%i in ("%~dp0.") do set "MSRB_LAUNCHER_DIR=%%~fi"',
-                    `"${nodePath}" "%MSRB_ROOT%\\scripts\\start.js"`,
+                    winNodeSetup,
+                    `"%MSRB_NODE%" "%MSRB_ROOT%\\scripts\\start.js"`,
                     'set "MSRB_EXIT=%errorlevel%"',
                     `taskkill /FI "WINDOWTITLE eq ${SPLASH_TITLE}*" /F >nul 2>&1`,
                     'if defined MSRB_SPLASH_PROFILE rmdir /s /q "%MSRB_SPLASH_PROFILE%" >nul 2>&1',
@@ -176,7 +202,8 @@ function createRuntimeLaunchers(options = {}) {
                 (splashArgsSh ? `${splashArgsSh} >/dev/null 2>&1 &\nSPLASH_PID=$!\n` : '') +
                 `printf '\\n  Rewards Desk is preparing...\\n  Updates and local files are being checked.\\n\\n'\n` +
                 `export MSRB_LAUNCHER_DIR=${shellQuote(runtimeDir)}\n` +
-                `${shellQuote(nodePath)} ${shellQuote(startScript)}\n` +
+                shNodeSetup +
+                `"$NODE_BIN" ${shellQuote(startScript)}\n` +
                 `status=$?\n` +
                 (splashArgsSh
                     ? `kill "$SPLASH_PID" >/dev/null 2>&1\nrm -rf "${splashProfileSh}" >/dev/null 2>&1\n`
@@ -199,7 +226,8 @@ function createRuntimeLaunchers(options = {}) {
                     'for %%i in ("%~dp0..\\..") do set "MSRB_ROOT=%%~fi"',
                     'cd /d "%MSRB_ROOT%"',
                     'for %%i in ("%~dp0.") do set "MSRB_LAUNCHER_DIR=%%~fi"',
-                    `"${nodePath}" "%MSRB_ROOT%\\scripts\\start.js" --background >> "%MSRB_ROOT%\\data\\logs\\background-agent.log" 2>&1`,
+                    winNodeSetup,
+                    `"%MSRB_NODE%" "%MSRB_ROOT%\\scripts\\start.js" --background >> "%MSRB_ROOT%\\data\\logs\\background-agent.log" 2>&1`,
                     ''
                 ].join('\r\n')
             )
@@ -209,7 +237,7 @@ function createRuntimeLaunchers(options = {}) {
         const filePath = path.join(runtimeDir, 'start-background.sh')
         atomicWrite(
             filePath,
-            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nexport MSRB_LAUNCHER_DIR=${shellQuote(runtimeDir)}\nexec ${shellQuote(nodePath)} ${shellQuote(startScript)} --background\n`,
+            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nexport MSRB_LAUNCHER_DIR=${shellQuote(runtimeDir)}\n${shNodeSetup}exec "$NODE_BIN" ${shellQuote(startScript)} --background\n`,
             0o700
         )
         return filePath
@@ -230,7 +258,8 @@ function createRuntimeLaunchers(options = {}) {
                     '@echo off',
                     'for %%i in ("%~dp0..\\..") do set "MSRB_ROOT=%%~fi"',
                     'cd /d "%MSRB_ROOT%"',
-                    `"${nodePath}" "${daemonScript}" >> "%MSRB_ROOT%\\data\\logs\\update-notifier.log" 2>&1`,
+                    winNodeSetup,
+                    `"%MSRB_NODE%" "${daemonScript}" >> "%MSRB_ROOT%\\data\\logs\\update-notifier.log" 2>&1`,
                     ''
                 ].join('\r\n')
             )
@@ -240,7 +269,7 @@ function createRuntimeLaunchers(options = {}) {
         const filePath = path.join(runtimeDir, 'start-notifier.sh')
         atomicWrite(
             filePath,
-            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\nexec ${shellQuote(nodePath)} ${shellQuote(daemonScript)}\n`,
+            `#!/usr/bin/env sh\ncd ${shellQuote(root)} || exit 1\n${shNodeSetup}exec "$NODE_BIN" ${shellQuote(daemonScript)}\n`,
             0o700
         )
         return filePath
