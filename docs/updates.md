@@ -44,7 +44,7 @@ On every `npm start`, the launcher also self-heals missing files: a missing `src
 npm start               # update check + build + launch
 npm run update:check    # check only, apply nothing
 npm run update:repair   # re-apply the current version if files look damaged
-npm run update:doctor   # diagnose update problems
+npm run update:doctor   # diagnose update problems + verify installed files
 ```
 
 Repair mode preserves the same user files as a normal update and refuses to downgrade.
@@ -80,14 +80,14 @@ The full flow:
 3. read `package.json` at that exact SHA;
 4. acquire `.updates/update.lock` before mutating files;
 5. apply the same commit with Git or its exact commit archive;
-6. remove obsolete files from managed project paths;
+6. delete files that the previous release installed but this one no longer ships (tracked in `.updates/applied.json`), plus known obsolete paths;
 7. preserve and migrate user files;
-8. verify that the local `package.json` matches the remote version;
-9. run `npm ci` or `npm install`;
-10. restart the launcher once with an internal guard;
-11. rebuild `dist/` from the newly installed source and start the new version.
+8. verify **every synced file** against the release (SHA-256), and only then write the new `package.json` — the version marker on disk is always the last thing written;
+9. record the applied-release manifest and clean old update workdirs (the last two are kept);
+10. run `npm ci` (falling back to `npm install` if `ci` fails);
+11. restart the launcher once with an internal guard, rebuild `dist/`, and start the new version.
 
-One update operation is pinned to the single SHA resolved at its start — if the branch moves mid-update, the update fails rather than mixing commits. The updater does not report `Updated` unless the version on disk matches the remote version after the apply step.
+One update operation is pinned to the single SHA resolved at its start — if the branch moves mid-update, the update fails rather than mixing commits. Because the version marker is written last, an interrupted or failed apply leaves the old version in place and the next launch simply re-applies the same release; the updater can never claim a version whose files aren't actually on disk and intact. `npm run update:doctor` re-checks the installed files against the applied-release manifest at any time.
 
 After a successful non-Docker update, the launcher exits and restarts itself once: the restart skips a second update check, rebuilds the runtime from the new source, and opens the normal app window or terminal mode.
 

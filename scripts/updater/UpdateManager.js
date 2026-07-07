@@ -54,16 +54,13 @@ const DEFAULT_EXCLUDES = [
     'plugins/.data'
 ]
 
-const DEFAULT_BACKUP_PATHS = [
-    'logs',
-    'diagnostics',
-    'Page',
-    'sessions',
-    'src/config.json',
-    'src/accounts.json',
-    'src/accounts.enc.json',
-    'plugins/plugins.jsonc'
-]
+// Only the small, critical user files are backed up before an apply and
+// restored on rollback. The heavy runtime dirs (sessions/, logs/, Page/,
+// diagnostics/) are excluded from syncing entirely — neither strategy ever
+// writes or prunes them — so copying hundreds of MB (including possibly
+// locked live session files) into .updates/ on every update only made
+// updates slow and failure-prone without protecting anything.
+const DEFAULT_BACKUP_PATHS = ['src/config.json', 'src/accounts.json', 'src/accounts.enc.json', 'plugins/plugins.jsonc']
 
 const DEFAULT_MANAGED_PATHS = [
     'assets',
@@ -114,6 +111,10 @@ const DEFAULT_OBSOLETE_PATHS = [
 
 const UPDATE_STRATEGIES = new Set(['auto', 'git', 'archive'])
 const UPDATE_LOCK_FILE = 'update.lock'
+const APPLIED_MANIFEST_FILE = 'applied.json'
+// Keep the last two .updates/<stamp>/ workdirs (current + previous) for
+// post-mortem; everything older is deleted after a successful apply.
+const KEEP_UPDATE_WORKDIRS = 2
 const DEFAULT_UPDATE_LOCK_WAIT_MS = 2 * 60 * 1000
 const DEFAULT_UPDATE_LOCK_STALE_MS = 30 * 60 * 1000
 const UPDATE_LOCK_POLL_MS = 500
@@ -210,6 +211,42 @@ function resolveNpmInvocation(env = process.env, nodePath = process.execPath) {
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
+}
+
+function sha256File(filePath) {
+    return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+}
+
+// Walk a release tree and return { 'posix/relative/path': sha256 } for every
+// file that the given exclude rules would sync. This is both the integrity
+// check input and the applied-manifest payload.
+function collectReleaseFiles(sourceRoot, excludes = DEFAULT_EXCLUDES) {
+    const files = {}
+    const walk = (dir, relative) => {
+        for (const entry of fs.readdirSync(dir)) {
+            const relPath = relative ? `${relative}/${entry}` : entry
+            if (isExcluded(relPath, excludes)) continue
+            const absolute = path.join(dir, entry)
+            if (fs.statSync(absolute).isDirectory()) {
+                walk(absolute, relPath)
+            } else {
+                files[relPath] = sha256File(absolute)
+            }
+        }
+    }
+    walk(sourceRoot, '')
+    return files
+}
+
+// A manifest path is only ever joined under root when it is a plain,
+// relative, forward path. Anything else (absolute, drive-letter, '..', empty
+// segments) is ignored — the manifest is local state, but never trust it
+// enough to delete outside the install root.
+function isSafeManifestPath(relPath) {
+    if (typeof relPath !== 'string' || relPath.length === 0) return false
+    if (path.isAbsolute(relPath) || /^[a-z]:/i.test(relPath)) return false
+    const segments = pathToPosix(relPath).split('/')
+    return segments.every(segment => segment !== '' && segment !== '.' && segment !== '..')
 }
 
 function copyRecursive(src, dest) {
@@ -704,7 +741,13 @@ class UpdateManager {
         this.logger.warn(
             color(
                 33,
-                `[UPDATER] Update available: local ${this.packageJson.version} -> remote ${remote.version}. Pull/rebuild the Docker image.`
+                `[UPDATER] Update available: local ${this.packageJson.version} -> remote ${remote.version}. Docker containers update by replacing the image, never in place.`
+            )
+        )
+        this.logger.warn(
+            color(
+                33,
+                '[UPDATER] Run `docker compose pull && docker compose up -d` (published image) or `docker compose up -d --build` (local build).'
             )
         )
     }
@@ -864,6 +907,15 @@ class UpdateManager {
             this.restoreBackup(backupDir)
             migrateUserFiles(this.root, this.logger)
             this.verifyAppliedRelease(remote)
+            // Git itself guarantees tree integrity here; record what was
+            // applied (no file map — `git status` is the drift check for git
+            // installs) and trim old workdirs.
+            this.writeAppliedManifest({
+                strategy: 'git',
+                botVersion: remote.version,
+                commitSha: remote.commitSha
+            })
+            this.cleanupUpdateWorkDirs()
             return { strategy: 'git', before, after: remote.commitSha }
         } catch (error) {
             this.logger.warn(`[UPDATER] Git apply failed, rolling back: ${error.message}`)
@@ -894,9 +946,16 @@ class UpdateManager {
         this.verifySourceRootRelease(sourceRoot, remote)
 
         try {
-            this.applyFromSourceRoot(sourceRoot, backupDir)
+            const applied = this.applyFromSourceRoot(sourceRoot, backupDir)
             migrateUserFiles(this.root, this.logger)
             this.verifyAppliedRelease(remote)
+            this.writeAppliedManifest({
+                strategy: 'archive',
+                botVersion: remote.version,
+                commitSha: remote.commitSha,
+                files: applied.files
+            })
+            this.cleanupUpdateArtifacts(workDir, { archivePath, extractDir })
             return { strategy: 'archive' }
         } catch (error) {
             this.logger.warn(`[UPDATER] Apply failed, rolling back: ${error.message}`)
@@ -921,10 +980,179 @@ class UpdateManager {
 
     applyFromSourceRoot(sourceRoot, backupDir, options = {}) {
         const excludes = options.excludes ?? DEFAULT_EXCLUDES
+        // Root package.json is the updater's only "this version is applied"
+        // marker, so it is deliberately excluded from the bulk copy and
+        // written last, after every other file has been copied and verified.
+        // If anything fails before that final write, the old version stays on
+        // disk and the next launch simply re-applies the same pinned release —
+        // instead of a half-updated tree that already claims the new version.
+        const copyExcludes = [...excludes, 'package.json']
+
         this.backupMutablePaths(backupDir, excludes)
+        this.pruneFromAppliedManifest(sourceRoot, excludes)
         pruneManagedPaths(sourceRoot, this.root, options.managedPaths ?? DEFAULT_MANAGED_PATHS, excludes)
         removeObsoletePaths(this.root, options.obsoletePaths ?? DEFAULT_OBSOLETE_PATHS, excludes)
-        copyReleaseTree(sourceRoot, this.root, excludes)
+        copyReleaseTree(sourceRoot, this.root, copyExcludes)
+
+        const files = this.verifyReleaseTree(sourceRoot, copyExcludes)
+
+        const sourcePackage = path.join(sourceRoot, 'package.json')
+        const targetPackage = path.join(this.root, 'package.json')
+        fs.copyFileSync(sourcePackage, targetPackage)
+        const packageHash = sha256File(sourcePackage)
+        if (sha256File(targetPackage) !== packageHash) {
+            throw new Error('Update apply failed: package.json did not copy intact')
+        }
+        files['package.json'] = packageHash
+
+        return { files }
+    }
+
+    // Compare every synced file on disk against the extracted release,
+    // byte-for-byte (SHA-256). This is what turns "the copy loop finished"
+    // into "the update is actually on disk".
+    verifyReleaseTree(sourceRoot, excludes = DEFAULT_EXCLUDES) {
+        const files = collectReleaseFiles(sourceRoot, excludes)
+        const problems = []
+        for (const [relPath, expectedHash] of Object.entries(files)) {
+            const target = path.join(this.root, relPath)
+            if (!fs.existsSync(target)) {
+                problems.push(`missing: ${relPath}`)
+                continue
+            }
+            if (sha256File(target) !== expectedHash) {
+                problems.push(`corrupted: ${relPath}`)
+            }
+        }
+        if (problems.length > 0) {
+            const shown = problems.slice(0, 10).join(', ')
+            const more = problems.length > 10 ? ` (+${problems.length - 10} more)` : ''
+            throw new Error(`Update verification failed for ${problems.length} file(s): ${shown}${more}`)
+        }
+        return files
+    }
+
+    // Delete files that the previous applied release installed but the new
+    // release no longer ships. Unlike the static managed/obsolete lists, this
+    // covers every synced path (root files included) without anyone having to
+    // remember to hand-list deletions — user files can never appear here
+    // because excluded paths are never recorded in the manifest.
+    pruneFromAppliedManifest(sourceRoot, excludes = DEFAULT_EXCLUDES) {
+        const manifest = this.readAppliedManifest()
+        const files = manifest?.files
+        if (!files || typeof files !== 'object') return
+
+        for (const relPath of Object.keys(files)) {
+            if (!isSafeManifestPath(relPath)) continue
+            const posix = pathToPosix(relPath)
+            if (posix === 'package.json') continue
+            if (isExcluded(posix, excludes)) continue
+            if (fs.existsSync(path.join(sourceRoot, posix))) continue
+
+            const target = path.join(this.root, posix)
+            if (!fs.existsSync(target)) continue
+            rmrf(target)
+            removeEmptyParents(path.dirname(target), this.root)
+        }
+    }
+
+    appliedManifestPath() {
+        return path.join(this.updatesDir, APPLIED_MANIFEST_FILE)
+    }
+
+    readAppliedManifest() {
+        try {
+            return JSON.parse(fs.readFileSync(this.appliedManifestPath(), 'utf8'))
+        } catch {
+            return null
+        }
+    }
+
+    writeAppliedManifest(data) {
+        mkdirp(this.updatesDir)
+        const manifest = {
+            schemaVersion: 1,
+            appliedAt: new Date().toISOString(),
+            ...data
+        }
+        const manifestPath = this.appliedManifestPath()
+        const tempPath = `${manifestPath}.${process.pid}.tmp`
+        fs.writeFileSync(tempPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        fs.renameSync(tempPath, manifestPath)
+    }
+
+    // Re-hash the installed tree against the last applied manifest. Used by
+    // update:doctor to prove (or disprove) that the version on disk is what
+    // the last update actually installed.
+    verifyAppliedManifest() {
+        const manifest = this.readAppliedManifest()
+        if (!manifest) return { status: 'missing' }
+        if (manifest.strategy !== 'archive' || !manifest.files || typeof manifest.files !== 'object') {
+            return { status: 'unsupported', strategy: manifest.strategy ?? 'unknown' }
+        }
+        if (manifest.botVersion !== this.packageJson.version) {
+            return { status: 'stale', manifestVersion: manifest.botVersion, localVersion: this.packageJson.version }
+        }
+
+        const missing = []
+        const drifted = []
+        for (const [relPath, expectedHash] of Object.entries(manifest.files)) {
+            if (!isSafeManifestPath(relPath)) continue
+            const target = path.join(this.root, pathToPosix(relPath))
+            if (!fs.existsSync(target)) {
+                missing.push(relPath)
+            } else if (sha256File(target) !== expectedHash) {
+                drifted.push(relPath)
+            }
+        }
+
+        return {
+            status: missing.length > 0 || drifted.length > 0 ? 'drift' : 'ok',
+            fileCount: Object.keys(manifest.files).length,
+            missing,
+            drifted
+        }
+    }
+
+    // After a successful apply: drop the biggest artifacts of the current
+    // workdir right away (tarball + extracted tree), then trim old stamped
+    // workdirs. Without this, .updates/ grew by the size of the repo on every
+    // single update, forever.
+    cleanupUpdateArtifacts(workDir, { archivePath, extractDir } = {}) {
+        try {
+            if (archivePath) rmrf(archivePath)
+            if (extractDir) rmrf(extractDir)
+            if (workDir && fs.existsSync(workDir) && fs.readdirSync(workDir).length === 0) {
+                fs.rmdirSync(workDir)
+            }
+        } catch (error) {
+            this.logger.warn(`[UPDATER] Workdir cleanup failed (non-fatal): ${error.message}`)
+        }
+        this.cleanupUpdateWorkDirs()
+    }
+
+    cleanupUpdateWorkDirs(keep = KEEP_UPDATE_WORKDIRS) {
+        let entries
+        try {
+            entries = fs.readdirSync(this.updatesDir, { withFileTypes: true })
+        } catch {
+            return
+        }
+
+        // Stamped workdirs are ISO timestamps with ':' and '.' replaced by '-',
+        // so a lexicographic sort is chronological.
+        const stamped = entries
+            .filter(entry => entry.isDirectory() && /^\d{4}-\d{2}-\d{2}T/.test(entry.name))
+            .map(entry => entry.name)
+            .sort()
+
+        for (const name of stamped.slice(0, Math.max(0, stamped.length - keep))) {
+            try {
+                rmrf(path.join(this.updatesDir, name))
+            } catch (error) {
+                this.logger.warn(`[UPDATER] Could not remove old update workdir ${name}: ${error.message}`)
+            }
+        }
     }
 
     verifySourceRootRelease(sourceRoot, remote) {
@@ -985,7 +1213,22 @@ class UpdateManager {
     }
 
     syncDependencies() {
-        const args = fs.existsSync(path.join(this.root, 'package-lock.json')) ? ['ci'] : ['install']
+        const hasLockfile = fs.existsSync(path.join(this.root, 'package-lock.json'))
+        try {
+            this.runNpm(hasLockfile ? ['ci'] : ['install'])
+        } catch (error) {
+            if (!hasLockfile) throw error
+            // At this point the release files are already applied; giving up
+            // here would strand the install as "up to date" with stale
+            // dependencies. `npm ci` is strict (and brittle against a dirty
+            // node_modules or npm cache), so fall back to `npm install`,
+            // which still honors the lockfile.
+            this.logger.warn(`[UPDATER] npm ci failed (${error.message}); retrying with npm install`)
+            this.runNpm(['install'])
+        }
+    }
+
+    runNpm(args) {
         const npm = resolveNpmInvocation()
         this.logger.log(`[UPDATER] Syncing dependencies with ${npm.label} ${args.join(' ')}`)
         const result = childProcess.spawnSync(npm.command, [...npm.argsPrefix, ...args], {
@@ -1006,11 +1249,14 @@ module.exports = {
     DEFAULT_OBSOLETE_PATHS,
     DEFAULT_REPO,
     UpdateManager,
+    collectReleaseFiles,
     copyReleaseTree,
     download,
     findExtractedRoot,
     isExcluded,
+    isSafeManifestPath,
     pruneManagedPaths,
     resolveNpmInvocation,
-    requestJson
+    requestJson,
+    sha256File
 }

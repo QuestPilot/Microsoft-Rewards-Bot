@@ -30,6 +30,8 @@ If another terminal started an update at the same time, the updater waits on `.u
 
 Use `npm run update:repair` when the installed files look inconsistent but the local `package.json` version already matches the remote `main` version. Repair mode re-applies the current `main` commit while preserving `src/config.json`, `src/accounts.json`, `plugins/plugins.jsonc`, sessions, logs, diagnostics, and custom plugin folders.
 
+Not sure whether the install is actually intact? `npm run update:doctor` compares every installed file against the last applied release (SHA-256) and reports any missing or modified file, with the exact repair action to run.
+
 Installations still running the earlier signed-release updater may display
 `Latest GitHub release is missing its signed update manifest`. That updater cannot update
 itself from `main`; update or reinstall manually once to version 4.5.1 or newer.

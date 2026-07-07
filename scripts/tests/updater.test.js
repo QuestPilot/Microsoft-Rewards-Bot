@@ -13,7 +13,8 @@ const {
     DEFAULT_MANAGED_PATHS,
     DEFAULT_OBSOLETE_PATHS,
     UpdateManager,
-    resolveNpmInvocation
+    resolveNpmInvocation,
+    sha256File
 } = require('../updater/UpdateManager')
 const { compareReleaseVersions, isReleaseVersion, parseReleaseVersion } = require('../updater/ReleaseVersion')
 
@@ -374,11 +375,17 @@ test('updater backup paths never include internal updater or dependency folders'
         'plugins/plugins.jsonc'
     ])
 
-    assert.deepEqual(backupPaths, ['sessions', 'src/config.json', 'src/accounts.json', 'plugins/plugins.jsonc'])
+    assert.deepEqual(backupPaths, ['src/config.json', 'src/accounts.json', 'plugins/plugins.jsonc'])
     assert.equal(DEFAULT_BACKUP_PATHS.includes('.updates'), false)
     assert.equal(DEFAULT_BACKUP_PATHS.includes('.git'), false)
     assert.equal(DEFAULT_BACKUP_PATHS.includes('node_modules'), false)
     assert.equal(DEFAULT_BACKUP_PATHS.includes('dist'), false)
+    // Heavy runtime dirs are excluded from syncing entirely — an update never
+    // touches them, so copying them into .updates/ on every update was pure
+    // I/O waste and a failure source (live locked session files).
+    for (const heavy of ['sessions', 'logs', 'Page', 'diagnostics']) {
+        assert.equal(DEFAULT_BACKUP_PATHS.includes(heavy), false, `${heavy} must not be backed up wholesale`)
+    }
 })
 
 test('updater knows old local dashboard source is obsolete', () => {
@@ -479,7 +486,11 @@ test('applying release preserves user files and removes obsolete managed files',
     assert.equal(fs.readFileSync(path.join(root, 'plugins', 'plugins.jsonc'), 'utf8'), '{"core":{"enabled":true}}')
     assert.equal(fs.readFileSync(path.join(root, 'sessions', 'keep.txt'), 'utf8'), 'session')
     assert.equal(fs.existsSync(path.join(root, 'src', 'old.ts')), false)
-    assert.equal(fs.existsSync(path.join(root, 'plugins', 'catalog.json')), false, 'obsolete plugins/catalog.json must be removed on update')
+    assert.equal(
+        fs.existsSync(path.join(root, 'plugins', 'catalog.json')),
+        false,
+        'obsolete plugins/catalog.json must be removed on update'
+    )
     assert.equal(fs.readFileSync(path.join(root, 'src', 'new.ts'), 'utf8'), 'new')
 })
 
@@ -508,8 +519,166 @@ test('applying release preserves generated launchers under scripts/runtime', () 
         '@echo off\r\n',
         'generated launcher under scripts/runtime must survive an update'
     )
-    assert.equal(fs.existsSync(path.join(root, 'scripts', 'old-tool.js')), false, 'stale managed script is still pruned')
+    assert.equal(
+        fs.existsSync(path.join(root, 'scripts', 'old-tool.js')),
+        false,
+        'stale managed script is still pruned'
+    )
     assert.equal(fs.readFileSync(path.join(root, 'scripts', 'new-tool.js'), 'utf8'), 'new')
+})
+
+test('root package.json is stamped last: a failed copy never claims the new version', () => {
+    const root = tempRoot()
+    const source = tempRoot()
+    const backup = path.join(root, '.updates', 'backup')
+
+    fs.mkdirSync(path.join(source, 'src'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    fs.writeFileSync(path.join(source, 'src', 'new.ts'), 'new')
+    // Sabotage: the release ships tool.txt as a file, but the install has a
+    // directory with that name — copyFileSync onto it throws mid-apply.
+    fs.writeFileSync(path.join(source, 'tool.txt'), 'file')
+    fs.mkdirSync(path.join(root, 'tool.txt', 'nested'), { recursive: true })
+
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    assert.throws(() => updater.applyFromSourceRoot(source, backup))
+
+    const local = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+    assert.equal(
+        local.version,
+        '1.0.0',
+        'a half-applied tree must still report the old version so the next run retries'
+    )
+})
+
+test('release tree verification detects corrupted and missing files', () => {
+    const root = tempRoot()
+    const source = tempRoot()
+
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(source, 'a.txt'), 'hello')
+    fs.writeFileSync(path.join(source, 'b.txt'), 'world')
+    fs.writeFileSync(path.join(root, 'a.txt'), 'tampered')
+
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    assert.throws(() => updater.verifyReleaseTree(source), /corrupted: a\.txt/)
+    assert.throws(() => updater.verifyReleaseTree(source), /missing: b\.txt/)
+
+    fs.writeFileSync(path.join(root, 'a.txt'), 'hello')
+    fs.writeFileSync(path.join(root, 'b.txt'), 'world')
+    const files = updater.verifyReleaseTree(source)
+    assert.deepEqual(Object.keys(files).sort(), ['a.txt', 'b.txt'])
+})
+
+test('manifest-based pruning removes stale released files but never user or excluded files', () => {
+    const root = tempRoot()
+    const source = tempRoot()
+    const backup = path.join(root, '.updates', 'backup')
+    const outside = path.join(path.dirname(root), `outside-${path.basename(root)}.txt`)
+
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    fs.mkdirSync(path.join(source, 'src'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    fs.writeFileSync(path.join(source, 'src', 'new.ts'), 'new')
+
+    // Previous release installed these; the new release no longer ships them.
+    fs.writeFileSync(path.join(root, 'old-root.md'), 'stale root file')
+    fs.writeFileSync(path.join(root, 'src', 'old.ts'), 'stale source file')
+    // User-owned content that must survive: not in the manifest / excluded.
+    fs.writeFileSync(path.join(root, 'notes.txt'), 'user notes')
+    fs.writeFileSync(path.join(root, 'src', 'config.json'), '{"user":true}')
+    fs.writeFileSync(outside, 'outside the install root')
+
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    updater.writeAppliedManifest({
+        strategy: 'archive',
+        botVersion: '1.0.0',
+        commitSha: 'abc',
+        files: {
+            'old-root.md': 'x',
+            'src/old.ts': 'x',
+            // Tampered entries that pruning must refuse to act on:
+            'src/config.json': 'x',
+            '../evil.txt': 'x',
+            [`../${path.basename(outside)}`]: 'x'
+        }
+    })
+
+    updater.applyFromSourceRoot(source, backup)
+
+    assert.equal(
+        fs.existsSync(path.join(root, 'old-root.md')),
+        false,
+        'stale root file must be pruned via the manifest'
+    )
+    assert.equal(
+        fs.existsSync(path.join(root, 'src', 'old.ts')),
+        false,
+        'stale source file must be pruned via the manifest'
+    )
+    assert.equal(fs.readFileSync(path.join(root, 'notes.txt'), 'utf8'), 'user notes')
+    assert.equal(fs.readFileSync(path.join(root, 'src', 'config.json'), 'utf8'), '{"user":true}')
+    assert.equal(fs.readFileSync(outside, 'utf8'), 'outside the install root')
+    fs.rmSync(outside, { force: true })
+})
+
+test('applied manifest roundtrip and drift verification', () => {
+    const root = tempRoot()
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '2.0.0' }))
+    fs.writeFileSync(path.join(root, 'src', 'app.ts'), 'code')
+
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+    assert.equal(updater.verifyAppliedManifest().status, 'missing')
+
+    updater.writeAppliedManifest({
+        strategy: 'archive',
+        botVersion: '2.0.0',
+        commitSha: 'abc',
+        files: {
+            'package.json': sha256File(path.join(root, 'package.json')),
+            'src/app.ts': sha256File(path.join(root, 'src', 'app.ts'))
+        }
+    })
+
+    const ok = updater.verifyAppliedManifest()
+    assert.equal(ok.status, 'ok')
+    assert.equal(ok.fileCount, 2)
+
+    fs.writeFileSync(path.join(root, 'src', 'app.ts'), 'tampered')
+    const drift = updater.verifyAppliedManifest()
+    assert.equal(drift.status, 'drift')
+    assert.deepEqual(drift.drifted, ['src/app.ts'])
+
+    fs.rmSync(path.join(root, 'src', 'app.ts'))
+    assert.deepEqual(updater.verifyAppliedManifest().missing, ['src/app.ts'])
+
+    // Git installs record what was applied but skip file verification.
+    updater.writeAppliedManifest({ strategy: 'git', botVersion: '2.0.0', commitSha: 'abc' })
+    assert.equal(updater.verifyAppliedManifest().status, 'unsupported')
+})
+
+test('old update workdirs are trimmed, keeping the newest two and updater state files', () => {
+    const root = tempRoot()
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+    const updater = new UpdateManager({ root, logger: { log() {}, warn() {} } })
+
+    const stamps = ['2026-01-01T00-00-00-000Z', '2026-01-02T00-00-00-000Z', '2026-01-03T00-00-00-000Z']
+    for (const stamp of stamps) {
+        fs.mkdirSync(path.join(root, '.updates', stamp, 'backup'), { recursive: true })
+    }
+    fs.writeFileSync(path.join(root, '.updates', 'update.lock'), '{}')
+    updater.writeAppliedManifest({ strategy: 'git', botVersion: '1.0.0', commitSha: 'abc' })
+
+    updater.cleanupUpdateWorkDirs()
+
+    assert.equal(fs.existsSync(path.join(root, '.updates', stamps[0])), false, 'oldest workdir is deleted')
+    assert.equal(fs.existsSync(path.join(root, '.updates', stamps[1])), true)
+    assert.equal(fs.existsSync(path.join(root, '.updates', stamps[2])), true)
+    assert.equal(fs.existsSync(path.join(root, '.updates', 'update.lock')), true)
+    assert.equal(fs.existsSync(updater.appliedManifestPath()), true)
 })
 
 test('git updater resets to the target commit and restores user config files', async t => {
