@@ -6,7 +6,7 @@
 
 # Node.js Version
 
-Navigation: [Documentation index](./README.md) -> [Install and auto-updates](./updates.md) -> [Troubleshooting](./troubleshooting.md)
+Navigation: [Documentation index](./README.md) · [Install & auto-updates](./updates.md) · [Troubleshooting](./troubleshooting.md)
 
 Use **Node.js 24.15.0**.
 

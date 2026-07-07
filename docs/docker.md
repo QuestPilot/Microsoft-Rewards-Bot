@@ -6,7 +6,7 @@
 
 # Docker
 
-Navigation: [Documentation index](./README.md) -> [Node.js version](./node-version.md) -> [Official Core plugin](./core-plugin.md) -> [Troubleshooting](./troubleshooting.md)
+Navigation: [Documentation index](./README.md) · [Node.js version](./node-version.md) · [Official Core plugin](./core-plugin.md) · [Troubleshooting](./troubleshooting.md)
 
 Docker is supported for the public bot and the official Core plugin on the official image target:
 

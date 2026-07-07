@@ -6,7 +6,7 @@
 
 # Plugin API Reference
 
-Navigation: [Documentation index](./README.md) -> [Plugin system overview](./plugins.md) -> [Create a plugin](./create-plugin.md) -> [Plugin publishing](./plugin-marketplace.md)
+Navigation: [Documentation index](./README.md) · [Plugin system overview](./plugins.md) · [Create a plugin](./create-plugin.md) · [Plugin publishing](./plugin-marketplace.md)
 
 This page documents the public third-party plugin contract. Import it from:
 

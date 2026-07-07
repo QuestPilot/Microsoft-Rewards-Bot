@@ -6,7 +6,7 @@
 
 # Create a Plugin
 
-Navigation: [Documentation index](./README.md) → [Plugin system overview](./plugins.md) → [Plugin API reference](./plugin-api.md) → [Publishing a plugin](./plugin-marketplace.md)
+Navigation: [Documentation index](./README.md) · [Plugin system overview](./plugins.md) · [Plugin API reference](./plugin-api.md) · [Publishing a plugin](./plugin-marketplace.md)
 
 A plugin is a small folder of code that the bot loads at startup. It can add diagnostics, react to account events, register selector groups, read its own **settings**, keep a little **storage**, and show a **panel** in Rewards Desk — all without touching the bot's source and (for community plugins) without any Node.js access. This page walks through a complete plugin from empty folder to running, then points you to publishing.
 

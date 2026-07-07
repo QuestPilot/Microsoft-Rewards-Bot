@@ -6,7 +6,7 @@
 
 # Licensing and Allowed Use
 
-Navigation: [Documentation index](./README.md) -> [Official Core plugin](./core-plugin.md) -> [Plugin publishing](./plugin-marketplace.md)
+Navigation: [Documentation index](./README.md) · [Official Core plugin](./core-plugin.md) · [Plugin publishing](./plugin-marketplace.md)
 
 Microsoft Rewards Bot is source-available, not open-source under an OSI-style permissive license.
 

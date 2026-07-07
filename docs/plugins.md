@@ -6,7 +6,7 @@
 
 # Plugin System Overview
 
-Navigation: [Documentation index](./README.md) -> [Create a plugin](./create-plugin.md) -> [Plugin API reference](./plugin-api.md) -> [Official Core plugin](./core-plugin.md)
+Navigation: [Documentation index](./README.md) · [Create a plugin](./create-plugin.md) · [Plugin API reference](./plugin-api.md) · [Official Core plugin](./core-plugin.md)
 
 The bot loads plugins from the `plugins/` directory at startup.
 

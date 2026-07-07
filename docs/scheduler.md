@@ -6,6 +6,8 @@
 
 # Built-in Scheduler
 
+Navigation: [Documentation index](./README.md) · [Install & auto-updates](./updates.md) · [Docker](./docker.md)
+
 The built-in scheduler lets the bot run immediately, finish all configured accounts, then wait inside the same process until the next daily run time. It works on Windows, macOS, Linux, and Docker without cron, systemd, Task Scheduler, or any third-party service.
 
 With Core enabled, the scheduler can run inside the background agent. In that mode the machine stays visible in the Core dashboard, waits silently between runs, and can still receive dashboard commands.

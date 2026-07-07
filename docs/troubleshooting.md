@@ -6,7 +6,7 @@
 
 # Troubleshooting
 
-Navigation: [Documentation index](./README.md) -> [Install and auto-updates](./updates.md) -> [Node.js version](./node-version.md) -> [Plugin system overview](./plugins.md)
+Navigation: [Documentation index](./README.md) · [Install & auto-updates](./updates.md) · [Node.js version](./node-version.md) · [Plugin system overview](./plugins.md)
 
 ## Auto-Update Fails
 
@@ -127,7 +127,8 @@ The public bot no longer starts a local dashboard server.
 
 Run the integrated Rewards harvester. It captures the live Microsoft Rewards pages and
 validates selectors, RSC/flight data, route inventories, fingerprints, and screenshots in
-one pass:
+one pass (using the first enabled account, without touching your sessions, statistics, or
+configuration), then prints the full analysis in the terminal:
 
 ```bash
 npm start -- harvester
@@ -146,7 +147,7 @@ Most people never need these. They are optional and off by default.
 
 ## Related Pages
 
-- [Install and auto-updates](./updates.md)
+- [Install & auto-updates](./updates.md)
 - [Docker](./docker.md)
 - [Node.js version](./node-version.md)
 - [Plugin system overview](./plugins.md)

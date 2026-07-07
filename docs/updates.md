@@ -4,26 +4,76 @@
 
 ---
 
-# Auto-Updates
+# Install & Auto-Updates
 
-Navigation: [Documentation index](./README.md) -> [Node.js version](./node-version.md) -> [Docker](./docker.md) -> [Troubleshooting](./troubleshooting.md)
+Navigation: [Documentation index](./README.md) · [Node.js version](./node-version.md) · [Docker](./docker.md) · [Troubleshooting](./troubleshooting.md)
 
-`npm start` checks the official `main` branch before building and launching the bot.
+Every `npm start` does three things: check the official `main` branch for a newer version, build, then launch the bot. You never have to update by hand.
 
-`npm run dev` and any launch using `-dev` skip auto-update so local development is not overwritten.
+- `npm run dev` (or any launch with `-dev`) **skips auto-update**, so local development is never overwritten.
+- **Docker never self-updates.** It only logs when a newer version exists — update by pulling or rebuilding the image.
 
-Docker never self-updates. It only logs when a newer version exists. Update Docker installs by pulling or rebuilding the image.
+## Install
 
-## How It Works
+Requires [Node.js 24.15.0](./node-version.md). Windows users can use the [automated installer](../README.md#quick-start) instead.
+
+```bash
+git clone https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
+cd Microsoft-Rewards-Bot
+npm install
+npm start
+```
+
+Manual installs and auto-updates both follow `main` — the supported public channel.
+
+## Your files are safe
+
+Updates never touch what's yours:
+
+- `src/config.json` and `src/accounts.json` (or `accounts.enc.json`)
+- `plugins/plugins.jsonc` and your custom plugin folders
+- `sessions/`, `logs/`, `diagnostics/`, `Page/`, `.updates/`, `.git/`
+
+After an update, new keys from `config.example.json` and `accounts.example.json` are added to your files without replacing your values.
+
+On every `npm start`, the launcher also self-heals missing files: a missing `src/config.json` is created from the example, and `src/accounts.json` is created from the example only if no plain *or* encrypted accounts file exists. Existing user files are never overwritten.
+
+## Commands
+
+```bash
+npm start               # update check + build + launch
+npm run update:check    # check only, apply nothing
+npm run update:repair   # re-apply the current version if files look damaged
+npm run update:doctor   # diagnose update problems
+```
+
+Repair mode preserves the same user files as a normal update and refuses to downgrade.
+
+## App window or terminal
+
+`npm start` opens the Rewards Desk app window by default — the right mode for everyday use (see [Rewards Desk](./rewards-desk.md)). To force the classic terminal for one launch:
+
+```bash
+npm start -- --terminal
+```
+
+Docker, CI, and forced-headless launches always keep terminal mode automatically, since they cannot open a desktop window.
+
+## Under the hood
+
+<details>
+<summary><strong>How an update is applied</strong> (for the curious)</summary>
+
+<br>
 
 The updater has two apply strategies:
 
-- Git installs: resolve `main` to a full commit SHA, fetch `main`, verify the fetched commit still matches that SHA, reset the working tree, restore user files, and verify the local version.
-- ZIP/archive installs: resolve `main` to a full commit SHA, download the GitHub tarball for that SHA, mirror managed project paths from the archive, preserve user files, and verify the local version.
+- **Git installs**: resolve `main` to a full commit SHA, fetch `main`, verify the fetched commit still matches that SHA, reset the working tree, restore user files, and verify the local version.
+- **ZIP/archive installs**: resolve `main` to a full commit SHA, download the GitHub tarball for that SHA, mirror managed project paths from the archive, preserve user files, and verify the local version.
 
-The default strategy is `auto`: use Git when `.git` exists, `git` is installed, and `origin` matches the configured update repository; otherwise use the archive strategy.
+The default strategy is `auto`: Git when `.git` exists, `git` is installed, and `origin` matches the configured update repository; otherwise archive.
 
-The update flow is:
+The full flow:
 
 1. resolve the configured `main` branch through the GitHub API;
 2. require a full 40-character commit SHA;
@@ -37,101 +87,34 @@ The update flow is:
 10. restart the launcher once with an internal guard;
 11. rebuild `dist/` from the newly installed source and start the new version.
 
-The updater does not report `Updated` unless the version on disk matches the remote version after the apply step.
+One update operation is pinned to the single SHA resolved at its start — if the branch moves mid-update, the update fails rather than mixing commits. The updater does not report `Updated` unless the version on disk matches the remote version after the apply step.
 
-After a successful non-Docker update, the current launcher exits and starts a fresh
-launcher process automatically. The restart skips a second update check, rebuilds the
-runtime from the new source, and then opens the normal app window or terminal mode.
+After a successful non-Docker update, the launcher exits and restarts itself once: the restart skips a second update check, rebuilds the runtime from the new source, and opens the normal app window or terminal mode.
 
-The branch can move between separate update checks, but one update operation is pinned to
-the single SHA resolved at its start. If Git fetch returns another SHA, the update fails.
+</details>
 
-If the installed files look damaged but the local version already matches the remote version, use repair mode:
+<details>
+<summary><strong>Advanced environment variables</strong> (most people never need these)</summary>
 
-```bash
-npm run update:repair
-```
+<br>
 
-Repair mode re-applies the current `main` commit through the same Git/archive updater path. It still preserves user-owned files and refuses to downgrade.
+- `MSRB_AUTO_UPDATE=0` — disable update checks and updates.
+- `MSRB_NO_APP_WINDOW=1` — keep terminal mode even when `terminal.enabled` is `false`.
+- `MSRB_FORCE_APP_WINDOW=1` — force the app window on a desktop machine.
+- `MSRB_UPDATE_CHECK_ONLY=1` — check and log only; do not apply updates.
+- `MSRB_UPDATE_FORCE=1` — re-apply the current remote version when local and remote versions are equal.
+- `MSRB_UPDATE_LOCK_WAIT_MS=120000` — maximum time to wait for another updater process before continuing with the local version.
+- `MSRB_UPDATE_LOCK_STALE_MS=1800000` — age after which an updater lock can be treated as stale.
+- `MSRB_UPDATE_STRATEGY=auto` — choose Git when possible, otherwise archive. `git` requires Git update mode; `archive` forces archive download mode.
+- `MSRB_UPDATE_REPO=QuestPilot/Microsoft-Rewards-Bot` — override the GitHub repo.
+- `MSRB_UPDATE_BRANCH=main` — branch used as the auto-update source.
+- `MSRB_POST_UPDATE_RESTART=1` — internal one-shot restart guard; never set it manually.
 
-## Preserved User Files
+</details>
 
-Updates preserve:
+## Related pages
 
-- `src/config.json`
-- `src/accounts.json`
-- `plugins/plugins.jsonc`
-- `sessions/`
-- `logs/`
-- `diagnostics/`
-- `Page/`
-- `.updates/`
-- `.git/`
-
-After an update, missing keys from `config.example.json` and `accounts.example.json` are added without replacing user values.
-
-On every `npm start`, the launcher also checks the user files before building:
-
-- if `src/config.json` is missing, it is copied from `src/config.example.json`;
-- if both `src/accounts.json` and `src/accounts.enc.json` are missing,
-  `src/accounts.json` is copied from `src/accounts.example.json`;
-- existing plain or encrypted account storage is never overwritten.
-
-## Commands
-
-```bash
-npm start
-npm run update:check
-npm run update:repair
-npm run update:doctor
-```
-
-## Terminal Or App Window
-
-By default, `npm start` opens the app window. It is the best mode for normal users and is already enabled in `config.example.json`:
-
-```jsonc
-"terminal": {
-  "enabled": false
-}
-```
-
-This opens a desktop-style app window with the current step, Core status, accounts, points, coupons, start/stop controls, and a small input box for license or prompt responses. The launcher starts it detached so a terminal can close or return to the prompt after startup.
-
-To force the classic terminal for one launch, run:
-
-```bash
-npm start -- --terminal
-```
-
-Docker, CI, and forced-headless launches keep terminal mode automatically because they cannot open a desktop window.
-
-Useful environment variables:
-
-- `MSRB_AUTO_UPDATE=0`: disable update checks and updates.
-- `MSRB_NO_APP_WINDOW=1`: keep terminal mode even when `terminal.enabled` is `false`.
-- `MSRB_FORCE_APP_WINDOW=1`: force the app window on a desktop machine.
-- `MSRB_UPDATE_CHECK_ONLY=1`: check and log only; do not apply updates.
-- `MSRB_UPDATE_FORCE=1`: re-apply the current remote version when local and remote versions are equal.
-- `MSRB_UPDATE_LOCK_WAIT_MS=120000`: maximum time to wait for another updater process before continuing with the local version.
-- `MSRB_UPDATE_LOCK_STALE_MS=1800000`: age after which an updater lock can be treated as stale.
-- `MSRB_UPDATE_STRATEGY=auto`: choose Git when possible, otherwise archive.
-- `MSRB_UPDATE_STRATEGY=git`: require Git update mode and fail if this is not a compatible Git working tree.
-- `MSRB_UPDATE_STRATEGY=archive`: force archive download mode.
-- `MSRB_UPDATE_REPO=QuestPilot/Microsoft-Rewards-Bot`: override the GitHub repo.
-- `MSRB_UPDATE_BRANCH=main`: branch used as the auto-update source.
-- `MSRB_POST_UPDATE_RESTART=1`: internal one-shot restart guard; users should not set it manually.
-
-## Manual Install From Git
-
-Use the supported public branch:
-
-```bash
-git clone https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
-cd Microsoft-Rewards-Bot
-npm install
-npm start
-```
-
-Manual installs and automatic updates use `main`. Each automatic update pins the full
-commit SHA before downloading or changing local files.
+- [Rewards Desk](./rewards-desk.md)
+- [Docker](./docker.md)
+- [Node.js version](./node-version.md)
+- [Troubleshooting](./troubleshooting.md)

@@ -6,7 +6,7 @@
 
 # Plugin Marketplace
 
-Navigation: [Documentation index](./README.md) → [Plugin system overview](./plugins.md) → [Create a plugin](./create-plugin.md) → [Plugin API reference](./plugin-api.md)
+Navigation: [Documentation index](./README.md) · [Plugin system overview](./plugins.md) · [Create a plugin](./create-plugin.md) · [Plugin API reference](./plugin-api.md)
 
 The marketplace lets community developers publish plugins that anyone can install. Every published plugin is **cryptographically signed**, **content‑pinned**, and **sandboxed by default** — so installing one is safe even though it was written by someone else.
 

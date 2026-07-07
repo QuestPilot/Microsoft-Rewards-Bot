@@ -1,4 +1,12 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Safety Advisory
+
+Navigation: [Documentation index](./README.md) · [Account safety](./account-safety.md)
 
 The safety advisory check lets maintainers flag that running the bot is temporarily risky. It is enabled by default and is intentionally not part of the normal user configuration.
 

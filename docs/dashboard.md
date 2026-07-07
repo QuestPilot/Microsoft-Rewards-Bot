@@ -6,7 +6,7 @@
 
 # Core Dashboard
 
-Navigation: [Documentation index](./README.md) -> [Official Core plugin](./core-plugin.md) -> [Core technical reference](./core-plugin-reference.md) -> [Troubleshooting](./troubleshooting.md)
+Navigation: [Documentation index](./README.md) · [Official Core plugin](./core-plugin.md) · [Core technical reference](./core-plugin-reference.md) · [Troubleshooting](./troubleshooting.md)
 
 The web dashboard is an official Core feature. It is not part of the public bot runtime and it does not open a local network port.
 

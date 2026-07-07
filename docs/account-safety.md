@@ -1,4 +1,12 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Account Safety
+
+Navigation: [Documentation index](./README.md) · [Safety advisory](./safety-advisory.md) · [Privacy & telemetry](./privacy.md)
 
 Automating Microsoft Rewards always carries some risk to your account. This bot is built to be **safe by default** and gives you knobs to be even more cautious. This page explains both.
 

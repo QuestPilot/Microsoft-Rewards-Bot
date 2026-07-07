@@ -6,6 +6,8 @@
 
 # Core Plugin Technical Reference
 
+Navigation: [Documentation index](./README.md) · [Official Core plugin](./core-plugin.md) · [Core Dashboard](./dashboard.md)
+
 This page documents how the official Core plugin behaves, what it covers, and how it is published. For the public-facing overview, see [Official Core plugin](./core-plugin.md).
 
 ## Distribution Model

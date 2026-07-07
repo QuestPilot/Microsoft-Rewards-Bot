@@ -6,7 +6,7 @@
 
 # Rewards Desk
 
-Navigation: [Documentation index](./README.md) → [Install and auto-updates](./updates.md) → [Plugin system overview](./plugins.md)
+Navigation: [Documentation index](./README.md) · [Install & auto-updates](./updates.md) · [Plugin system overview](./plugins.md)
 
 **Rewards Desk** is the friendly control panel for the bot. It opens automatically in its own window when you run `npm start` on a normal desktop — there's no browser tab to find and no extra command to remember. Almost everything you do day to day happens here.
 
@@ -80,7 +80,7 @@ Set it back to off (or drop the `--terminal` flag) to bring the Desk window back
 
 ## Related pages
 
-- [Install and auto-updates](./updates.md)
+- [Install & auto-updates](./updates.md)
 - [Plugin system overview](./plugins.md)
 - [Official Core plugin](./core-plugin.md)
 - [Troubleshooting](./troubleshooting.md)

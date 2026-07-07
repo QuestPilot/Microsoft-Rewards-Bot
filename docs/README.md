@@ -15,7 +15,7 @@ New here? Run `npm start`, let **Rewards Desk** open, and read the two pages bel
 | If you want to… | Go to |
 | --- | --- |
 | Understand the app and its control panel | [Rewards Desk](./rewards-desk.md) |
-| Install the bot or learn what `npm start` does | [Install and auto-updates](./updates.md) |
+| Install the bot or learn what `npm start` does | [Install & auto-updates](./updates.md) |
 | Run the bot in a container | [Docker](./docker.md) |
 | Turn features on and off, or add a plugin | [Plugin system overview](./plugins.md) |
 | See what the premium Core plugin adds | [Official Core plugin](./core-plugin.md) |
@@ -26,7 +26,7 @@ New here? Run `npm start`, let **Rewards Desk** open, and read the two pages bel
 ## For everyone
 
 - [Rewards Desk](./rewards-desk.md) — the local control panel that opens on `npm start`
-- [Install and auto-updates](./updates.md)
+- [Install & auto-updates](./updates.md)
 - [Docker](./docker.md)
 - [Node.js version](./node-version.md)
 - [Built-in scheduler](./scheduler.md)
@@ -59,7 +59,7 @@ New here? Run `npm start`, let **Rewards Desk** open, and read the two pages bel
 ## Suggested reading order
 
 1. [Rewards Desk](./rewards-desk.md)
-2. [Install and auto-updates](./updates.md)
+2. [Install & auto-updates](./updates.md)
 3. [Plugin system overview](./plugins.md)
 4. [Official Core plugin](./core-plugin.md)
 5. [Troubleshooting](./troubleshooting.md)

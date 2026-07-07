@@ -1,4 +1,12 @@
+<div align="center">
+  <img src="../assets/banner.png" alt="Microsoft Rewards Bot" width="100%">
+</div>
+
+---
+
 # Privacy & Telemetry
+
+Navigation: [Documentation index](./README.md) · [Account safety](./account-safety.md) · [Security policy](../.github/SECURITY.md)
 
 We believe a tool that handles your Microsoft account should be **transparent** about what it sends. This page tells you exactly what the bot collects, what it never collects, and how to turn it off.
 

