@@ -37,8 +37,11 @@ workaround:
   only reproduces for you.
 - There is no CI gate on pull requests (no automated test/build workflow runs
   on PRs). Nothing else will catch a regression before a human reviews it —
-  run `npm run build` (includes `tsc`), `npm test`, and
-  `npm run format:check` (Prettier) yourself before considering a task done.
+  run `npm run build` (includes `tsc`) and `npm test` yourself before
+  considering a task done. Format with
+  `npx prettier --check <files you touched>` — the repo-wide
+  `npm run format:check` is not currently clean, so don't reformat unrelated
+  files in your PR.
 
 ## Landmines / do-not-touch areas
 

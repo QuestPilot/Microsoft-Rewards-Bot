@@ -42,10 +42,13 @@ There is **no CI gate on pull requests**. Local checks are the only gate
 before a human review, so run them yourself, every time:
 
 ```bash
-npm run build          # tsc + asset copy — must pass with zero errors
-npm test               # Node built-in runner (node --test), scripts/tests/
-npm run format:check   # Prettier
+npm run build                          # tsc + asset copy — zero errors
+npm test                               # Node built-in runner, scripts/tests/
+npx prettier --check <files you touched>
 ```
+
+(Repo-wide `npm run format:check` is not currently clean — check only the
+files you changed, and don't reformat unrelated files in your commit.)
 
 - Run a single test file with `node --test scripts/tests/<file>.test.js`.
 - Tests use Node's built-in runner only — never add jest/mocha/vitest.
