@@ -31,6 +31,10 @@ plugins/*/node_modules/
 plugins/core-source/
 plugins/.data/
 plugins/*/.installed.json
+plugins/.marketplace-seq
+# Live catalog cache: re-synced from core-api on every bot start (see
+# syncMarketplaceCatalog in src/core/PluginManager.ts). Never ship a snapshot —
+# plugins/marketplace.example.json is the committed reference/template instead.
 plugins/marketplace.json
 plugins/marketplace.sig
 core-source/
