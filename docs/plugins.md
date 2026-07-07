@@ -26,10 +26,12 @@ The built-in Core plugin lives in `plugins/core/` and is distributed as a propri
 - register public selector groups
 - provide diagnostics
 - receive account lifecycle events
-- read its own config
+- read its own config **and typed settings** (a form the Desk renders from the plugin's `plugin.json`)
+- keep a small, scoped **storage** that persists across runs
+- show a read-only **panel** (title + stats + lines) inside its card on the Desk Plugins page
 - provide non-premium extension points such as diagnostics and notifications
 
-Public plugins cannot register official premium Core tasks or unlock premium entitlements.
+Public plugins cannot register official premium Core tasks or unlock premium entitlements. They also **cannot create new Desk pages** — a plugin's UI is confined to its own panel on the single Plugins page. See the [Plugin API reference](./plugin-api.md#capabilities-settings-storage-panel) for the settings/storage/panel contract.
 
 The official web dashboard is also outside the public plugin contract. It is started by the verified Core bytecode only and is not available to third-party plugins.
 

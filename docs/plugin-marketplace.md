@@ -12,10 +12,12 @@ The marketplace lets community developers publish plugins that anyone can instal
 
 ```
 Author → publishes on the website (Discord login, no Core license)
-      → the maintainer reviews it
-      → it is stored + the signed catalog is updated
+      → an automated safety scan runs
+      → it is stored + the signed catalog is updated (published instantly)
 Bot   → fetches the signed catalog → verifies → installs → runs the plugin SANDBOXED
 ```
+
+Publishing is **open**: there is no manual pre‑approval queue. A submission that passes the automated scan goes live immediately; the safety of the whole system rests on the **sandbox** (a marketplace plugin has no Node/fs/raw‑network access) plus **reactive controls** — community reports, a per‑plugin **revoke/takedown**, and a global **kill switch** the owner can flip at any time.
 
 ---
 
@@ -25,17 +27,17 @@ You do **not** need a Core license to publish — making plugins is free and sep
 
 1. Go to **`https://bot.lgtw.tf/?view=developers`**.
 2. **Sign in with Discord.** This only identifies you as the author; it does not touch any license.
-3. Fill in the form: **name**, **version** (`x.y.z`), a short **description**, and your **`index.js`** (paste it or pick the file).
-4. Submit. Your plugin is now **pending review**.
-5. The maintainer reviews the code and **approves or rejects** it. You can see the status (and any rejection reason) under **My plugins**.
+3. Fill in the form: **name**, **version** (`x.y.z`), a short **description**, and your plugin — a single **`index.js`**, or a **`.zip`** (with `index.js` at its root, plus an optional `plugin.json` for settings/permissions).
+4. Publish. The automated scan runs and, unless it flags something serious, your plugin is **live immediately** — you can install it from any bot. You can delete or unpublish any version from **My plugins** at any time.
+5. If the scan blocks it (e.g. no `index.js`, or a non‑text upload), it is **held for a quick manual check** instead of going live; the status shows under **My plugins**.
 
-Once approved, your plugin is committed to the official storage repository and added to the signed catalog. From that moment any bot can install it.
+Once published, your plugin is committed to the official storage repository and added to the signed catalog. From that moment any bot can install it.
 
 **Rules**
 
 - A plugin **name is owned by its first author** — nobody else can publish under a name you already use.
-- To ship a fix, **bump the version** and submit again (an already‑approved version is immutable).
-- Marketplace plugins ship a **single `index.js`** and run **sandboxed**, so write to the public plugin API only (no `require`, `fs`, `process`, network, …). See [Create a plugin](./create-plugin.md).
+- To ship a fix, **bump the version** and publish again (an already‑published version is immutable). To take a version down, **unpublish** it from **My plugins** — it is removed from the catalog and revoked so bots that installed it drop it.
+- Marketplace plugins run **sandboxed**: no `require`, `fs`, `process`, or raw network. Use the public plugin API — `ctx.settings`, `ctx.storage`, `ctx.ui.panel`, and (with a declared + user‑approved `net:<host>` permission) `ctx.fetch`. See [Create a plugin](./create-plugin.md).
 - Be honest about what your plugin does and **never claim official Core capabilities** — only the verified Core plugin can grant premium entitlement.
 
 ---
@@ -86,8 +88,9 @@ Plugins are stored in a **public** GitHub repository and served by **jsDelivr** 
 
 ## Security & moderation
 
-- **Nothing goes live without review.** Submissions sit as *pending* until the maintainer approves them; the maintainer can read the full source before approving.
-- **Author gating.** Logins/submissions are checked server‑side (Redis): abusive accounts can be banned, and an optional invite‑only allowlist can restrict who may publish. A per‑author cap limits pending spam.
+- **Open publishing, sandbox‑first.** Plugins publish instantly after an automated static scan (which rejects broken/non‑text uploads and surfaces smells like obfuscation or a declared network permission). Real safety comes from the **sandbox** — a marketplace plugin cannot touch Node, the filesystem, or raw network — not from a human reading every line up front.
+- **Reactive takedown.** Anyone can **report** a plugin from Rewards Desk; the owner can **revoke** a specific version (or a whole name) — it leaves the catalog and bots that installed it drop it on next sync — and can flip a **global kill switch** that disables every marketplace plugin at once. A held (scan‑blocked) submission can still be reviewed and published manually.
+- **Author gating.** Logins/submissions are checked server‑side (Redis): abusive accounts can be banned, and an optional invite‑only allowlist can restrict who may publish. A per‑author cap limits spam.
 - **No impersonation.** Authors are bound to their Discord identity; nobody can publish under another author’s plugin name; commits to the storage repo are made by the server under a **neutral marketplace identity**, never the maintainer’s personal account.
 - **Hardened API.** Author sessions are sealed (AES‑GCM) `HttpOnly; Secure; SameSite=Lax` cookies; CORS is pinned to the app origin; all database access is parameterized; names/versions are validated (no path traversal).
 
@@ -106,7 +109,7 @@ Bot‑side:
 - `MSRB_MARKETPLACE_CATALOG_URL=https://bot.lgtw.tf/api/marketplace/catalog` so the bot pulls the latest signed catalog.
 - Ship the trusted **public** key in `scripts/security/marketplace-keys/` (commit it upstream so it survives auto‑updates). Sign locally with `npm run marketplace:sign` only for offline/testing — production signs on the server.
 
-Approve/reject and ban from the dashboard **Admin → Marketplace** section.
+Moderate from the dashboard **Admin → Marketplace** section: review the held queue, **revoke** a published plugin, ban authors, and flip the marketplace **kill switch**. The separate **Admin → Safety & Kill Switch** section publishes the global bot‑stop advisory (halts all bots during an incident).
 
 ## Related pages
 

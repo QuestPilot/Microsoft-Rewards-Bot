@@ -1031,9 +1031,15 @@ function enrichAccountsWithVariant(accounts) {
 // ── Plugins (plugins/plugins.jsonc) ─────────────────────────────────────────
 // Extracted to ./desk/plugins-config.js (behavior identical).
 const { createPluginsConfig } = require('./plugins-config')
+// Shared plugin capability backend — same module the bot uses, so the Desk shows the
+// exact settings schema + last panel snapshot the running plugin produced.
+let pluginDataStore = null
+try { pluginDataStore = require('../plugins/plugin-data-store') } catch {}
 const {
     isPluginEnabled,
+    readPluginsConfig,
     readPluginsList,
+    listInstalledFolders,
     setPluginEnabled,
     setPluginTrust,
     addMarketplacePlugin,
@@ -2581,6 +2587,43 @@ function html() {
     .pbtn-install:hover:not(:disabled){background:rgba(46,232,255,.18);border-color:rgba(46,232,255,.5)}
     .pbtn-update{border-color:rgba(46,232,255,.3);background:rgba(46,232,255,.1);color:var(--cyan)}
     .pbtn-update:hover:not(:disabled){background:rgba(46,232,255,.18);border-color:rgba(46,232,255,.5)}
+    .pbtn-cfg{border-color:var(--border);background:rgba(255,255,255,.03);color:var(--muted)}
+    .pbtn-cfg:hover:not(:disabled){background:rgba(255,255,255,.07);color:var(--text)}
+    .pbtn-cfg.active{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.1);color:var(--cyan)}
+    /* Per-plugin settings + read-only panel (the plugin's slice of THIS page — no new pages) */
+    .pcard-panel{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+    .pp-form{display:flex;flex-direction:column;gap:12px}
+    .pp-field{display:flex;flex-direction:column;gap:5px}
+    .pp-label{font-size:12px;font-weight:600;color:var(--text);display:flex;flex-direction:column;gap:2px}
+    .pp-help{font-size:11px;font-weight:400;color:var(--muted)}
+    .pp-input{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:12.5px;outline:none;transition:border-color .15s,background .15s}
+    .pp-input:focus{border-color:rgba(46,232,255,.4);background:rgba(46,232,255,.04)}
+    .pp-switch{position:relative;display:inline-flex;width:38px;height:22px;cursor:pointer}
+    .pp-switch input{position:absolute;opacity:0;width:0;height:0}
+    .pp-switch-s{position:absolute;inset:0;border-radius:22px;background:rgba(255,255,255,.12);transition:background .15s}
+    .pp-switch-s::before{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+    .pp-switch input:checked + .pp-switch-s{background:var(--cyan)}
+    .pp-switch input:checked + .pp-switch-s::before{transform:translateX(16px)}
+    .pp-form-actions{display:flex;align-items:center;gap:10px;margin-top:2px}
+    .pp-saved{font-size:12px;font-weight:600;color:var(--green,#2fd27d)}
+    .pp-out{margin-top:14px;padding:12px;border-radius:10px;background:rgba(46,232,255,.05);border:1px solid rgba(46,232,255,.14)}
+    .pp-out-title{font-size:12px;font-weight:800;color:var(--text);margin-bottom:8px;letter-spacing:-.01em}
+    .pp-out-stats{display:flex;flex-wrap:wrap;gap:14px}
+    .pp-out-stat{min-width:70px}
+    .pp-out-v{font-size:18px;font-weight:800;color:var(--cyan);letter-spacing:-.02em}
+    .pp-out-l{font-size:11px;color:var(--muted);margin-top:1px}
+    .pp-out-h{font-size:10.5px;color:var(--muted);opacity:.8}
+    .pp-out-lines{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+    .pp-out-line{font-size:12px;color:var(--text)}
+    .pp-out-ts{font-size:10.5px;color:var(--muted);margin-top:8px}
+    /* Elevated permissions (net:*) consent block */
+    .pp-perms{margin-bottom:14px;padding:12px;border-radius:10px;background:rgba(255,180,84,.06);border:1px solid rgba(255,180,84,.2)}
+    .pp-perms-head{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:#ffb454;margin-bottom:5px}
+    .pp-perms-head svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .pp-perms-warn{font-size:11.5px;color:var(--muted);line-height:1.45;margin-bottom:10px}
+    .pp-perm{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)}
+    .pp-perm-host{font-size:12.5px;font-weight:700;color:var(--text);font-family:ui-monospace,monospace}
+    .pp-perm-sub{font-size:11px;color:var(--muted);margin-top:1px}
     /* Icon links (report / remove) */
     .plink{font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px;transition:color .15s,background .15s,border-color .15s}
     .plink:hover{color:var(--text)}
@@ -6206,6 +6249,7 @@ function html() {
         m.enabled = p.enabled;
         m.source = p.source;
         m.trust = p.trust;
+        m.unmanaged = !!p.unmanaged;
         m.installedVersion = p.installedVersion || p.version || '';
         m.pinned = !!p.version;
         m.autoUpdate = p.autoUpdate;
@@ -6256,25 +6300,29 @@ function html() {
       if (ver) chips += '<span class="pchip pchip-ver">v' + esc(ver) + '</span>';
       if (!p.installed && p.license) chips += '<span class="pchip pchip-ver">' + esc(p.license) + '</span>';
       if (p.installed && p.trust === 'full') chips += '<span class="pchip pchip-trusted">Trusted</span>';
-      if (p.installed && !p.enabled) chips += '<span class="pchip pchip-off">Off</span>';
+      if (p.unmanaged) chips += '<span class="pchip pchip-stale">Not in config</span>';
+      if (p.installed && !p.enabled && !p.unmanaged) chips += '<span class="pchip pchip-off">Off</span>';
       if (p.installed && p.stale) chips += '<span class="pchip pchip-stale">Outdated</span>';
       if (updatable) chips += '<span class="pchip pchip-update">v' + esc(p.latest) + ' ready</span>';
       // Author / origin line
       var meta = [];
       if (p.author) meta.push('by ' + esc(p.author));
       if (p.installed && !p.inCatalog) meta.push('local');
-      // Top-right primary control: enable toggle (installed) — store cards install from the footer
-      var topCtrl = p.installed
+      // Top-right primary control: enable toggle (installed) — store cards install from the
+      // footer. Unmanaged (on-disk, no config entry) plugins have no toggle to flip.
+      var topCtrl = (p.installed && !p.unmanaged)
         ? '<label class="toggle" title="' + (p.enabled ? 'Enabled' : 'Disabled') + '"><input type="checkbox" data-plugin="' + escAttr(p.name) + '" data-source="' + escAttr(p.source || 'local') + '"' + (p.enabled ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
         : '';
       // Footer — manage controls (left) + actions (right)
       var footL = '', footR = '';
       if (p.installed) {
-        if (isMkt) {
+        if (isMkt && !p.unmanaged) {
           footL += '<label class="pmanage-trust" title="Lets this plugin access more bot APIs — no OS, admin or filesystem access"><input type="checkbox" data-trust="' + escAttr(p.name) + '"' + (p.trust === 'full' ? ' checked' : '') + '>Trusted</label>';
           if (!p.pinned) footL += '<label class="pmanage-au" title="Keep this plugin up to date from the store"><input type="checkbox" data-autoupdate="' + escAttr(p.name) + '"' + (p.autoUpdate !== false ? ' checked' : '') + '>Auto-update</label>';
         }
         if (held && updatable) footR += '<button class="pbtn pbtn-update" data-update="' + escAttr(p.name) + '" data-ver="' + escAttr(p.latest) + '">Update</button>';
+        var hasPanel = (p.settings && p.settings.length) || p.panel || (p.elevatedPermissions && p.elevatedPermissions.length);
+        if (hasPanel) footR += '<button class="pbtn pbtn-cfg" data-cfg="' + escAttr(p.name) + '">Settings</button>';
         if (isMkt) footR += '<button class="plink plink-ico" data-report="' + escAttr(p.name) + '" data-rv="' + escAttr(p.installedVersion || p.version) + '" title="Report a problem"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>';
         footR += '<button class="plink plink-ico danger" data-remove="' + escAttr(p.name) + '" title="Remove"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
       } else {
@@ -6292,7 +6340,77 @@ function html() {
         (chips ? '<div class="pcard-chips">' + chips + '</div>' : '') +
         (p.description ? '<div class="pcard-desc">' + esc(p.description) + '</div>' : '<div class="pcard-desc pcard-desc-empty">No description provided.</div>') +
         foot +
+        pluginPanelHtml(p) +
       '</div>';
+    }
+
+    // Read-only panel (fixed vocabulary: title + labelled stats + text lines) a plugin
+    // pushed via ctx.ui.panel — never HTML. Everything is escaped on the way in.
+    function pluginOutputHtml(panel) {
+      if (!panel) return '';
+      var h = '';
+      if (panel.title) h += '<div class="pp-out-title">' + esc(panel.title) + '</div>';
+      if (Array.isArray(panel.stats) && panel.stats.length) {
+        h += '<div class="pp-out-stats">' + panel.stats.map(function(s){
+          return '<div class="pp-out-stat"><div class="pp-out-v">' + esc(String(s.value)) + '</div><div class="pp-out-l">' + esc(String(s.label)) + '</div>' +
+            (s.hint ? '<div class="pp-out-h">' + esc(String(s.hint)) + '</div>' : '') + '</div>';
+        }).join('') + '</div>';
+      }
+      if (Array.isArray(panel.lines) && panel.lines.length) {
+        h += '<div class="pp-out-lines">' + panel.lines.map(function(l){ return '<div class="pp-out-line">' + esc(String(l)) + '</div>'; }).join('') + '</div>';
+      }
+      if (panel.updatedAt) { var t = new Date(panel.updatedAt); if (!isNaN(t)) h += '<div class="pp-out-ts">Updated ' + esc(t.toLocaleString()) + '</div>'; }
+      return h ? '<div class="pp-out">' + h + '</div>' : '';
+    }
+
+    // One settings field -> a labelled input bound by data-k. Values come from p.settingsValues.
+    function pluginFieldHtml(name, f, values) {
+      var val = (values && values[f.key] !== undefined) ? values[f.key] : (f.default !== undefined ? f.default : '');
+      var id = 'set-' + name + '-' + f.key;
+      var input;
+      if (f.type === 'toggle') {
+        input = '<label class="pp-switch"><input type="checkbox" id="' + escAttr(id) + '" data-k="' + escAttr(f.key) + '"' + (val ? ' checked' : '') + '><span class="pp-switch-s"></span></label>';
+      } else if (f.type === 'select') {
+        var opts = (f.options || []).map(function(o){ return '<option value="' + escAttr(String(o.value)) + '"' + (String(o.value) === String(val) ? ' selected' : '') + '>' + esc(String(o.label != null ? o.label : o.value)) + '</option>'; }).join('');
+        input = '<select class="pp-input" id="' + escAttr(id) + '" data-k="' + escAttr(f.key) + '">' + opts + '</select>';
+      } else {
+        var t = f.type === 'number' ? 'number' : 'text';
+        var attrs = '';
+        if (f.type === 'number') { if (f.min != null) attrs += ' min="' + escAttr(String(f.min)) + '"'; if (f.max != null) attrs += ' max="' + escAttr(String(f.max)) + '"'; if (f.step != null) attrs += ' step="' + escAttr(String(f.step)) + '"'; }
+        input = '<input class="pp-input" type="' + t + '" id="' + escAttr(id) + '" data-k="' + escAttr(f.key) + '" value="' + escAttr(String(val)) + '"' + (f.placeholder ? ' placeholder="' + escAttr(f.placeholder) + '"' : '') + attrs + '>';
+      }
+      return '<div class="pp-field"><label class="pp-label" for="' + escAttr(id) + '">' + esc(f.label) + (f.help ? '<span class="pp-help">' + esc(f.help) + '</span>' : '') + '</label>' + input + '</div>';
+    }
+
+    // Elevated (net:*) permissions with a warning + a consent toggle each. Denied by
+    // default; the plugin's ctx.fetch only works for hosts the user turns on here.
+    function pluginPermsHtml(p) {
+      if (!p.elevatedPermissions || !p.elevatedPermissions.length) return '';
+      var rows = p.elevatedPermissions.map(function(perm){
+        return '<div class="pp-perm">' +
+          '<div class="pp-perm-info"><div class="pp-perm-host">' + esc(perm.host) + '</div>' +
+          '<div class="pp-perm-sub">Network access — this plugin can send/receive data with this host</div></div>' +
+          '<label class="pp-switch"><input type="checkbox" data-grant="' + escAttr(p.name) + '" data-perm="' + escAttr(perm.permission) + '"' + (perm.granted ? ' checked' : '') + '><span class="pp-switch-s"></span></label>' +
+        '</div>';
+      }).join('');
+      return '<div class="pp-perms"><div class="pp-perms-head"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>Elevated permissions</div>' +
+        '<div class="pp-perms-warn">Only turn these on for a plugin you trust. Network access lets it talk to outside servers.</div>' +
+        rows + '</div>';
+    }
+
+    function pluginPanelHtml(p) {
+      if (!p.installed || (!(p.settings && p.settings.length) && !p.panel && !(p.elevatedPermissions && p.elevatedPermissions.length))) return '';
+      var h = '<div class="pcard-panel" data-panel-for="' + escAttr(p.name) + '" style="display:none">';
+      h += pluginPermsHtml(p);
+      if (p.settings && p.settings.length) {
+        h += '<form class="pp-form" data-settings-for="' + escAttr(p.name) + '">';
+        h += p.settings.map(function(f){ return pluginFieldHtml(p.name, f, p.settingsValues); }).join('');
+        h += '<div class="pp-form-actions"><button type="submit" class="pbtn pbtn-primary pp-save">Save settings</button><span class="pp-saved" style="display:none">Saved ✓</span></div>';
+        h += '</form>';
+      }
+      h += pluginOutputHtml(p.panel);
+      h += '</div>';
+      return h;
     }
 
     function psectHtml(title, n) {
@@ -6434,6 +6552,53 @@ function html() {
             if (r.ok) { alert('Thanks — your report was sent to the maintainers.'); }
             else { var msg = await r.text(); alert('Could not send the report: ' + (msg || 'Unknown error')); }
           } catch(e) { alert('Report failed: ' + e.message); }
+        });
+      });
+      // Toggle a plugin's settings/panel area open/closed.
+      wrap.querySelectorAll('button[data-cfg]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var name = btn.getAttribute('data-cfg');
+          var panel = wrap.querySelector('.pcard-panel[data-panel-for="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]');
+          if (!panel) return;
+          var open = panel.style.display !== 'none';
+          panel.style.display = open ? 'none' : 'block';
+          btn.classList.toggle('active', !open);
+        });
+      });
+      // Grant / revoke an elevated (net:*) permission — with a confirm when turning ON.
+      wrap.querySelectorAll('input[data-grant]').forEach(function(inp) {
+        inp.addEventListener('change', async function() {
+          var name = inp.getAttribute('data-grant');
+          var perm = inp.getAttribute('data-perm');
+          if (inp.checked && !window.confirm('Allow "' + name + '" to access the network host "' + perm.slice(4) + '"?\\n\\nThe plugin will be able to send and receive data with this server. Only allow this if you trust the plugin.')) {
+            inp.checked = false; return;
+          }
+          try {
+            var r = await fetch('/api/plugins/grant', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, permission:perm, granted:inp.checked})});
+            if (!r.ok) { var msg = await r.text(); inp.checked = !inp.checked; alert('Could not change permission: ' + (msg || 'Unknown error')); }
+          } catch(e) { inp.checked = !inp.checked; alert('Permission change failed: ' + e.message); }
+        });
+      });
+      // Save a plugin's settings (coerced server-side against its declared schema).
+      wrap.querySelectorAll('form[data-settings-for]').forEach(function(form) {
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          var name = form.getAttribute('data-settings-for');
+          var values = {};
+          form.querySelectorAll('[data-k]').forEach(function(inp) {
+            var key = inp.getAttribute('data-k');
+            values[key] = inp.type === 'checkbox' ? inp.checked : inp.value;
+          });
+          var saveBtn = form.querySelector('.pp-save');
+          var savedMsg = form.querySelector('.pp-saved');
+          if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+          try {
+            var r = await fetch('/api/plugins/settings', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:name, values:values})});
+            if (r.ok) {
+              if (savedMsg) { savedMsg.style.display = ''; setTimeout(function(){ savedMsg.style.display = 'none'; }, 2200); }
+            } else { var msg = await r.text(); alert('Could not save settings: ' + (msg || 'Unknown error')); }
+          } catch(err) { alert('Save failed: ' + err.message); }
+          finally { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save settings'; } }
         });
       });
     }
@@ -7531,6 +7696,28 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/plugins') {
         const list = readPluginsList()
+        // Surface plugins that exist ON DISK but have no plugins.jsonc entry (dropped in
+        // manually, or left behind by a failed removal). They don't load — with a config
+        // file present only listed plugins do — but the user must still see and remove
+        // them. Mark them "unmanaged" so the UI shows a remove action without a toggle.
+        try {
+            const known = new Set(list.map(p => p.name))
+            for (const name of listInstalledFolders()) {
+                if (known.has(name)) continue
+                list.push({
+                    name,
+                    enabled: false,
+                    priority: 0,
+                    source: 'local',
+                    version: '',
+                    autoUpdate: false,
+                    trust: '',
+                    official: false,
+                    unmanaged: true,
+                    description: 'Present on disk but not listed in plugins.jsonc — it will not load. Remove it or add it to your config.'
+                })
+            }
+        } catch {}
         // Enrich each plugin with its on-disk installed version (.installed.json) for
         // accurate "update available", and a "may be outdated" flag when this bot has
         // moved well ahead of the bot version the plugin was published for.
@@ -7554,6 +7741,32 @@ const server = http.createServer((req, res) => {
                     p.stale = true
                 }
             } catch {}
+            // Phase 2 capabilities: the declared settings schema (so the Desk can render a
+            // form), the resolved current values, and the last panel snapshot the plugin
+            // pushed. All read from the shared store — no plugin code runs here.
+            if (pluginDataStore) {
+                try {
+                    const manifest = pluginDataStore.readManifest(ROOT, p.name)
+                    if (manifest.permissions && manifest.permissions.length) {
+                        p.permissions = manifest.permissions
+                        // Elevated (net:*) permissions need explicit user consent — surface
+                        // each with its current grant state so the Desk can show a toggle.
+                        const grants = pluginDataStore.readGrants(ROOT, p.name)
+                        const elevated = manifest.permissions
+                            .filter(perm => typeof perm === 'string' && perm.toLowerCase().startsWith('net:'))
+                            .map(perm => ({ permission: perm, host: perm.slice(4), granted: grants[perm] === true }))
+                        if (elevated.length) p.elevatedPermissions = elevated
+                    }
+                    if (manifest.settings && manifest.settings.length) {
+                        p.settings = manifest.settings
+                        const entry = readPluginsConfig()[p.name]
+                        const cfg = entry && typeof entry.config === 'object' ? entry.config : {}
+                        p.settingsValues = pluginDataStore.resolveSettings(ROOT, p.name, cfg)
+                    }
+                    const panel = pluginDataStore.readPanel(ROOT, p.name)
+                    if (panel) p.panel = panel
+                } catch {}
+            }
         }
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ plugins: list, hasCoreLicense: state.deskLicense.tier === 'premium' }))
@@ -7642,14 +7855,92 @@ const server = http.createServer((req, res) => {
                 return
             }
             try {
-                removePlugin(data.name)
-                // Best-effort: delete the downloaded plugin folder (guarded against path escape).
+                // Strip the plugins.jsonc entry if there is one (tolerant: a folder-only
+                // "unmanaged" plugin has no entry — removePlugin returns false, not throw).
+                const removedEntry = removePlugin(data.name)
+                // Delete the on-disk plugin folder (guarded against path escape). This is
+                // what actually removes an unmanaged plugin, so it must always run.
+                let removedFolder = false
                 try {
                     const pluginsDir = path.join(ROOT, 'plugins')
                     const dir = path.join(pluginsDir, data.name)
-                    if (dir.startsWith(pluginsDir + path.sep) && fs.existsSync(dir))
+                    if (dir.startsWith(pluginsDir + path.sep) && fs.existsSync(dir)) {
                         fs.rmSync(dir, { recursive: true, force: true })
+                        removedFolder = true
+                    }
                 } catch {}
+                // Also drop the plugin's runtime data (storage/panel/settings).
+                try { if (pluginDataStore) pluginDataStore.clearData(ROOT, data.name) } catch {}
+                if (!removedEntry && !removedFolder) {
+                    res.writeHead(404)
+                    res.end('Plugin not found: ' + data.name)
+                    return
+                }
+                res.writeHead(204)
+                res.end()
+            } catch (e) {
+                res.writeHead(400)
+                res.end(String(e.message))
+            }
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/plugins/settings') {
+        readApiBody(req, res, body => {
+            const data = parseJson(body, null)
+            if (!data || typeof data.name !== 'string' || !data.values || typeof data.values !== 'object') {
+                res.writeHead(400)
+                res.end('Missing name or values')
+                return
+            }
+            if (!/^[a-z0-9][a-z0-9._-]{0,48}$/i.test(data.name)) {
+                res.writeHead(400)
+                res.end('Invalid plugin name')
+                return
+            }
+            if (!pluginDataStore) {
+                res.writeHead(503)
+                res.end('Plugin settings unavailable')
+                return
+            }
+            try {
+                // writeSettingsValues coerces to the declared schema and ignores unknown keys.
+                pluginDataStore.writeSettingsValues(ROOT, data.name, data.values)
+                res.writeHead(204)
+                res.end()
+            } catch (e) {
+                res.writeHead(400)
+                res.end(String(e.message))
+            }
+        })
+        return
+    }
+    if (req.method === 'POST' && req.url === '/api/plugins/grant') {
+        readApiBody(req, res, body => {
+            const data = parseJson(body, null)
+            if (!data || typeof data.name !== 'string' || typeof data.permission !== 'string' || typeof data.granted !== 'boolean') {
+                res.writeHead(400)
+                res.end('Missing name, permission or granted')
+                return
+            }
+            if (!/^[a-z0-9][a-z0-9._-]{0,48}$/i.test(data.name)) {
+                res.writeHead(400)
+                res.end('Invalid plugin name')
+                return
+            }
+            // Only elevated permissions are consent-gated; today that means net:<host>.
+            if (!/^net:[a-z0-9.-]{1,253}$/i.test(data.permission)) {
+                res.writeHead(400)
+                res.end('Unsupported permission')
+                return
+            }
+            if (!pluginDataStore) {
+                res.writeHead(503)
+                res.end('Plugin permissions unavailable')
+                return
+            }
+            try {
+                pluginDataStore.writeGrant(ROOT, data.name, data.permission, data.granted)
                 res.writeHead(204)
                 res.end()
             } catch (e) {
