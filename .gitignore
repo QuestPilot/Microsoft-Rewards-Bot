@@ -31,6 +31,8 @@ plugins/*/node_modules/
 plugins/core-source/
 plugins/.data/
 plugins/*/.installed.json
+plugins/marketplace.json
+plugins/marketplace.sig
 core-source/
 *.jsc.map
 license-admin.config.local.js
