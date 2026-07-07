@@ -7468,6 +7468,8 @@ const server = http.createServer((req, res) => {
                 runOnZeroPoints: cfg.runOnZeroPoints,
                 debugLogs: cfg.debugLogs,
                 searchOnBingLocalQueries: cfg.searchOnBingLocalQueries,
+                globalTimeout: cfg.globalTimeout,
+                searchSettings: cfg.searchSettings || {},
                 analytics: cfg.analytics,
                 updateNotifier: cfg.updateNotifier || {},
                 terminal: cfg.terminal || { enabled: false },

@@ -194,6 +194,25 @@ test('GET /api/state returns a state object', async () => {
     assert.ok(state !== null)
 })
 
+// Regression: the Settings page reads s.globalTimeout and s.searchSettings.* to
+// populate the "Global timeout" / search-tuning fields on load (see the ss.*
+// reads in app-window.js's settings renderer). The GET handler used to omit
+// both from its response, so those fields — and the parallelSearching /
+// scrollRandomResults / clickRandomResults toggles — always rendered blank or
+// default on every page load, even though the value was correctly saved to
+// config.json. Users reported this as "changes to config.json never apply".
+test('GET /api/settings echoes globalTimeout and searchSettings so saved values survive a reload', async () => {
+    const res = await request('/api/settings', { token })
+    assert.equal(res.status, 200)
+    const settings = JSON.parse(res.body)
+    assert.ok('globalTimeout' in settings, 'globalTimeout must be present so the Settings page does not blank it out')
+    assert.equal(typeof settings.searchSettings, 'object')
+    assert.ok(settings.searchSettings !== null)
+    for (const key of ['searchResultVisitTime', 'searchDelay', 'readDelay', 'parallelSearching', 'scrollRandomResults', 'clickRandomResults']) {
+        assert.ok(key in settings.searchSettings, `searchSettings.${key} must be present`)
+    }
+})
+
 // Refactor-safe UI contract: asserts the SERVED HTML (not the source text), so it
 // survives splitting html() into modules. This behaviorally covers the element-ID
 // and removed-legacy-control invariants that tests/app-window.test.js currently
