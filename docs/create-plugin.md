@@ -8,7 +8,7 @@
 
 Navigation: [Documentation index](./README.md) → [Plugin system overview](./plugins.md) → [Plugin API reference](./plugin-api.md) → [Publishing a plugin](./plugin-marketplace.md)
 
-A plugin is a small folder of code that the bot loads at startup. It can add diagnostics, react to account events, register selector groups, and read its own settings — without touching the bot's source. This page walks through a complete plugin from empty folder to running, then points you to publishing.
+A plugin is a small folder of code that the bot loads at startup. It can add diagnostics, react to account events, register selector groups, read its own **settings**, keep a little **storage**, and show a **panel** in Rewards Desk — all without touching the bot's source and (for community plugins) without any Node.js access. This page walks through a complete plugin from empty folder to running, then points you to publishing.
 
 > Plugins use the **public** plugin API. They cannot register premium Core tasks or grant premium entitlements — those are reserved for the official Core plugin.
 
@@ -102,6 +102,59 @@ If it doesn't appear, check that the folder name matches `name`, that `enabled` 
 
 ---
 
+## 6. Settings, storage, and a panel (the capability surface)
+
+These three capabilities let a plugin have its own little UI and memory **without** Node.js access and **without** patching the Desk. They work identically whether your plugin runs sandboxed (community) or in-process (first-party).
+
+### Declare a manifest — `plugin.json`
+
+Ship a `plugin.json` next to `index.js`. It is the **static** source of truth the Desk reads to draw your settings form — your code never runs just to show settings.
+
+```json
+{
+  "name": "earnings-estimator",
+  "version": "1.0.0",
+  "permissions": ["settings", "storage", "ui.panel", "points.read"],
+  "settings": [
+    { "key": "pointsPerEuro", "type": "number", "label": "Points per €", "default": 1500, "min": 1 },
+    { "key": "days", "type": "number", "label": "Days to project", "default": 30, "min": 1, "max": 3650 }
+  ]
+}
+```
+
+- **`permissions`** — what your plugin uses. `settings`, `storage`, `ui.panel`, `points.read` are default-safe (no prompt). `net:<host>` is elevated and asks the user for consent.
+- **`settings`** — a field list (`number` | `text` | `toggle` | `select`). The Desk renders a form; the user's values are validated against this schema.
+
+### Read settings, use storage, push a panel
+
+```js
+module.exports = {
+  name: 'earnings-estimator',
+  version: '1.0.0',
+  register(ctx) { render(ctx) },
+  onAccountEnd(ctx) {
+    const total = (Number(ctx.storage.get('totalPoints')) || 0) + (ctx.result.collectedPoints || 0)
+    ctx.storage.set('totalPoints', total)     // persists across runs, scoped to this plugin
+    render(ctx)
+  }
+}
+function render(ctx) {
+  const euros = (Number(ctx.storage.get('totalPoints')) || 0) / (ctx.settings.pointsPerEuro || 1500)
+  ctx.ui.panel({                               // shown in the Desk Plugins page — no HTML, a fixed vocabulary
+    title: 'Earnings estimate',
+    stats: [{ label: 'Worth now', value: euros.toFixed(2) + ' €' }]
+  })
+}
+```
+
+- **`ctx.settings`** — resolved values: schema defaults, then `plugins.jsonc` `config`, then what the user set in the Desk.
+- **`ctx.storage`** — `get` / `set` / `delete` / `keys`, JSON only, size-capped, persisted under `plugins/.data/<name>/`.
+- **`ctx.ui.panel(data)`** — replaces your plugin's panel: a `title`, labelled `stats`, and text `lines`. It is **not** HTML and plugins **cannot** create new Desk pages — everything renders inside your card on the one Plugins page.
+
+A complete, runnable version of this plugin is in [`docs/examples/earnings-estimator/`](./examples/earnings-estimator/) — copy it into `plugins/` to try it, or use it as a template to publish.
+
+---
+
 ## Good practices
 
 - **Match the names.** The folder name, the `name` field, and the `plugins.jsonc` key should all be identical.
@@ -113,5 +166,6 @@ If it doesn't appear, check that the folder name matches `name`, that `enabled` 
 ## Next steps
 
 - [Plugin API reference](./plugin-api.md) — every interface, context method, and lifecycle hook.
+- [Example: earnings-estimator](./examples/earnings-estimator/) — a full settings + storage + panel plugin you can copy.
 - [Publishing a plugin](./plugin-marketplace.md) — package, checksum, and share your plugin so others can install it.
 - [Official Core plugin](./core-plugin.md) — understand the boundary between public plugins and the paid Core plugin.

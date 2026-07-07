@@ -130,5 +130,26 @@ test('removePlugin deletes the entry and leaves the rest valid', () => {
     // surrounding entries intact and file still parses
     assert.equal(cfg.core.priority, 10)
     assert.equal(cfg['my-plugin'].enabled, true)
-    assert.throws(() => pc.removePlugin('ghost'), /Plugin not found/)
+    // Tolerant contract: an unknown name is a no-op returning false (NOT a throw), so a
+    // folder-only "unmanaged" plugin with no config entry can still be removed on disk.
+    assert.equal(pc.removePlugin('ghost'), false)
+})
+
+test('listInstalledFolders finds on-disk plugins independent of plugins.jsonc', () => {
+    const dir = path.join(root, 'plugins')
+    // A folder plugin with index.js, a bare file plugin, a .jsc folder, and noise.
+    fs.mkdirSync(path.join(dir, 'disk-plugin'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'disk-plugin', 'index.js'), 'module.exports={}')
+    fs.writeFileSync(path.join(dir, 'file-plugin.js'), 'module.exports={}')
+    fs.mkdirSync(path.join(dir, 'compiled'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'compiled', 'index.jsc'), 'x')
+    fs.mkdirSync(path.join(dir, 'empty-dir'), { recursive: true }) // no entry point -> ignored
+    fs.writeFileSync(path.join(dir, 'marketplace.json'), '{}') // ignored non-plugin file
+    const found = pc.listInstalledFolders()
+    assert.ok(found.includes('disk-plugin'), 'folder plugin detected')
+    assert.ok(found.includes('file-plugin'), 'bare .js plugin detected (extension stripped)')
+    assert.ok(found.includes('compiled'), '.jsc folder plugin detected')
+    assert.ok(!found.includes('empty-dir'), 'a dir with no entry point is not a plugin')
+    assert.ok(!found.includes('marketplace'), 'ignored files are not plugins')
+    assert.ok(!found.includes('plugins'), 'the jsonc file is not a plugin')
 })

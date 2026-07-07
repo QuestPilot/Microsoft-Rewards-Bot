@@ -29,6 +29,8 @@ plugins/*/coverage/
 plugins/*/.cache/
 plugins/*/node_modules/
 plugins/core-source/
+plugins/.data/
+plugins/*/.installed.json
 core-source/
 *.jsc.map
 license-admin.config.local.js

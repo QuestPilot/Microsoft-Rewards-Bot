@@ -9,6 +9,101 @@ export const PLUGIN_API_VERSION = '1.0.0'
 
 export type PluginCapability = 'selector-pack' | 'diagnostics' | 'notifications' | 'query-provider'
 
+/**
+ * Declared, consent-gated capabilities a plugin may use. Everything except the
+ * `net:*` family is a "default-safe" capability (no OS/filesystem/network reach) and
+ * is granted without a prompt; `net:<host>` is an ELEVATED capability that the user
+ * must approve in the Desk. Declared in the plugin's `plugin.json` manifest so the
+ * Desk can show them and render a settings panel WITHOUT running the plugin.
+ */
+export type PluginPermission =
+    | 'settings'    // declare a settings schema -> the Desk renders inputs
+    | 'storage'     // a small key/value store scoped to this plugin, persisted across runs
+    | 'ui.panel'    // push read-only data to this plugin's panel in the Desk plugins page
+    | 'points.read' // receive per-account point results (already delivered via lifecycle hooks)
+    | `net:${string}` // ELEVATED: brokered fetch limited to the named host (Phase 2b)
+
+/** One field in a plugin's settings schema — rendered by the Desk into a form. */
+export interface PluginSettingField {
+    /** Key the value is stored under (a-z0-9._-). Read back via ctx.settings[key]. */
+    key: string
+    type: 'number' | 'text' | 'toggle' | 'select'
+    label: string
+    default?: number | string | boolean
+    help?: string
+    placeholder?: string
+    /** number only */
+    min?: number
+    max?: number
+    step?: number
+    /** select only */
+    options?: ReadonlyArray<{ value: string; label: string }>
+}
+
+/**
+ * A plugin's static manifest (plugins/<name>/plugin.json). Source of truth for the
+ * Desk's settings panel + declared permissions — read from disk, never executed.
+ */
+export interface PluginManifest {
+    name: string
+    version: string
+    description?: string
+    author?: string
+    permissions?: PluginPermission[]
+    settings?: PluginSettingField[]
+}
+
+/** One labelled figure shown in the plugin's Desk panel. */
+export interface PluginPanelStat {
+    label: string
+    value: string
+    hint?: string
+}
+
+/** Read-only data a plugin pushes to its panel in the Desk plugins page. */
+export interface PluginPanelData {
+    title?: string
+    stats?: PluginPanelStat[]
+    lines?: string[]
+}
+
+/** A small key/value store scoped to one plugin, persisted across runs (JSON-only). */
+export interface PluginStorage {
+    get<T = unknown>(key: string): T | undefined
+    set(key: string, value: unknown): void
+    delete(key: string): void
+    keys(): string[]
+}
+
+/** The plugin's slice of the Desk plugins page (no arbitrary DOM/pages — a fixed vocabulary). */
+export interface PluginUI {
+    /** Replace this plugin's panel contents. Capped in size; plain JSON only. */
+    panel(data: PluginPanelData): void
+}
+
+export interface PluginFetchOptions {
+    method?: 'GET' | 'POST'
+    headers?: Record<string, string>
+    body?: string
+}
+
+export interface PluginFetchResponse {
+    ok: boolean
+    status: number
+    /** A small, safe subset of response headers (e.g. content-type). */
+    headers: Record<string, string>
+    /** Response body as text, size-capped by the host broker. */
+    body: string
+}
+
+/**
+ * Brokered HTTPS fetch. ELEVATED capability: it is the HOST that performs the request
+ * (the isolate has no network), and only to a host the plugin declared as `net:<host>`
+ * in its manifest AND the user consented to in the Desk. Rejects otherwise. https only,
+ * no redirects, no private/loopback targets, response size- and time-capped.
+ */
+export type PluginFetch = (url: string, options?: PluginFetchOptions) => Promise<PluginFetchResponse>
+
 export interface PluginMetadata {
     /** Unique plugin identifier. Must match the folder/file key in plugins/plugins.jsonc. */
     readonly name: string
@@ -41,6 +136,18 @@ export interface PublicPluginContext {
     readonly apiVersion: typeof PLUGIN_API_VERSION
     /** Plugin-specific config loaded from plugins/plugins.jsonc. */
     readonly config: Record<string, unknown>
+    /**
+     * Resolved settings values: the plugin's `settings` schema defaults, overlaid with
+     * plugins.jsonc `config`, overlaid with the values the user set in the Desk. Read
+     * your settings from here (e.g. ctx.settings.pointsPerEuro).
+     */
+    readonly settings: Record<string, unknown>
+    /** A small key/value store scoped to this plugin (requires the `storage` permission). */
+    readonly storage: PluginStorage
+    /** This plugin's panel in the Desk plugins page (requires the `ui.panel` permission). */
+    readonly ui: PluginUI
+    /** Brokered HTTPS fetch, limited to granted `net:<host>` permissions (rejects otherwise). */
+    readonly fetch: PluginFetch
     /** Logger proxy scoped to the bot log system. */
     readonly log: PluginLogger
     /** Register public selector groups. Premium task registration is intentionally not public. */
@@ -54,6 +161,10 @@ export interface PublicPluginContext {
 export interface PluginLifecycleContext {
     readonly apiVersion: typeof PLUGIN_API_VERSION
     readonly config: Record<string, unknown>
+    readonly settings: Record<string, unknown>
+    readonly storage: PluginStorage
+    readonly ui: PluginUI
+    readonly fetch: PluginFetch
     readonly log: PluginLogger
 }
 

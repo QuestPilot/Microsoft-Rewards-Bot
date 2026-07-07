@@ -31,9 +31,16 @@ on the next start.
 A plugin can be a folder with:
 
 - `index.js` or `index.jsc`
+- `plugin.json` — optional manifest declaring `permissions` and a `settings` schema (the Desk renders a settings form from it)
 - `package.json`
 - `README.md`
 - optional assets or support files
+
+Beyond logging, selectors, diagnostics, and notifications, a plugin can use `ctx.settings`
+(user-editable settings), `ctx.storage` (a scoped key/value store), `ctx.ui.panel(...)` (a
+read-only panel on the Plugins page), and — with a declared + user-approved `net:<host>`
+permission — `ctx.fetch(...)`. A complete example is in
+[`../docs/examples/earnings-estimator/`](../docs/examples/earnings-estimator/).
 
 See these docs for the full contract:
 

@@ -47,7 +47,11 @@ const DEFAULT_EXCLUDES = [
     'src/accounts.enc.json',
     'plugins/plugins.jsonc',
     'plugins/*/node_modules',
-    'plugins/*/.cache'
+    'plugins/*/.cache',
+    // Per-plugin runtime state written by the capability layer (settings a user set in
+    // the Desk, scoped storage, the last panel snapshot). Not shipped in a release, so
+    // preserve it across updates — losing it would silently reset every plugin's config.
+    'plugins/.data'
 ]
 
 const DEFAULT_BACKUP_PATHS = [

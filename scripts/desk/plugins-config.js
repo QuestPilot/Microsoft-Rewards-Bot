@@ -10,7 +10,15 @@ const fs = require('fs')
 const path = require('path')
 
 function createPluginsConfig({ root, atomicWriteText }) {
-    const PLUGINS_JSONC = path.join(root, 'plugins', 'plugins.jsonc')
+    const PLUGINS_DIR = path.join(root, 'plugins')
+    const PLUGINS_JSONC = path.join(PLUGINS_DIR, 'plugins.jsonc')
+
+    // Non-plugin files/dirs living in plugins/ that must never be treated as a plugin.
+    const IGNORED_ENTRIES = new Set([
+        'README.md', 'plugins.jsonc', 'official-core.json', 'official-core.sig',
+        'catalog.json', 'marketplace.json', 'marketplace.sig', 'marketplace.example.json',
+        '.marketplace-seq'
+    ])
 
     const PLUGIN_META = {
         'core': {
@@ -56,6 +64,32 @@ function createPluginsConfig({ root, atomicWriteText }) {
                 description: (PLUGIN_META[name] && PLUGIN_META[name].description) || 'Custom plugin.'
             }))
             .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name))
+    }
+
+    // Every plugin actually present ON DISK in plugins/ (a folder with index.js/.jsc,
+    // or a bare index.js/.jsc file). This is independent of plugins.jsonc — it's how the
+    // Desk surfaces (and can remove) a plugin that was dropped in without a config entry,
+    // which readPluginsList alone would never show.
+    function listInstalledFolders() {
+        let entries
+        try {
+            entries = fs.readdirSync(PLUGINS_DIR, { withFileTypes: true })
+        } catch {
+            return []
+        }
+        const names = []
+        for (const entry of entries) {
+            if (entry.name.startsWith('.') || IGNORED_ENTRIES.has(entry.name)) continue
+            if (entry.isDirectory()) {
+                const dir = path.join(PLUGINS_DIR, entry.name)
+                if (fs.existsSync(path.join(dir, 'index.js')) || fs.existsSync(path.join(dir, 'index.jsc'))) {
+                    names.push(entry.name)
+                }
+            } else if (/\.(jsc|js)$/i.test(entry.name)) {
+                names.push(entry.name.replace(/\.(jsc|js)$/i, ''))
+            }
+        }
+        return names
     }
 
     function setPluginEnabled(name, enabled) {
@@ -120,11 +154,17 @@ function createPluginsConfig({ root, atomicWriteText }) {
     // plugin's own { } object and drops it plus one adjacent comma. Any comment lines
     // above the entry are left in place (harmless). The bot's loader / readPluginsConfig
     // tolerates trailing commas, so even an imperfect trim still parses.
+    //
+    // Tolerant by design: a plugin can exist ON DISK (a folder in plugins/) without any
+    // plugins.jsonc entry. In that case there is nothing to strip — return false so the
+    // caller still deletes the on-disk folder rather than failing the whole removal.
+    // Returns true when a config entry was actually removed.
     function removePlugin(name) {
-        let src = fs.readFileSync(PLUGINS_JSONC, 'utf8')
+        let src
+        try { src = fs.readFileSync(PLUGINS_JSONC, 'utf8') } catch { return false }
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         const keyIdx = src.search(new RegExp('"' + escaped + '"\\s*:\\s*\\{'))
-        if (keyIdx < 0) throw new Error('Plugin not found: ' + name)
+        if (keyIdx < 0) return false
         const braceIdx = src.indexOf('{', keyIdx)
         let depth = 0
         let endIdx = -1
@@ -198,7 +238,7 @@ function createPluginsConfig({ root, atomicWriteText }) {
         return true
     }
 
-    return { PLUGINS_JSONC, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion, setPluginAutoUpdate }
+    return { PLUGINS_JSONC, PLUGINS_DIR, PLUGIN_META, stripJsonc, readPluginsConfig, isPluginEnabled, readPluginsList, listInstalledFolders, setPluginEnabled, setPluginTrust, addMarketplacePlugin, removePlugin, setPluginVersion, setPluginAutoUpdate }
 }
 
 module.exports = { createPluginsConfig }

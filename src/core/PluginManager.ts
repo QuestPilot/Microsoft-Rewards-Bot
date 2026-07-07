@@ -20,7 +20,32 @@ import type {
     PluginLogger,
     PremiumTaskMap
 } from './InternalPluginAPI'
-import type { PluginDiagnosticsProvider, PluginNotification, PluginNotificationSink, PublicPluginContext } from '../plugin-api'
+import type { PluginDiagnosticsProvider, PluginFetch, PluginNotification, PluginNotificationSink, PluginPanelData, PluginStorage, PluginUI, PublicPluginContext } from '../plugin-api'
+
+/** The shared capability backend (scripts/plugins/plugin-data-store.js). */
+interface PluginDataStore {
+    resolveSettings(root: string, name: string, pluginConfig: Record<string, unknown>): Record<string, unknown>
+    createStorage(root: string, name: string): PluginStorage
+    writePanel(root: string, name: string, data: PluginPanelData): unknown
+    grantedNetHosts(root: string, name: string): string[]
+    clearData(root: string, name: string): void
+}
+
+/** The host-side network broker (scripts/plugins/plugin-fetch-broker.js). */
+interface FetchBroker {
+    fetch(url: string, options?: unknown): Promise<unknown>
+    fetchJson(argsJson: string): Promise<string>
+}
+
+/** The per-plugin capability handles (settings/storage/ui/fetch) reused across lifecycle calls. */
+interface PluginCapabilities {
+    settings: Record<string, unknown>
+    storage: PluginStorage
+    ui: PluginUI
+    fetch: PluginFetch
+    /** Present only when the plugin has granted net hosts — bridged into the sandbox. */
+    fetchBroker?: FetchBroker
+}
 
 interface OfficialCoreManifest {
     plugin: 'core'
@@ -76,6 +101,14 @@ interface SandboxedPluginHandle {
 type CreatePluginSandbox = (options: {
     source: string
     config?: Record<string, unknown>
+    /** Resolved settings values (schema defaults + config + Desk overrides). */
+    settings?: Record<string, unknown>
+    /** Host-side scoped storage backing ctx.storage across the isolate boundary. */
+    storage?: PluginStorage
+    /** Host sink for ctx.ui.panel(...) — validated + persisted by the caller. */
+    onPanel?: (data: PluginPanelData) => void
+    /** Host network broker backing ctx.fetch; omitted when the plugin has no granted hosts. */
+    fetchBroker?: { fetchJson(argsJson: string): Promise<string> }
     apiVersion?: string
     log?: PluginLogger
     memoryLimitMb?: number
@@ -100,6 +133,7 @@ export class PluginManager {
     private bot: MicrosoftRewardsBot
     private plugins: IPlugin[] = []
     private pluginConfigs = new WeakMap<IPlugin, Record<string, unknown>>()
+    private pluginCapabilities = new WeakMap<IPlugin, PluginCapabilities>()
     private officialCorePlugins = new WeakSet<IPlugin>()
     private sandboxedPlugins = new WeakSet<IPlugin>()
     private readonly sandboxAccountKey = crypto.randomBytes(32)
@@ -754,13 +788,15 @@ export class PluginManager {
             throw new Error(`Plugin name "${plugin.name}" must match configured entry "${entryName}"`)
         }
 
+        const caps = this.capabilitiesFor(entryName, pluginConfig)
         const context = isOfficialCore
-            ? this.createOfficialCoreContext(pluginConfig)
-            : this.createPublicPluginContext(pluginConfig)
+            ? this.createOfficialCoreContext(caps, pluginConfig)
+            : this.createPublicPluginContext(caps, pluginConfig)
 
         await plugin.register(context)
         this.plugins.push(plugin)
         this.pluginConfigs.set(plugin, pluginConfig)
+        this.pluginCapabilities.set(plugin, caps)
 
         if (isOfficialCore) {
             this.officialCorePlugins.add(plugin)
@@ -833,9 +869,16 @@ export class PluginManager {
 
         const pluginConfig = entryConfig?.config ?? {}
         const source = fs.readFileSync(filePath, 'utf-8')
+        // The sandboxed plugin gets the SAME settings/storage/panel capabilities as an
+        // in-process one — bridged safely across the isolate boundary (JSON only).
+        const caps = this.capabilitiesFor(entryName, pluginConfig)
         const sandbox = await createPluginSandbox({
             source,
             config: pluginConfig,
+            settings: caps.settings,
+            storage: caps.storage,
+            onPanel: (data: PluginPanelData) => caps.ui.panel(data),
+            fetchBroker: caps.fetchBroker,
             apiVersion: PLUGIN_API_VERSION,
             log: this.createLogger(),
             memoryLimitMb: 64,
@@ -909,6 +952,7 @@ export class PluginManager {
 
         this.plugins.push(adapter)
         this.pluginConfigs.set(adapter, pluginConfig)
+        this.pluginCapabilities.set(adapter, caps)
         this.sandboxedPlugins.add(adapter)
 
         if (cluster.isPrimary) {
@@ -1165,12 +1209,96 @@ export class PluginManager {
         }
     }
 
-    private createPublicPluginContext(pluginConfig: Record<string, unknown>): PublicPluginContext {
+    /** Lazy-require the shared capability backend; undefined if it can't be loaded. */
+    private pluginDataStore(): PluginDataStore | undefined {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            return require('../../scripts/plugins/plugin-data-store') as PluginDataStore
+        } catch {
+            return undefined
+        }
+    }
+
+    /** Lazy-require the network broker factory; undefined if it can't be loaded. */
+    private fetchBrokerFactory(): ((opts: { allowedHosts: string[] }) => FetchBroker) | undefined {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            return (require('../../scripts/plugins/plugin-fetch-broker') as { createFetchBroker: (opts: { allowedHosts: string[] }) => FetchBroker }).createFetchBroker
+        } catch {
+            return undefined
+        }
+    }
+
+    /**
+     * Build (once per plugin) the settings/storage/ui/fetch capability handles from the
+     * shared data store. These back both the in-process context and the sandbox bridge,
+     * so a plugin sees the same capabilities whichever way it runs. A broker is created
+     * ONLY for the net hosts the user actually granted (declared ∩ consented); otherwise
+     * ctx.fetch rejects. Falls back to inert handles if the store is unavailable.
+     */
+    private capabilitiesFor(entryName: string, pluginConfig: Record<string, unknown>): PluginCapabilities {
+        const store = this.pluginDataStore()
+        const root = process.cwd()
+        const denyFetch: PluginFetch = () => Promise.reject(new Error('this plugin has no granted network permissions'))
+        if (store) {
+            try {
+                const storage = store.createStorage(root, entryName)
+                const ui: PluginUI = {
+                    panel: (data: PluginPanelData) => {
+                        try {
+                            store.writePanel(root, entryName, data)
+                        } catch (error) {
+                            this.bot.logger.warn(
+                                'main',
+                                'PLUGIN-MANAGER',
+                                `Plugin "${entryName}" panel update rejected: ${error instanceof Error ? error.message : String(error)}`
+                            )
+                        }
+                    }
+                }
+
+                // Elevated network: only for granted hosts, and only if the broker loads.
+                let fetch: PluginFetch = denyFetch
+                let fetchBroker: FetchBroker | undefined
+                const grantedHosts = store.grantedNetHosts(root, entryName) || []
+                if (grantedHosts.length > 0) {
+                    const factory = this.fetchBrokerFactory()
+                    if (factory) {
+                        fetchBroker = factory({ allowedHosts: grantedHosts })
+                        fetch = ((url, options) => (fetchBroker as FetchBroker).fetch(url, options)) as PluginFetch
+                        if (cluster.isPrimary) {
+                            this.bot.logger.warn(
+                                'main',
+                                'PLUGIN-MANAGER',
+                                `⚠ Plugin "${entryName}" has been granted network access to: ${grantedHosts.join(', ')}`
+                            )
+                        }
+                    }
+                }
+
+                return { settings: store.resolveSettings(root, entryName, pluginConfig), storage, ui, fetch, fetchBroker }
+            } catch (error) {
+                this.bot.logger.warn(
+                    'main',
+                    'PLUGIN-MANAGER',
+                    `Plugin "${entryName}" capabilities unavailable: ${error instanceof Error ? error.message : String(error)}`
+                )
+            }
+        }
+        const inert: PluginStorage = { get: () => undefined, set: () => {}, delete: () => {}, keys: () => [] }
+        return { settings: { ...pluginConfig }, storage: inert, ui: { panel: () => {} }, fetch: denyFetch }
+    }
+
+    private createPublicPluginContext(caps: PluginCapabilities, pluginConfig: Record<string, unknown>): PublicPluginContext {
         const logger = this.createLogger()
 
         return {
             apiVersion: PLUGIN_API_VERSION,
             config: pluginConfig,
+            settings: caps.settings,
+            storage: caps.storage,
+            ui: caps.ui,
+            fetch: caps.fetch,
             log: logger,
             registerSelectors: (selectors: Record<string, Record<string, unknown>>) => {
                 Object.assign(this.registeredSelectors, selectors)
@@ -1184,9 +1312,9 @@ export class PluginManager {
         }
     }
 
-    private createOfficialCoreContext(pluginConfig: Record<string, unknown>): OfficialCoreContext {
+    private createOfficialCoreContext(caps: PluginCapabilities, pluginConfig: Record<string, unknown>): OfficialCoreContext {
         return {
-            ...this.createPublicPluginContext(pluginConfig),
+            ...this.createPublicPluginContext(caps, pluginConfig),
             bot: this.bot,
             registerPremiumTasks: (tasks: Partial<PremiumTaskMap>) => {
                 Object.assign(this.registeredTasks, tasks)
@@ -1198,9 +1326,15 @@ export class PluginManager {
     }
 
     private createLifecycleContext(plugin: IPlugin) {
+        const caps = this.pluginCapabilities.get(plugin)
+        const inert: PluginStorage = { get: () => undefined, set: () => {}, delete: () => {}, keys: () => [] }
         const base = {
             apiVersion: PLUGIN_API_VERSION as typeof PLUGIN_API_VERSION,
             config: this.pluginConfigs.get(plugin) ?? {},
+            settings: caps?.settings ?? {},
+            storage: caps?.storage ?? inert,
+            ui: caps?.ui ?? { panel: () => {} },
+            fetch: caps?.fetch ?? ((() => Promise.reject(new Error('this plugin has no granted network permissions'))) as PluginFetch),
             log: this.createLogger()
         }
 
