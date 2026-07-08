@@ -42,6 +42,19 @@ let agentApi = null
 try {
     agentApi = require('../../dist/core/AgentRuntime')
 } catch {}
+let schedulerLib = null
+try {
+    schedulerLib = require('../../dist/core/Scheduler')
+} catch {}
+
+function computeSchedulerNextRunAt(scheduler) {
+    if (!schedulerLib || !scheduler || !scheduler.enabled || !scheduler.startTime) return null
+    try {
+        return schedulerLib.getNextScheduledRun(scheduler).target.toISOString()
+    } catch {
+        return null
+    }
+}
 
 function readVersion() {
     try {
@@ -4350,19 +4363,20 @@ function html() {
       }
       requestAnimationFrame(step);
     }
-    // Compute the next scheduled run time from cached settings
+    // Display the next scheduled run time from a cache of the last /api/settings
+    // response. nextRunAt is computed server-side (real Intl timezone math against
+    // scheduler.timezone, see computeSchedulerNextRunAt in app-window.js) — this only
+    // diffs two absolute instants, so it stays correct no matter what timezone the
+    // browser viewing the Desk is in (e.g. viewing a VPS bot's Desk remotely).
     var _schedCache = null;
     function updateNextRun() {
       var el = G('st-next'); if (!el) return;
       var sc = _schedCache;
-      if (!sc || !sc.enabled || !sc.startTime) { el.style.display = 'none'; return; }
-      var hm = String(sc.startTime).split(':');
-      var hh = Number(hm[0]), mm = Number(hm[1] || 0);
-      if (isNaN(hh)) { el.style.display = 'none'; return; }
-      var now = new Date(), next = new Date();
-      next.setHours(hh, mm, 0, 0);
-      if (next <= now) next.setDate(next.getDate() + 1);
-      var diffMin = Math.round((next - now) / 60000);
+      if (!sc || !sc.enabled || !sc.startTime || !sc.nextRunAt) { el.style.display = 'none'; return; }
+      var next = new Date(sc.nextRunAt);
+      var now = new Date();
+      if (isNaN(next.getTime())) { el.style.display = 'none'; return; }
+      var diffMin = Math.max(0, Math.round((next - now) / 60000));
       var when = diffMin < 60 ? (diffMin + ' min') : (Math.floor(diffMin / 60) + 'h ' + (diffMin % 60) + 'm');
       el.textContent = 'Next run at ' + sc.startTime + ' (in ' + when + ')';
       el.style.display = 'flex';
@@ -5343,7 +5357,7 @@ function html() {
       if (G('set-readDelayMin')) G('set-readDelayMin').value = rdl.min != null ? rdl.min : '';
       if (G('set-readDelayMax')) G('set-readDelayMax').value = rdl.max != null ? rdl.max : '';
       var sc = s.scheduler || {};
-      _schedCache = sc; updateNextRun();
+      _schedCache = Object.assign({}, sc, { nextRunAt: s.schedulerNextRunAt }); updateNextRun();
       var schTog = G('tog-scheduler');
       if (schTog) { schTog.checked = !!sc.enabled; _updateSchFields(!!sc.enabled); }
       if (G('sch-startTime')) G('sch-startTime').value = sc.startTime || '08:00';
@@ -6894,7 +6908,8 @@ function html() {
     // ── end GitHub Star prompt ──────────────────────────────────────────────
 
     fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
-      _schedCache = (s && s.scheduler) || null; updateNextRun();
+      _schedCache = (s && s.scheduler) ? Object.assign({}, s.scheduler, { nextRunAt: s.schedulerNextRunAt }) : null;
+      updateNextRun();
     }).catch(function(){});
     setInterval(updateNextRun, 30000);
     initLicOverlay();
@@ -7473,6 +7488,11 @@ const server = http.createServer((req, res) => {
                 analytics: cfg.analytics,
                 updateNotifier: cfg.updateNotifier || {},
                 terminal: cfg.terminal || { enabled: false },
+                // Computed server-side (real Intl timezone math against scheduler.timezone) so
+                // the Desk countdown reflects the CONFIGURED timezone instead of whatever
+                // timezone the browser viewing the Desk happens to be in — which matters as
+                // soon as Desk is viewed remotely (e.g. a VPS bot in a different zone from you).
+                schedulerNextRunAt: computeSchedulerNextRunAt(cfg.scheduler),
                 scheduler: cfg.scheduler || {},
                 core: cfg.core || {},
                 backgroundAgent: cfg.backgroundAgent || {},

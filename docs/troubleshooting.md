@@ -60,6 +60,8 @@ The interface can accept a Core license prompt or an empty response, but develop
 
 Docker, CI, and forced-headless launches stay in terminal mode automatically. Use `MSRB_NO_APP_WINDOW=1` if a desktop machine should also skip the app window.
 
+Running under a process manager (pm2, systemd) on a headless Linux server through `xvfb-run` (a common workaround for Chromium launch issues without a display)? `xvfb-run` exports a `DISPLAY` variable, and on Linux the bot only treats that as a real desktop when a desktop-session variable (`XDG_CURRENT_DESKTOP`, `DESKTOP_SESSION`, etc.) is also present — plain Xvfb sets none of those, so it correctly stays in terminal/CLI mode by default and `scheduler.enabled` runs on its own. If you still land in the app window unexpectedly, set `MSRB_NO_APP_WINDOW=1` explicitly to guarantee CLI mode.
+
 The Desk window can fall back to an installed Chrome, Chromium, or Edge browser. Automation runs are stricter: they always use Patchright's bundled Chromium so behavior is consistent across Windows, Linux, and macOS.
 
 The launcher checks for Patchright Chromium before opening Rewards Desk and installs it

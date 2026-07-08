@@ -35,12 +35,13 @@ function freePort() {
 }
 
 // Minimal HTTP client with FULL header control (fetch forbids setting Host).
-function request(reqPath, { method = 'GET', host, token: tok, origin } = {}) {
+function request(reqPath, { method = 'GET', host, token: tok, origin, body: reqBody } = {}) {
     return new Promise((resolve, reject) => {
         const headers = {}
         if (host !== null) headers.host = host || `127.0.0.1:${port}`
         if (tok) headers['x-msrb-token'] = tok
         if (origin) headers.origin = origin
+        if (reqBody != null) headers['content-length'] = Buffer.byteLength(reqBody)
         const req = http.request(
             { host: '127.0.0.1', port, path: reqPath, method, headers },
             res => {
@@ -51,7 +52,7 @@ function request(reqPath, { method = 'GET', host, token: tok, origin } = {}) {
         )
         req.on('error', reject)
         req.setTimeout(8000, () => req.destroy(new Error('request timeout')))
-        req.end()
+        req.end(reqBody != null ? reqBody : undefined)
     })
 }
 
@@ -210,6 +211,43 @@ test('GET /api/settings echoes globalTimeout and searchSettings so saved values 
     assert.ok(settings.searchSettings !== null)
     for (const key of ['searchResultVisitTime', 'searchDelay', 'readDelay', 'parallelSearching', 'scrollRandomResults', 'clickRandomResults']) {
         assert.ok(key in settings.searchSettings, `searchSettings.${key} must be present`)
+    }
+})
+
+// Regression: the "Next run at HH:MM (in Xh Ym)" countdown used to be computed
+// entirely client-side from the BROWSER's local clock (next.setHours(...)), so it
+// silently ignored scheduler.timezone — wrong the moment Desk is viewed from a
+// different timezone than the configured one (e.g. a VPS bot viewed remotely).
+// schedulerNextRunAt is the fix: computed server-side via the same Scheduler.ts
+// Intl timezone math the real scheduler loop uses, so the client only ever diffs
+// two absolute instants.
+test('GET /api/settings reports a server-computed schedulerNextRunAt when the scheduler is enabled', async () => {
+    const disabled = await request('/api/settings', { token })
+    assert.equal(JSON.parse(disabled.body).schedulerNextRunAt, null, 'disabled scheduler must report no next run')
+
+    const patch = await request('/api/settings', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ scheduler: { enabled: true, startTime: '08:00', timezone: 'Europe/Paris' } })
+    })
+    assert.equal(patch.status, 204)
+
+    try {
+        const enabled = await request('/api/settings', { token })
+        assert.equal(enabled.status, 200)
+        const settings = JSON.parse(enabled.body)
+        assert.ok(settings.schedulerNextRunAt, 'enabled scheduler must report a next run timestamp')
+        const nextRun = new Date(settings.schedulerNextRunAt)
+        assert.ok(!Number.isNaN(nextRun.getTime()), 'schedulerNextRunAt must be a valid ISO timestamp')
+        assert.ok(nextRun.getTime() > Date.now(), 'the next run must be in the future')
+    } finally {
+        // Restore the repo's real config.json to its original (disabled) state.
+        const restore = await request('/api/settings', {
+            method: 'POST',
+            token,
+            body: JSON.stringify({ scheduler: { enabled: false } })
+        })
+        assert.equal(restore.status, 204)
     }
 })
 

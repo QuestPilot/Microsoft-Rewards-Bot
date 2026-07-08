@@ -208,6 +208,27 @@ test('app window launcher can be explicitly disabled or forced by environment', 
     assert.equal(startScript.hasGuiEnvironment({ FORCE_HEADLESS: '1' }), false)
 })
 
+test('on Linux, a bare DISPLAY from xvfb-run is not mistaken for a real desktop', () => {
+    // xvfb-run (a common workaround for headless Chromium launch issues on a
+    // server) exports DISPLAY for a virtual, windowless X server — indistinguishable
+    // from a real desktop by DISPLAY alone. Without a real desktop session variable
+    // alongside it, this must stay headless so scheduler.enabled runs via the CLI
+    // bot process instead of being silently routed into the click-to-run Desk GUI.
+    assert.equal(startScript.hasGuiEnvironment({ DISPLAY: ':99' }, 'linux'), false)
+    assert.equal(
+        startScript.hasGuiEnvironment({ DISPLAY: ':99', XDG_CURRENT_DESKTOP: 'GNOME' }, 'linux'),
+        true
+    )
+    assert.equal(startScript.hasGuiEnvironment({ DISPLAY: ':0', DESKTOP_SESSION: 'gnome' }, 'linux'), true)
+    assert.equal(startScript.hasGuiEnvironment({ WAYLAND_DISPLAY: 'wayland-0' }, 'linux'), true)
+    assert.equal(startScript.hasGuiEnvironment({}, 'linux'), false)
+    // An explicit override still wins regardless of the desktop-session heuristic.
+    assert.equal(
+        startScript.hasGuiEnvironment({ DISPLAY: ':99', MSRB_FORCE_APP_WINDOW: '1' }, 'linux'),
+        true
+    )
+})
+
 test('app window mode is the default when terminal mode is not explicitly enabled', () => {
     assert.equal(startScript.terminalModeEnabled(null), false)
     assert.equal(startScript.terminalModeEnabled({}), false)

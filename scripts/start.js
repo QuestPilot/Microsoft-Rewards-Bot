@@ -133,12 +133,24 @@ function syncUpdateNotifier(config = readConfig(), root = ROOT, env = process.en
     }
 }
 
-function hasGuiEnvironment(env = process.env) {
+function hasGuiEnvironment(env = process.env, platform = process.platform) {
     if (env.MSRB_FORCE_APP_WINDOW === '1') return true
     if (env.MSRB_NO_APP_WINDOW === '1' || env.CI === 'true' || env.CI === '1' || env.FORCE_HEADLESS === '1')
         return false
     if (isDockerRuntime()) return false
-    if (process.platform === 'linux') return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY)
+    if (platform === 'linux') {
+        // A bare DISPLAY alone is not proof of an interactive desktop: `xvfb-run` (a
+        // common workaround for headless Chromium launch issues on a server) exports
+        // DISPLAY for a virtual, windowless X server, which looks identical to a real
+        // desktop from here. Without this check, a headless VPS running under pm2 or
+        // similar gets silently routed into the Desk GUI (which needs a manual click
+        // to run anything) instead of the CLI bot process (whose own scheduler.enabled
+        // loop is what actually fires scheduled runs) — the scheduler then never
+        // triggers and nothing in the logs explains why. A real desktop session sets
+        // one of these session-manager variables; Xvfb/xvfb-run does not.
+        if (env.WAYLAND_DISPLAY) return true
+        return Boolean(env.DISPLAY) && Boolean(env.XDG_CURRENT_DESKTOP || env.XDG_SESSION_DESKTOP || env.DESKTOP_SESSION || env.GDMSESSION)
+    }
     return true
 }
 
