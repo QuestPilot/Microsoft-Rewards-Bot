@@ -1251,6 +1251,16 @@ export class MicrosoftRewardsBot {
                             `Failed to get mobile access token: ${error instanceof Error ? error.message : String(error)}`
                         )
                     }
+
+                    // getAppAccessToken's OAuth detour always reloads the rewards dashboard on
+                    // its way out (success or failure), which can rotate the legacy anti-forgery
+                    // cookie pairing. Re-scrape the token from that reloaded page so it stays
+                    // matched with the cookies captured just below — otherwise every legacy call
+                    // for the rest of the run (report-activity, claim-points, dashboard JSON)
+                    // fails with a uniform 400. Only the legacy dashboard uses this token.
+                    if (this.dashboardVariant === 'legacy') {
+                        await this.login.refreshRequestToken(this.mainMobilePage)
+                    }
                 } else {
                     this.logger.debug(
                         'main',

@@ -1352,6 +1352,24 @@ export class AuthManager {
         return null
     }
 
+    /**
+     * Re-scrape `__RequestVerificationToken` from the CURRENT page. Needed after any
+     * navigation that can rotate the legacy dashboard's anti-forgery cookie pairing —
+     * e.g. the mobile app-token OAuth detour (MobileStrategy.get), whose `finally`
+     * always reloads the rewards dashboard whether the token exchange succeeded or
+     * not. `requestToken` is otherwise captured once at login (getRewardsSession)
+     * and never touched again; reusing that pre-detour token against post-detour
+     * cookies is a stale token/cookie mismatch that ASP.NET rejects, and every
+     * legacy call built from the pair (report-activity, claim-points, dashboard
+     * JSON) then fails with a uniform 400 for the rest of the run. No-op if no
+     * token is found (e.g. the NEXT dashboard variant has none) — keeps whatever
+     * token is already set.
+     */
+    async refreshRequestToken(page: Page): Promise<void> {
+        const captured = await this.captureRequestToken(page)
+        if (captured) this.bot.requestToken = captured
+    }
+
     async getAppAccessToken(page: Page, account: Account) {
         this.bot.logger.info(this.bot.isMobile, 'GET-APP-TOKEN', 'Requesting mobile access token')
         return await new MobileStrategy(this.bot, page).get(account.email, account)
