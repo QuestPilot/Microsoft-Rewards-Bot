@@ -87,6 +87,15 @@ interface PluginPackageManifest {
     }
 }
 
+/**
+ * Every isVerifiedOfficialCore() failure means the on-disk plugins/core files don't
+ * match what was officially signed — almost always an incomplete/corrupted install or
+ * an update that didn't fully apply, not something the user can hand-fix. Point at the
+ * existing self-heal command (re-fetches + re-verifies the official files) instead of
+ * leaving them with a bare crypto error and no next step.
+ */
+const CORE_REPAIR_HINT = 'Run `npm run update:repair` to restore the official Core files.'
+
 /** Handle returned by the out-of-process plugin sandbox (scripts/plugins/plugin-sandbox.js). */
 interface SandboxedPluginHandle {
     name: string | null
@@ -1053,10 +1062,10 @@ export class PluginManager {
         const signaturePath = path.resolve(process.cwd(), 'plugins', 'official-core.sig')
         const publicKeyPath = path.resolve(process.cwd(), 'scripts', 'security', 'core-public-key.pem')
         if (!fs.existsSync(manifestPath)) {
-            throw new Error('Official Core manifest missing: plugins/official-core.json')
+            throw new Error(`Official Core manifest missing: plugins/official-core.json. ${CORE_REPAIR_HINT}`)
         }
         if (!fs.existsSync(signaturePath) || !fs.existsSync(publicKeyPath)) {
-            throw new Error('Official Core signature or public key is missing')
+            throw new Error(`Official Core signature or public key is missing. ${CORE_REPAIR_HINT}`)
         }
 
         const manifestPayload = fs.readFileSync(manifestPath)
@@ -1067,23 +1076,25 @@ export class PluginManager {
             publicKey.asymmetricKeyType !== 'ed25519' ||
             !crypto.verify(null, manifestPayload, publicKey, signature)
         ) {
-            throw new Error('Official Core manifest signature verification failed')
+            throw new Error(`Official Core manifest signature verification failed. ${CORE_REPAIR_HINT}`)
         }
 
         const manifest = JSON.parse(manifestPayload.toString('utf8')) as OfficialCoreManifest
         if (manifest.plugin !== 'core') {
-            throw new Error('Official Core manifest is invalid')
+            throw new Error(`Official Core manifest is invalid. ${CORE_REPAIR_HINT}`)
         }
 
         const target = this.resolveOfficialCoreTarget(filePath)
         if (!target?.indexSha256) {
-            throw new Error(`Official Core manifest does not contain target ${this.currentCoreTargetId()}`)
+            throw new Error(
+                `Official Core manifest does not contain target ${this.currentCoreTargetId()}. ${CORE_REPAIR_HINT}`
+            )
         }
 
         const bytecodePath = this.resolveOfficialCoreBytecodePath(filePath)
         const fileHash = crypto.createHash('sha256').update(fs.readFileSync(bytecodePath)).digest('hex')
         if (fileHash.toLowerCase() !== target.indexSha256.toLowerCase()) {
-            throw new Error('Official Core bytecode checksum mismatch')
+            throw new Error(`Official Core bytecode checksum mismatch. ${CORE_REPAIR_HINT}`)
         }
 
         // Pin the LOADED entrypoint too, not just the bytecode it loads. `filePath` here
@@ -1096,7 +1107,7 @@ export class PluginManager {
             if (shimSha) {
                 const shimHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
                 if (shimHash.toLowerCase() !== String(shimSha).toLowerCase()) {
-                    throw new Error('Official Core loader (index.js) checksum mismatch')
+                    throw new Error(`Official Core loader (index.js) checksum mismatch. ${CORE_REPAIR_HINT}`)
                 }
             } else if (cluster.isPrimary) {
                 this.bot.logger.warn(
