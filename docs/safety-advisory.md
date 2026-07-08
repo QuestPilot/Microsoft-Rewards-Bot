@@ -10,7 +10,7 @@ Navigation: [Documentation index](./README.md) · [Account safety](./account-saf
 
 The safety advisory check lets maintainers flag that running the bot is temporarily risky. It is enabled by default and is intentionally not part of the normal user configuration.
 
-Every run fetches the current advisory once from `https://bot.lgtw.tf/api/safety-advisory` (backed by Core-API + Redis) before starting. Maintainers toggle it instantly from the admin dashboard — no JSON file to hand-edit or commit.
+Every run checks the current advisory from `https://bot.lgtw.tf/api/safety-advisory` (backed by Core-API + Turso) before starting. Maintainers toggle it instantly from the admin dashboard — no JSON file to hand-edit or commit. A successful check is cached locally for 10 minutes, so back-to-back runs (scheduled cycles, multiple accounts, restarts) don't each make their own network request — a failed/unreachable check is never cached, so it's retried on the very next run.
 
 The advisory payload has this shape:
 
