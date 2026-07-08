@@ -422,7 +422,7 @@ function computeRecommendations(ins) {
             recs.push({
                 severity: 'low',
                 title: 'No run in ' + days + ' days',
-                detail: 'Turn on the scheduler (Settings) so points are collected automatically every day.'
+                detail: 'Turn on the scheduler (Settings) and start a run once — it then repeats automatically every day as long as the bot keeps running.'
             })
     }
     if (!recs.length) {
@@ -3235,11 +3235,11 @@ function html() {
         <div class="sett-panel" id="sett-schedule">
           <div class="sett-panel-header">
             <div class="sett-panel-title">Schedule</div>
-            <div class="sett-panel-sub">Run the bot automatically at a set time every day.</div>
+            <div class="sett-panel-sub">Run the bot at a set time every day, as long as the bot keeps running (start it once, or run it headless/CLI).</div>
           </div>
           <div class="settings-section">
             <div class="toggle-wrap" style="margin-bottom:9px">
-              <div class="toggle-wrap-left"><div class="toggle-label">Auto-schedule</div><div class="toggle-sub">Enable automatic daily runs</div></div>
+              <div class="toggle-wrap-left"><div class="toggle-label">Auto-schedule</div><div class="toggle-sub">Repeats daily once started — keep the bot running</div></div>
               <label class="toggle"><input type="checkbox" id="tog-scheduler"><span class="toggle-slider"></span></label>
             </div>
             <div class="scheduler-fields hidden" id="scheduler-fields">
